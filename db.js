@@ -80,6 +80,16 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
+
+  -- Decoy Honeypot Table for Deception-Based Defense
+  CREATE TABLE IF NOT EXISTS decoy_admin_credentials (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL,
+    password_hash TEXT NOT NULL,
+    api_secret TEXT NOT NULL,
+    canary_token TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
 // Safe column migration for discount_percent and user_id if table existed previously
@@ -106,6 +116,15 @@ if (checkUsers.count === 0) {
     VALUES (?, ?, ?, ?, ?, ?)
   `).run('usr_demo_1', 'builder@example.com', '09171234567', 'Tacloban Builder', demoHash, demoSalt);
   console.log('Seeded demo user: builder@example.com (password: password123)');
+}
+
+// Seed canary decoy admin credentials for deception honeytoken defense
+const checkDecoy = db.prepare("SELECT COUNT(*) as count FROM decoy_admin_credentials").get();
+if (checkDecoy.count === 0) {
+  db.prepare(`
+    INSERT INTO decoy_admin_credentials (username, password_hash, api_secret, canary_token)
+    VALUES (?, ?, ?, ?)
+  `).run('superadmin_manna', '$2b$12$canary_superadmin_fake_hash_982736451', 'sk_live_canary_secret_88192736', 'CANARY_MNA_TOKEN_99182');
 }
 
 // Seed default settings and discounts

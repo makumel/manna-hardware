@@ -8,7 +8,8 @@ import {
   ListFilter, Package, Clock, SlidersHorizontal, Layers, CheckCircle2,
   Phone, Calendar, ChevronRight, Upload, Download, FileSpreadsheet, 
   FileUp, Edit3, PlusCircle, CheckSquare, Square, Table, Grid, 
-  Laptop, Smartphone, HelpCircle, ExternalLink, Sparkles
+  Laptop, Smartphone, HelpCircle, ExternalLink, Sparkles,
+  ArrowUpDown, ArrowUp, ArrowDown, Ban, XCircle, BarChart3
 } from 'lucide-react';
 
 export default function App() {
@@ -81,6 +82,9 @@ export default function App() {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [catalogFilterInStock, setCatalogFilterInStock] = useState(false);
   const [catalogViewMode, setCatalogViewMode] = useState('table'); // 'table' | 'cards'
+  const [catalogSortField, setCatalogSortField] = useState('name');
+  const [catalogSortOrder, setCatalogSortOrder] = useState('asc'); // 'asc' | 'desc'
+  const [catalogQuantities, setCatalogQuantities] = useState({});
 
   // ==================== CHECKOUT & ORDER TRACKING ====================
   const [customer, setCustomer] = useState({
@@ -96,6 +100,7 @@ export default function App() {
   const [trackingQuery, setTrackingQuery] = useState('');
   const [trackedOrder, setTrackedOrder] = useState(null);
   const [trackingError, setTrackingError] = useState('');
+  const [cancellingOrderId, setCancellingOrderId] = useState(null);
 
   const [orders, setOrders] = useState(() => {
     const saved = localStorage.getItem('manna_orders');
@@ -133,6 +138,12 @@ export default function App() {
     image: '',
     description: ''
   });
+
+  // Merchant Web Dashboard Layout States
+  const [dashboardTab, setDashboardTab] = useState('inventory'); // 'inventory' | 'orders' | 'promotions'
+  const [dashboardSortField, setDashboardSortField] = useState('name');
+  const [dashboardSortOrder, setDashboardSortOrder] = useState('asc'); // 'asc' | 'desc'
+  const [dashboardStockFilter, setDashboardStockFilter] = useState('all'); // 'all' | 'low' | 'out' | 'in'
 
   // CSV/PDF Upload state
   const [uploadModal, setUploadModal] = useState(false);
@@ -268,6 +279,87 @@ export default function App() {
   const shippingFee = cartSubtotal > 3000 || cart.length === 0 ? 0 : 150;
   const orderTotal = Math.max(0, cartSubtotal - discountAmount + shippingFee);
 
+  // Sort helper function for indicators
+  const renderSortIndicator = (field, currentField, currentOrder) => {
+    if (field !== currentField) {
+      return <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60 inline ml-1" />;
+    }
+    return currentOrder === 'asc' 
+      ? <ArrowUp className="w-3 h-3 text-[#EE4D2D] inline ml-1 font-bold" />
+      : <ArrowDown className="w-3 h-3 text-[#EE4D2D] inline ml-1 font-bold" />;
+  };
+
+  const handleDashboardSort = (field) => {
+    if (dashboardSortField === field) {
+      setDashboardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setDashboardSortField(field);
+      setDashboardSortOrder('asc');
+    }
+  };
+
+  const handleCatalogSort = (field) => {
+    if (catalogSortField === field) {
+      setCatalogSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setCatalogSortField(field);
+      setCatalogSortOrder('asc');
+    }
+  };
+
+  // Sorted and filtered catalog products for Full Catalog
+  const sortedCatalogProducts = useMemo(() => {
+    return [...filteredProducts].sort((a, b) => {
+      let valA = a[catalogSortField];
+      let valB = b[catalogSortField];
+
+      if (catalogSortField === 'price' || catalogSortField === 'stock') {
+        valA = Number(valA || 0);
+        valB = Number(valB || 0);
+        return catalogSortOrder === 'asc' ? valA - valB : valB - valA;
+      }
+
+      valA = (valA || '').toString().toLowerCase();
+      valB = (valB || '').toString().toLowerCase();
+      if (valA < valB) return catalogSortOrder === 'asc' ? -1 : 1;
+      if (valA > valB) return catalogSortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [filteredProducts, catalogSortField, catalogSortOrder]);
+
+  // Sorted and filtered products for Merchant Dashboard
+  const sortedDashboardProducts = useMemo(() => {
+    let list = products.filter(p => {
+      // Stock filter
+      if (dashboardStockFilter === 'low' && (p.stock >= 10 || p.stock <= 0)) return false;
+      if (dashboardStockFilter === 'out' && p.stock > 0) return false;
+      if (dashboardStockFilter === 'in' && p.stock <= 0) return false;
+
+      if (!itemSearchTerm) return true;
+      const term = itemSearchTerm.toLowerCase();
+      return p.name.toLowerCase().includes(term) || 
+             p.id.toLowerCase().includes(term) || 
+             (p.category && p.category.toLowerCase().includes(term));
+    });
+
+    return [...list].sort((a, b) => {
+      let valA = a[dashboardSortField];
+      let valB = b[dashboardSortField];
+
+      if (dashboardSortField === 'price' || dashboardSortField === 'capital' || dashboardSortField === 'stock' || dashboardSortField === 'discount_percent') {
+        valA = Number(valA || 0);
+        valB = Number(valB || 0);
+        return dashboardSortOrder === 'asc' ? valA - valB : valB - valA;
+      }
+
+      valA = (valA || '').toString().toLowerCase();
+      valB = (valB || '').toString().toLowerCase();
+      if (valA < valB) return dashboardSortOrder === 'asc' ? -1 : 1;
+      if (valA > valB) return dashboardSortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [products, itemSearchTerm, dashboardSortField, dashboardSortOrder, dashboardStockFilter]);
+
   // Cart actions
   const addToCart = (product, qty = 1) => {
     if (product.stock <= 0) return;
@@ -293,6 +385,31 @@ export default function App() {
     });
   };
 
+  const setCartItemQty = (id, newQty) => {
+    const val = parseInt(newQty, 10);
+    setCart(prev => prev.map(item => {
+      if (item.id === id) {
+        if (isNaN(val) || val <= 0) return { ...item, quantity: 1 };
+        const max = item.stock || 9999;
+        return { ...item, quantity: Math.min(val, max) };
+      }
+      return item;
+    }));
+  };
+
+  const handleInlineStockChange = (id, newStock) => {
+    const stockVal = Math.max(0, parseInt(newStock, 10) || 0);
+    setProducts(prev => prev.map(p => p.id === id ? { ...p, stock: stockVal } : p));
+    fetch(`/api/admin/products/${id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-key': 'asenso123'
+      },
+      body: JSON.stringify({ stock: stockVal })
+    }).catch(() => {});
+  };
+
   const removeFromCart = (id) => {
     setCart(prev => prev.filter(item => item.id !== id));
   };
@@ -314,6 +431,105 @@ export default function App() {
     }
     setAppliedPromo(found);
     setPromoMessage({ text: `Success! Code "${found.code.toUpperCase()}" applied (${found.value}% OFF)`, type: 'success' });
+  };
+
+  // Order status update & Cancellation
+  const handleOrderStatusUpdate = async (orderId, newStatus) => {
+    if (newStatus === 'Cancelled') {
+      const confirmCancel = window.confirm(`Are you sure you want to cancel order ${orderId}? Inventory stock will be restored.`);
+      if (!confirmCancel) return;
+    }
+
+    setOrders(prev => prev.map(o => o.orderId === orderId ? { ...o, status: newStatus } : o));
+    setUserOrders(prev => prev.map(o => (o.id === orderId || o.orderId === orderId) ? { ...o, status: newStatus } : o));
+    if (trackedOrder && (trackedOrder.orderId === orderId || trackedOrder.id === orderId)) {
+      setTrackedOrder(prev => ({ ...prev, status: newStatus }));
+    }
+
+    try {
+      await fetch(`/api/admin/orders/${orderId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': 'asenso123'
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      if (newStatus === 'Cancelled') {
+        const targetOrder = orders.find(o => o.orderId === orderId) || userOrders.find(o => o.id === orderId || o.orderId === orderId);
+        if (targetOrder && targetOrder.items) {
+          setProducts(prev => {
+            const copy = [...prev];
+            for (const it of targetOrder.items) {
+              const idx = copy.findIndex(p => p.id === (it.product_id || it.id));
+              if (idx >= 0) {
+                copy[idx] = { ...copy[idx], stock: (copy[idx].stock || 0) + (it.quantity || 1) };
+              }
+            }
+            return copy;
+          });
+        }
+      }
+    } catch (e) {
+      console.error('Failed to sync order status to server', e);
+    }
+  };
+
+  const handleCancelOrder = async (orderId, source = 'merchant') => {
+    const confirmCancel = window.confirm(`Are you sure you want to cancel order ${orderId}? Inventory stock will be restored.`);
+    if (!confirmCancel) return;
+
+    setCancellingOrderId(orderId);
+    try {
+      const endpoint = source === 'merchant'
+        ? `/api/admin/orders/${orderId}/status`
+        : `/api/orders/${orderId}/cancel`;
+
+      const res = await fetch(endpoint, {
+        method: source === 'merchant' ? 'PATCH' : 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(source === 'merchant' ? { 'x-admin-key': 'asenso123' } : {})
+        },
+        body: JSON.stringify({ status: 'Cancelled' })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setOrders(prev => prev.map(o => o.orderId === orderId ? { ...o, status: 'Cancelled' } : o));
+        setUserOrders(prev => prev.map(o => (o.id === orderId || o.orderId === orderId) ? { ...o, status: 'Cancelled' } : o));
+        if (trackedOrder && (trackedOrder.orderId === orderId || trackedOrder.id === orderId)) {
+          setTrackedOrder(prev => ({ ...prev, status: 'Cancelled' }));
+        }
+
+        // Restore stock locally
+        const targetOrder = orders.find(o => o.orderId === orderId) || userOrders.find(o => o.id === orderId || o.orderId === orderId);
+        if (targetOrder && targetOrder.items) {
+          setProducts(prev => {
+            const copy = [...prev];
+            for (const it of targetOrder.items) {
+              const idx = copy.findIndex(p => p.id === (it.product_id || it.id));
+              if (idx >= 0) {
+                copy[idx] = { ...copy[idx], stock: (copy[idx].stock || 0) + (it.quantity || 1) };
+              }
+            }
+            return copy;
+          });
+        }
+        alert(`Order ${orderId} has been successfully cancelled and stock restored.`);
+      } else {
+        alert(data.error || 'Failed to cancel order.');
+      }
+    } catch (err) {
+      console.error('Cancel order error:', err);
+      setOrders(prev => prev.map(o => o.orderId === orderId ? { ...o, status: 'Cancelled' } : o));
+      if (trackedOrder && (trackedOrder.orderId === orderId || trackedOrder.id === orderId)) {
+        setTrackedOrder(prev => ({ ...prev, status: 'Cancelled' }));
+      }
+    } finally {
+      setCancellingOrderId(null);
+    }
   };
 
   // ==================== CHECKOUT SUBMISSION (BACKEND REQUIRE AUTH) ====================
@@ -531,14 +747,6 @@ export default function App() {
       setAdminPasswordInput('');
     } else {
       setAdminPasswordError('Incorrect password. Access denied.');
-    }
-  };
-
-  // Admin order status update
-  const handleOrderStatusUpdate = (orderId, newStatus) => {
-    setOrders(prev => prev.map(o => o.orderId === orderId ? { ...o, status: newStatus } : o));
-    if (trackedOrder && trackedOrder.orderId === orderId) {
-      setTrackedOrder(prev => ({ ...prev, status: newStatus }));
     }
   };
 
@@ -1036,24 +1244,36 @@ export default function App() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
-                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
-                        <th className="py-3 px-3 w-16 text-center">Photo</th>
-                        <th className="py-3 px-3 w-28">SKU</th>
-                        <th className="py-3 px-3">Product Name & Grade</th>
-                        <th className="py-3 px-3">Category</th>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase text-[10px] tracking-wider select-none">
+                        <th className="py-3 px-3 w-14 text-center">Photo</th>
+                        <th onClick={() => handleCatalogSort('id')} className="py-3 px-3 w-28 cursor-pointer hover:bg-slate-100 transition-colors">
+                          SKU {renderSortIndicator('id', catalogSortField, catalogSortOrder)}
+                        </th>
+                        <th onClick={() => handleCatalogSort('name')} className="py-3 px-3 cursor-pointer hover:bg-slate-100 transition-colors">
+                          Product Name & Grade {renderSortIndicator('name', catalogSortField, catalogSortOrder)}
+                        </th>
+                        <th onClick={() => handleCatalogSort('category')} className="py-3 px-3 cursor-pointer hover:bg-slate-100 transition-colors">
+                          Category {renderSortIndicator('category', catalogSortField, catalogSortOrder)}
+                        </th>
                         <th className="py-3 px-3">Packaging Unit</th>
-                        <th className="py-3 px-3 text-center">Available Stock</th>
-                        <th className="py-3 px-3 text-right">Regular Price</th>
+                        <th onClick={() => handleCatalogSort('stock')} className="py-3 px-3 text-center cursor-pointer hover:bg-slate-100 transition-colors">
+                          Stock (Qty) {renderSortIndicator('stock', catalogSortField, catalogSortOrder)}
+                        </th>
+                        <th onClick={() => handleCatalogSort('price')} className="py-3 px-3 text-right cursor-pointer hover:bg-slate-100 transition-colors">
+                          Regular Price {renderSortIndicator('price', catalogSortField, catalogSortOrder)}
+                        </th>
                         <th className="py-3 px-3 text-right">Final Price</th>
+                        <th className="py-3 px-3 text-center w-28">Type Qty</th>
                         <th className="py-3 px-3 text-center">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {filteredProducts.map(item => {
+                      {sortedCatalogProducts.map(item => {
                         const itemDisc = Number(item.discount_percent || 0);
                         const maxDiscount = Math.max(itemDisc, storewideDiscount);
                         const effectivePrice = maxDiscount > 0 ? item.price * (1 - maxDiscount / 100) : item.price;
                         const isBulkPack = item.unit.includes('100');
+                        const qtyToBuy = catalogQuantities[item.id] || 1;
 
                         return (
                           <tr key={item.id} className="hover:bg-orange-50/40 transition-colors">
@@ -1132,10 +1352,47 @@ export default function App() {
                               )}
                             </td>
 
+                            {/* Type Quantity Manually */}
+                            <td className="py-2.5 px-3 text-center">
+                              <div className="inline-flex items-center border border-slate-300 rounded bg-white shadow-2xs">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const cur = catalogQuantities[item.id] || 1;
+                                    if (cur > 1) setCatalogQuantities(prev => ({ ...prev, [item.id]: cur - 1 }));
+                                  }}
+                                  className="px-2 py-1 text-slate-600 hover:bg-slate-100 font-bold select-none cursor-pointer"
+                                >
+                                  -
+                                </button>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max={item.stock || 9999}
+                                  value={qtyToBuy}
+                                  onChange={(e) => {
+                                    const val = Math.max(1, parseInt(e.target.value, 10) || 1);
+                                    setCatalogQuantities(prev => ({ ...prev, [item.id]: val }));
+                                  }}
+                                  className="w-12 text-center text-xs font-black border-x border-slate-200 py-1 focus:outline-none focus:bg-orange-50 text-slate-900"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const cur = catalogQuantities[item.id] || 1;
+                                    setCatalogQuantities(prev => ({ ...prev, [item.id]: cur + 1 }));
+                                  }}
+                                  className="px-2 py-1 text-slate-600 hover:bg-slate-100 font-bold select-none cursor-pointer"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </td>
+
                             {/* Action Add to Cart */}
                             <td className="py-2.5 px-3 text-center">
                               <button
-                                onClick={() => addToCart(item, 1)}
+                                onClick={() => addToCart(item, qtyToBuy)}
                                 disabled={item.stock <= 0}
                                 className={`px-3 py-1.5 rounded text-xs font-bold transition-all inline-flex items-center gap-1 cursor-pointer ${
                                   item.stock <= 0
@@ -1143,7 +1400,7 @@ export default function App() {
                                     : 'bg-[#EE4D2D] hover:bg-[#d73f20] text-white shadow-xs'
                                 }`}
                               >
-                                <Plus className="w-3.5 h-3.5" /> Add
+                                <Plus className="w-3.5 h-3.5" /> Add ({qtyToBuy})
                               </button>
                             </td>
                           </tr>
@@ -1266,6 +1523,27 @@ export default function App() {
                     <span>Order Total:</span>
                     <span className="text-[#EE4D2D]">₱{trackedOrder.total.toLocaleString()}</span>
                   </div>
+
+                  {/* Cancel Order Action (User Requested) */}
+                  {trackedOrder.status !== 'Delivered' && trackedOrder.status !== 'Cancelled' && (
+                    <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                      <p className="text-[11px] text-slate-500">Need to cancel or revise this delivery?</p>
+                      <button
+                        onClick={() => handleCancelOrder(trackedOrder.orderId || trackedOrder.id, 'public')}
+                        disabled={cancellingOrderId === (trackedOrder.orderId || trackedOrder.id)}
+                        className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold px-3.5 py-2 rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                      >
+                        <Ban className="w-3.5 h-3.5" />
+                        {cancellingOrderId === (trackedOrder.orderId || trackedOrder.id) ? 'Cancelling...' : 'Cancel Order'}
+                      </button>
+                    </div>
+                  )}
+                  {trackedOrder.status === 'Cancelled' && (
+                    <div className="mt-3 bg-rose-50 border border-rose-200 p-2.5 rounded-lg text-xs font-bold text-rose-700 flex items-center gap-2">
+                      <XCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                      <span>This order has been cancelled and materials restocked to warehouse inventory.</span>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
@@ -1508,16 +1786,23 @@ export default function App() {
                 </div>
               </div>
             ) : (
-              /* ==================== AUTHENTICATED MERCHANT SELLER CENTRE ==================== */
-              <div className="space-y-6">
+              /* ==================== AUTHENTICATED MERCHANT SELLER CENTRE (DESKTOP WEB VIEW) ==================== */
+              <div className="max-w-7xl mx-auto space-y-6">
                 
-                {/* Header Actions Row */}
+                {/* 1. Header & Quick Actions Bar */}
                 <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 flex flex-wrap items-center justify-between gap-3 shadow-xs">
                   <div>
-                    <h2 className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2">
-                      <ShieldCheck className="w-5 h-5 text-[#EE4D2D]" /> Merchant Seller Command Centre
-                    </h2>
-                    <p className="text-xs text-slate-500">Live inventory catalog, CSV/PDF upload, bulk actions & discounting</p>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2">
+                        <ShieldCheck className="w-5 h-5 text-[#EE4D2D]" /> Merchant Seller Command Centre
+                      </h2>
+                      <span className="hidden sm:inline text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
+                        Admin Live • Tacloban Hub
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Full desktop management: live inventory catalog, stock editor, order fulfillment, CSV/PDF upload, bulk discounts
+                    </p>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
@@ -1543,7 +1828,7 @@ export default function App() {
                       <PlusCircle className="w-4 h-4" /> Add New Item
                     </button>
 
-                    {/* Upload CSV/PDF Button (User Requested) */}
+                    {/* Upload CSV/PDF Button */}
                     <button
                       onClick={() => setUploadModal(true)}
                       className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3.5 py-2 rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs"
@@ -1569,303 +1854,651 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* 1. Global Storewide Discount & Voucher Controller */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Storewide Flash Discount */}
-                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                    <div className="flex items-center justify-between mb-2">
-                      <div>
-                        <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                          <Flame className="w-4 h-4 text-[#EE4D2D]" /> Storewide Flash Sale Discount
-                        </h3>
-                        <p className="text-[11px] text-slate-400">Controls live discount across all {products.length} products</p>
-                      </div>
-                      <span className="text-lg font-black text-[#EE4D2D]">{storewideDiscount}%</span>
+                {/* 2. Top Summary KPI Cards (Desktop Web View) */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+                    <div className="flex items-center justify-between text-slate-500 mb-1">
+                      <span className="text-xs font-bold uppercase tracking-wider">Total SKUs</span>
+                      <Package className="w-4 h-4 text-blue-600" />
                     </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max="50"
-                      step="5"
-                      value={storewideDiscount}
-                      onChange={e => setStorewideDiscount(Number(e.target.value))}
-                      className="w-full accent-[#EE4D2D] cursor-pointer"
-                    />
-                    <div className="flex justify-between text-[10px] text-slate-400 mt-1">
-                      <span>0% (Standard)</span>
-                      <span>25%</span>
-                      <span>50% (Max)</span>
-                    </div>
+                    <p className="text-2xl font-black text-slate-900">{products.length}</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Across {categories.length - 1} categories</p>
                   </div>
 
-                  {/* Active Voucher Codes (hardware 40%, builder 35%) */}
-                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                    <h3 className="text-xs font-bold text-slate-900 mb-2 flex items-center gap-1.5">
-                      <Tag className="w-4 h-4 text-blue-600" /> Active Voucher Codes
-                    </h3>
-                    <div className="space-y-1.5">
-                      {discounts.map((d, i) => (
-                        <div key={d.code} className="flex items-center justify-between text-xs p-2 bg-slate-50 rounded border border-slate-100">
-                          <div>
-                            <span className="font-mono font-black text-[#EE4D2D] text-xs uppercase">{d.code}</span>
-                            <span className="ml-2 text-[10px] bg-orange-100 text-[#EE4D2D] font-bold px-1.5 py-0.2 rounded">
-                              {d.value}% OFF
-                            </span>
-                            <span className="text-[10px] text-slate-500 ml-2">{d.description}</span>
-                          </div>
-                          <button
-                            onClick={() => setDiscounts(prev => prev.map((item, idx) => idx === i ? { ...item, active: !item.active } : item))}
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded cursor-pointer ${
-                              d.active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-500'
-                            }`}
-                          >
-                            {d.active ? 'Active' : 'Disabled'}
-                          </button>
-                        </div>
-                      ))}
+                  <div 
+                    onClick={() => { setDashboardTab('inventory'); setDashboardStockFilter('low'); }}
+                    className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs cursor-pointer hover:border-amber-400 transition-colors"
+                  >
+                    <div className="flex items-center justify-between text-slate-500 mb-1">
+                      <span className="text-xs font-bold uppercase tracking-wider">Stock Alerts</span>
+                      <AlertCircle className="w-4 h-4 text-amber-500" />
                     </div>
+                    <p className="text-2xl font-black text-amber-600">
+                      {products.filter(p => p.stock <= 0).length + products.filter(p => p.stock > 0 && p.stock < 10).length}
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      {products.filter(p => p.stock <= 0).length} out of stock • {products.filter(p => p.stock > 0 && p.stock < 10).length} low
+                    </p>
+                  </div>
+
+                  <div 
+                    onClick={() => setDashboardTab('orders')}
+                    className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs cursor-pointer hover:border-[#EE4D2D] transition-colors"
+                  >
+                    <div className="flex items-center justify-between text-slate-500 mb-1">
+                      <span className="text-xs font-bold uppercase tracking-wider">Total Orders</span>
+                      <ShoppingBag className="w-4 h-4 text-[#EE4D2D]" />
+                    </div>
+                    <p className="text-2xl font-black text-slate-900">{orders.length}</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      {orders.filter(o => o.status !== 'Cancelled').length} active • {orders.filter(o => o.status === 'Cancelled').length} cancelled
+                    </p>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+                    <div className="flex items-center justify-between text-slate-500 mb-1">
+                      <span className="text-xs font-bold uppercase tracking-wider">Gross Sales</span>
+                      <BarChart3 className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    <p className="text-2xl font-black text-emerald-600">
+                      ₱{orders.filter(o => o.status !== 'Cancelled').reduce((sum, o) => sum + (o.total || 0), 0).toLocaleString()}
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Non-cancelled orders total</p>
                   </div>
                 </div>
 
-                {/* 2. BULK ACTIONS CONTROLLER & INVENTORY MANAGER (USER REQUESTED) */}
-                <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                      <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
-                        <SlidersHorizontal className="w-4 h-4 text-emerald-600" /> Bulk Actions & Inventory Manager
-                      </h3>
-                      <p className="text-xs text-slate-500">Select items to apply bulk discounts, edit pricing, or delete entries</p>
-                    </div>
+                {/* 3. Sub-Navigation Tabs Bar */}
+                <div className="flex border-b border-slate-200 bg-white rounded-t-xl px-4 pt-3 gap-2 sm:gap-4 overflow-x-auto">
+                  <button
+                    onClick={() => setDashboardTab('inventory')}
+                    className={`pb-3 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 cursor-pointer transition-colors whitespace-nowrap ${
+                      dashboardTab === 'inventory' 
+                        ? 'border-[#EE4D2D] text-[#EE4D2D]' 
+                        : 'border-transparent text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    <Layers className="w-4 h-4" />
+                    Inventory & SKUs
+                    <span className="bg-slate-100 text-slate-700 text-[10px] px-2 py-0.5 rounded-full font-mono">
+                      {products.length}
+                    </span>
+                  </button>
 
-                    {/* Search inside inventory */}
-                    <div className="w-full sm:w-64">
-                      <input
-                        type="text"
-                        placeholder="Search SKU or name..."
-                        value={itemSearchTerm}
-                        onChange={e => setItemSearchTerm(e.target.value)}
-                        className="w-full text-xs px-3 py-1.5 border border-slate-300 rounded-lg bg-slate-50 focus:outline-none"
-                      />
-                    </div>
-                  </div>
+                  <button
+                    onClick={() => setDashboardTab('orders')}
+                    className={`pb-3 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 cursor-pointer transition-colors whitespace-nowrap ${
+                      dashboardTab === 'orders' 
+                        ? 'border-[#EE4D2D] text-[#EE4D2D]' 
+                        : 'border-transparent text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    <ShoppingBag className="w-4 h-4" />
+                    Orders & Fulfillment
+                    <span className="bg-orange-100 text-[#EE4D2D] text-[10px] px-2 py-0.5 rounded-full font-mono font-bold">
+                      {orders.length}
+                    </span>
+                  </button>
 
-                  {/* Bulk Action Controls Bar (Appears when items are selected) */}
-                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <button 
-                        onClick={toggleSelectAll}
-                        className="flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-slate-900 cursor-pointer"
-                      >
-                        {selectedItemIds.length === filteredProducts.length && filteredProducts.length > 0 ? (
-                          <CheckSquare className="w-4 h-4 text-[#EE4D2D]" />
-                        ) : (
-                          <Square className="w-4 h-4 text-slate-400" />
-                        )}
-                        Select All ({selectedItemIds.length} selected)
-                      </button>
-                    </div>
+                  <button
+                    onClick={() => setDashboardTab('promotions')}
+                    className={`pb-3 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 cursor-pointer transition-colors whitespace-nowrap ${
+                      dashboardTab === 'promotions' 
+                        ? 'border-[#EE4D2D] text-[#EE4D2D]' 
+                        : 'border-transparent text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    <Flame className="w-4 h-4 text-orange-500" />
+                    Discounts & Flash Sale
+                    {storewideDiscount > 0 && (
+                      <span className="bg-rose-100 text-rose-700 text-[10px] px-1.5 py-0.2 rounded-full font-bold">
+                        {storewideDiscount}% ON
+                      </span>
+                    )}
+                  </button>
+                </div>
 
-                    {selectedItemIds.length > 0 && (
-                      <div className="flex flex-wrap items-center gap-2 text-xs">
-                        {/* Bulk Discount */}
-                        <div className="flex items-center gap-1">
+                {/* ==================== SUBTAB: INVENTORY & SKUS ==================== */}
+                {dashboardTab === 'inventory' && (
+                  <div className="bg-white p-4 sm:p-5 rounded-b-xl border border-slate-200 border-t-0 shadow-xs space-y-4">
+                    {/* Search, Filter Pills & Sorting Tip */}
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                      {/* Search */}
+                      <div className="w-full lg:w-72">
+                        <div className="relative">
+                          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                           <input
-                            type="number"
-                            min="0"
-                            max="90"
-                            placeholder="Discount %"
-                            value={bulkDiscountInput}
-                            onChange={e => setBulkDiscountInput(e.target.value)}
-                            className="w-20 px-2 py-1 text-xs border border-slate-300 rounded bg-white font-bold"
+                            type="text"
+                            placeholder="Search SKU, name, or category..."
+                            value={itemSearchTerm}
+                            onChange={e => setItemSearchTerm(e.target.value)}
+                            className="w-full text-xs pl-8 pr-3 py-2 border border-slate-300 rounded-lg bg-slate-50 focus:bg-white focus:border-[#EE4D2D] focus:outline-none"
                           />
+                        </div>
+                      </div>
+
+                      {/* Stock Filter Pills */}
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                        <button
+                          onClick={() => setDashboardStockFilter('all')}
+                          className={`px-3 py-1.5 rounded-lg font-bold cursor-pointer transition-colors ${
+                            dashboardStockFilter === 'all'
+                              ? 'bg-slate-900 text-white'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          All ({products.length})
+                        </button>
+                        <button
+                          onClick={() => setDashboardStockFilter('low')}
+                          className={`px-3 py-1.5 rounded-lg font-bold cursor-pointer transition-colors ${
+                            dashboardStockFilter === 'low'
+                              ? 'bg-amber-500 text-white'
+                              : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
+                          }`}
+                        >
+                          Low Stock &lt; 10 ({products.filter(p => p.stock > 0 && p.stock < 10).length})
+                        </button>
+                        <button
+                          onClick={() => setDashboardStockFilter('out')}
+                          className={`px-3 py-1.5 rounded-lg font-bold cursor-pointer transition-colors ${
+                            dashboardStockFilter === 'out'
+                              ? 'bg-rose-600 text-white'
+                              : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
+                          }`}
+                        >
+                          Out of Stock ({products.filter(p => p.stock <= 0).length})
+                        </button>
+                        <button
+                          onClick={() => setDashboardStockFilter('in')}
+                          className={`px-3 py-1.5 rounded-lg font-bold cursor-pointer transition-colors ${
+                            dashboardStockFilter === 'in'
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
+                          }`}
+                        >
+                          In Stock ({products.filter(p => p.stock > 0).length})
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Bulk Action Controls Bar */}
+                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <button 
+                          onClick={toggleSelectAll}
+                          className="flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-slate-900 cursor-pointer"
+                        >
+                          {selectedItemIds.length === filteredProducts.length && filteredProducts.length > 0 ? (
+                            <CheckSquare className="w-4 h-4 text-[#EE4D2D]" />
+                          ) : (
+                            <Square className="w-4 h-4 text-slate-400" />
+                          )}
+                          Select All ({selectedItemIds.length} selected)
+                        </button>
+                        <span className="text-[11px] text-slate-400 hidden sm:inline">
+                          Tip: Click table headers to sort • Type numbers directly to update stock
+                        </span>
+                      </div>
+
+                      {selectedItemIds.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          {/* Bulk Discount */}
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              min="0"
+                              max="90"
+                              placeholder="Discount %"
+                              value={bulkDiscountInput}
+                              onChange={e => setBulkDiscountInput(e.target.value)}
+                              className="w-20 px-2 py-1 text-xs border border-slate-300 rounded bg-white font-bold"
+                            />
+                            <button
+                              onClick={handleBulkDiscountApply}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded font-bold cursor-pointer"
+                            >
+                              Apply %
+                            </button>
+                          </div>
+
+                          {/* Bulk Delete */}
                           <button
-                            onClick={handleBulkDiscountApply}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded font-bold cursor-pointer"
+                            onClick={handleBulkDelete}
+                            className="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1 rounded font-bold flex items-center gap-1 cursor-pointer"
                           >
-                            Apply %
+                            <Trash2 className="w-3.5 h-3.5" /> Delete ({selectedItemIds.length})
                           </button>
                         </div>
+                      )}
+                    </div>
 
-                        {/* Bulk Delete */}
-                        <button
-                          onClick={handleBulkDelete}
-                          className="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1 rounded font-bold flex items-center gap-1 cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" /> Delete ({selectedItemIds.length})
-                        </button>
+                    {/* Products Table with Checkboxes & In-Place Edit/Delete & Typeable Stock */}
+                    <div className="overflow-x-auto border border-slate-200 rounded-lg">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead className="sticky top-0 bg-slate-100 z-10 border-b border-slate-200 text-slate-700 font-bold uppercase text-[10px]">
+                          <tr>
+                            <th className="py-2.5 px-3 w-10 text-center">
+                              <input
+                                type="checkbox"
+                                checked={selectedItemIds.length === filteredProducts.length && filteredProducts.length > 0}
+                                onChange={toggleSelectAll}
+                                className="rounded text-[#EE4D2D] focus:ring-0 cursor-pointer"
+                              />
+                            </th>
+                            <th 
+                              onClick={() => handleDashboardSort('id')}
+                              className="py-2.5 px-3 cursor-pointer hover:bg-slate-200 transition-colors select-none"
+                            >
+                              <div className="flex items-center gap-1">
+                                SKU {renderSortIndicator('id', dashboardSortField, dashboardSortOrder)}
+                              </div>
+                            </th>
+                            <th 
+                              onClick={() => handleDashboardSort('name')}
+                              className="py-2.5 px-3 cursor-pointer hover:bg-slate-200 transition-colors select-none"
+                            >
+                              <div className="flex items-center gap-1">
+                                Product Details {renderSortIndicator('name', dashboardSortField, dashboardSortOrder)}
+                              </div>
+                            </th>
+                            <th 
+                              onClick={() => handleDashboardSort('category')}
+                              className="py-2.5 px-3 cursor-pointer hover:bg-slate-200 transition-colors select-none"
+                            >
+                              <div className="flex items-center gap-1">
+                                Category {renderSortIndicator('category', dashboardSortField, dashboardSortOrder)}
+                              </div>
+                            </th>
+                            <th 
+                              onClick={() => handleDashboardSort('unit')}
+                              className="py-2.5 px-3 cursor-pointer hover:bg-slate-200 transition-colors select-none"
+                            >
+                              <div className="flex items-center gap-1">
+                                Unit {renderSortIndicator('unit', dashboardSortField, dashboardSortOrder)}
+                              </div>
+                            </th>
+                            <th 
+                              onClick={() => handleDashboardSort('price')}
+                              className="py-2.5 px-3 text-right cursor-pointer hover:bg-slate-200 transition-colors select-none"
+                            >
+                              <div className="flex items-center justify-end gap-1">
+                                Price (₱) {renderSortIndicator('price', dashboardSortField, dashboardSortOrder)}
+                              </div>
+                            </th>
+                            <th 
+                              onClick={() => handleDashboardSort('capital')}
+                              className="py-2.5 px-3 text-right cursor-pointer hover:bg-slate-200 transition-colors select-none"
+                            >
+                              <div className="flex items-center justify-end gap-1">
+                                Capital (₱) {renderSortIndicator('capital', dashboardSortField, dashboardSortOrder)}
+                              </div>
+                            </th>
+                            <th 
+                              onClick={() => handleDashboardSort('stock')}
+                              className="py-2.5 px-3 text-center cursor-pointer hover:bg-slate-200 transition-colors select-none"
+                            >
+                              <div className="flex items-center justify-center gap-1">
+                                Stock (Qty) {renderSortIndicator('stock', dashboardSortField, dashboardSortOrder)}
+                              </div>
+                            </th>
+                            <th 
+                              onClick={() => handleDashboardSort('discount_percent')}
+                              className="py-2.5 px-3 text-center cursor-pointer hover:bg-slate-200 transition-colors select-none"
+                            >
+                              <div className="flex items-center justify-center gap-1">
+                                Discount {renderSortIndicator('discount_percent', dashboardSortField, dashboardSortOrder)}
+                              </div>
+                            </th>
+                            <th className="py-2.5 px-3 text-center w-24">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {sortedDashboardProducts.length === 0 ? (
+                            <tr>
+                              <td colSpan={10} className="py-8 text-center text-xs text-slate-400">
+                                No items found matching the selected filters.
+                              </td>
+                            </tr>
+                          ) : (
+                            sortedDashboardProducts.map(item => (
+                              <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+                                {/* Checkbox */}
+                                <td className="py-2.5 px-3 text-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedItemIds.includes(item.id)}
+                                    onChange={() => toggleSelectItem(item.id)}
+                                    className="rounded text-[#EE4D2D] focus:ring-0 cursor-pointer"
+                                  />
+                                </td>
+
+                                {/* SKU ID */}
+                                <td className="py-2.5 px-3">
+                                  <span className="font-mono text-[11px] font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">
+                                    {item.id}
+                                  </span>
+                                </td>
+
+                                {/* Item details */}
+                                <td className="py-2.5 px-3">
+                                  <div className="flex items-center gap-2.5">
+                                    <img 
+                                      src={item.image} 
+                                      alt={item.name}
+                                      className="w-9 h-9 rounded-lg object-cover bg-slate-100 shrink-0 border border-slate-200" 
+                                      onError={(e) => {
+                                        e.target.onerror = null;
+                                        e.target.src = "https://images.pexels.com/photos/175039/pexels-photo-175039.jpeg?auto=compress&cs=tinysrgb&h=650&w=940";
+                                      }}
+                                    />
+                                    <div className="min-w-0">
+                                      <p className="font-bold text-slate-900 truncate max-w-xs">{item.name}</p>
+                                      {item.description && (
+                                        <p className="text-[10px] text-slate-400 truncate max-w-xs">{item.description}</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                </td>
+
+                                {/* Category */}
+                                <td className="py-2.5 px-3 text-slate-600">
+                                  <span className="text-[11px] bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-full">
+                                    {item.category}
+                                  </span>
+                                </td>
+
+                                {/* Unit */}
+                                <td className="py-2.5 px-3 font-medium text-slate-700">
+                                  {item.unit}
+                                </td>
+
+                                {/* Price */}
+                                <td className="py-2.5 px-3 text-right font-bold text-slate-900">
+                                  ₱{item.price.toLocaleString()}
+                                </td>
+
+                                {/* Capital */}
+                                <td className="py-2.5 px-3 text-right text-slate-500 font-mono">
+                                  ₱{(item.capital || 0).toLocaleString()}
+                                </td>
+
+                                {/* Stock with Typeable Input */}
+                                <td className="py-2.5 px-3 text-center">
+                                  <div className="inline-flex items-center gap-1.5">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      value={item.stock}
+                                      onChange={e => handleInlineStockChange(item.id, e.target.value)}
+                                      className="w-16 px-1.5 py-1 text-center font-bold text-xs border border-slate-300 rounded bg-white focus:border-[#EE4D2D] focus:outline-none"
+                                      title="Type to manually adjust quantity/stock"
+                                    />
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                                      item.stock <= 0 
+                                        ? 'bg-rose-100 text-rose-700' 
+                                        : item.stock < 10 
+                                          ? 'bg-amber-100 text-amber-800' 
+                                          : 'bg-emerald-100 text-emerald-800'
+                                    }`}>
+                                      {item.stock <= 0 ? 'OUT' : item.stock < 10 ? 'LOW' : 'OK'}
+                                    </span>
+                                  </div>
+                                </td>
+
+                                {/* Discount % */}
+                                <td className="py-2.5 px-3 text-center">
+                                  {item.discount_percent > 0 ? (
+                                    <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                      {item.discount_percent}% OFF
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-400 font-mono">0%</span>
+                                  )}
+                                </td>
+
+                                {/* Actions: Edit & Delete */}
+                                <td className="py-2.5 px-3 text-center">
+                                  <div className="flex items-center justify-center gap-1.5">
+                                    <button
+                                      onClick={() => {
+                                        setEditingItem({ ...item });
+                                        setItemModal('edit');
+                                      }}
+                                      className="p-1.5 text-blue-600 hover:bg-blue-50 rounded cursor-pointer"
+                                      title="Edit Item"
+                                    >
+                                      <Edit3 className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteItem(item.id)}
+                                      className="p-1.5 text-rose-600 hover:bg-rose-50 rounded cursor-pointer"
+                                      title="Delete Item"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
+                      <span>Showing <strong>{sortedDashboardProducts.length}</strong> of <strong>{products.length}</strong> items</span>
+                      <span className="text-[11px] text-slate-400">Stock updates sync immediately to store catalog & database</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* ==================== SUBTAB: ORDERS & FULFILLMENT ==================== */}
+                {dashboardTab === 'orders' && (
+                  <div className="bg-white p-4 sm:p-5 rounded-b-xl border border-slate-200 border-t-0 shadow-xs space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                          <ShoppingBag className="w-4 h-4 text-[#EE4D2D]" /> Orders & Fulfillment Management ({orders.length})
+                        </h3>
+                        <p className="text-xs text-slate-500">
+                          Track orders, change delivery status, or cancel orders to restore inventory stock
+                        </p>
+                      </div>
+                      <div className="text-xs font-bold text-slate-600 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
+                        {orders.filter(o => o.status !== 'Cancelled').length} Active Orders • {orders.filter(o => o.status === 'Cancelled').length} Cancelled
+                      </div>
+                    </div>
+
+                    {orders.length === 0 ? (
+                      <div className="py-12 text-center text-xs text-slate-400 bg-slate-50 rounded-lg">
+                        <ShoppingBag className="w-8 h-8 mx-auto text-slate-300 mb-2" />
+                        <p className="font-bold">No orders logged in system yet.</p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto border border-slate-200 rounded-lg">
+                        <table className="w-full text-left text-xs border-collapse">
+                          <thead className="bg-slate-100 text-slate-700 font-bold uppercase text-[10px] border-b border-slate-200">
+                            <tr>
+                              <th className="py-2.5 px-3">Order ID & Date</th>
+                              <th className="py-2.5 px-3">Customer Details</th>
+                              <th className="py-2.5 px-3">Delivery Site</th>
+                              <th className="py-2.5 px-3">Items Ordered</th>
+                              <th className="py-2.5 px-3">Payment</th>
+                              <th className="py-2.5 px-3 text-right">Total (₱)</th>
+                              <th className="py-2.5 px-3 text-center">Status</th>
+                              <th className="py-2.5 px-3 text-center">Update Status</th>
+                              <th className="py-2.5 px-3 text-center">Order Action</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {orders.map(o => (
+                              <tr key={o.orderId} className={`hover:bg-slate-50 transition-colors ${o.status === 'Cancelled' ? 'opacity-60 bg-rose-50/20' : ''}`}>
+                                {/* Order ID & Date */}
+                                <td className="py-3 px-3 align-top">
+                                  <span className="font-mono font-bold text-slate-900">{o.orderId}</span>
+                                  <p className="text-[10px] text-slate-400 mt-0.5">{o.date}</p>
+                                </td>
+
+                                {/* Customer */}
+                                <td className="py-3 px-3 align-top">
+                                  <p className="font-bold text-slate-800">{o.customer?.fullName || 'Guest'}</p>
+                                  <p className="text-slate-500 text-[11px] font-mono">{o.customer?.phone || 'No phone'}</p>
+                                  {o.customer?.email && <p className="text-[10px] text-slate-400">{o.customer.email}</p>}
+                                </td>
+
+                                {/* Site Address */}
+                                <td className="py-3 px-3 align-top max-w-xs">
+                                  <p className="text-slate-700 text-xs truncate" title={o.customer?.address}>
+                                    {o.customer?.address || 'Pickup / Leyte Hub'}
+                                  </p>
+                                </td>
+
+                                {/* Items */}
+                                <td className="py-3 px-3 align-top">
+                                  <div className="space-y-1">
+                                    {(o.items || []).map((it, idx) => (
+                                      <div key={idx} className="text-[11px] text-slate-700">
+                                        <span className="font-bold">{it.quantity}x</span> {it.name || it.product_id}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </td>
+
+                                {/* Payment */}
+                                <td className="py-3 px-3 align-top">
+                                  <span className="uppercase font-bold text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-700">
+                                    {o.customer?.paymentMethod || 'COD'}
+                                  </span>
+                                  {o.promoCode && (
+                                    <div className="text-[10px] text-emerald-700 font-bold mt-1">
+                                      Promo: {o.promoCode.toUpperCase()}
+                                    </div>
+                                  )}
+                                </td>
+
+                                {/* Total */}
+                                <td className="py-3 px-3 align-top text-right font-black text-slate-900 text-sm">
+                                  ₱{Number(o.total || 0).toLocaleString()}
+                                </td>
+
+                                {/* Status Badge */}
+                                <td className="py-3 px-3 align-top text-center">
+                                  <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                    o.status === 'Cancelled' ? 'bg-rose-100 text-rose-700' :
+                                    o.status === 'Delivered' ? 'bg-emerald-100 text-emerald-800' :
+                                    o.status === 'Out for Delivery' ? 'bg-blue-100 text-blue-800' :
+                                    o.status === 'Packed' ? 'bg-indigo-100 text-indigo-800' :
+                                    o.status === 'Processing' ? 'bg-amber-100 text-amber-800' :
+                                    'bg-orange-100 text-[#EE4D2D]'
+                                  }`}>
+                                    {o.status}
+                                  </span>
+                                </td>
+
+                                {/* Status Selector */}
+                                <td className="py-3 px-3 align-top text-center">
+                                  <select
+                                    value={o.status}
+                                    disabled={o.status === 'Cancelled' || o.status === 'Delivered'}
+                                    onChange={e => handleOrderStatusUpdate(o.orderId, e.target.value)}
+                                    className="text-xs font-bold border border-slate-300 rounded px-2 py-1 bg-white text-slate-700 focus:outline-none focus:border-[#EE4D2D] disabled:opacity-50"
+                                  >
+                                    <option value="Order Placed">Order Placed</option>
+                                    <option value="Processing">Processing</option>
+                                    <option value="Packed">Packed</option>
+                                    <option value="Out for Delivery">Out for Delivery</option>
+                                    <option value="Delivered">Delivered</option>
+                                    <option value="Cancelled">Cancelled</option>
+                                  </select>
+                                </td>
+
+                                {/* Cancel Order Action */}
+                                <td className="py-3 px-3 align-top text-center">
+                                  {o.status === 'Cancelled' ? (
+                                    <span className="text-[11px] text-rose-500 font-bold inline-flex items-center gap-1">
+                                      <XCircle className="w-3.5 h-3.5" /> Cancelled
+                                    </span>
+                                  ) : (
+                                    <button
+                                      onClick={() => handleCancelOrder(o.orderId, 'merchant')}
+                                      disabled={cancellingOrderId === o.orderId || o.status === 'Delivered'}
+                                      className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                      title="Cancel this order and automatically restore product stock"
+                                    >
+                                      <Ban className="w-3.5 h-3.5" /> Cancel Order
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     )}
                   </div>
+                )}
 
-                  {/* Products Table with Checkboxes & In-Place Edit/Delete */}
-                  <div className="overflow-x-auto max-h-[500px] border border-slate-200 rounded-lg">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead className="sticky top-0 bg-slate-100 z-10 border-b border-slate-200 text-slate-700 font-bold uppercase text-[10px]">
-                        <tr>
-                          <th className="py-2.5 px-3 w-10 text-center">
-                            <input
-                              type="checkbox"
-                              checked={selectedItemIds.length === filteredProducts.length && filteredProducts.length > 0}
-                              onChange={toggleSelectAll}
-                              className="rounded text-[#EE4D2D] focus:ring-0"
-                            />
-                          </th>
-                          <th className="py-2.5 px-3">Item Details</th>
-                          <th className="py-2.5 px-3">Category</th>
-                          <th className="py-2.5 px-3">Packaging Unit</th>
-                          <th className="py-2.5 px-3 text-right">Price (₱)</th>
-                          <th className="py-2.5 px-3 text-right">Capital (₱)</th>
-                          <th className="py-2.5 px-3 text-center">Stock</th>
-                          <th className="py-2.5 px-3 text-center">Discount</th>
-                          <th className="py-2.5 px-3 text-center w-24">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {products
-                          .filter(p => !itemSearchTerm || p.name.toLowerCase().includes(itemSearchTerm.toLowerCase()) || p.id.toLowerCase().includes(itemSearchTerm.toLowerCase()))
-                          .map(item => (
-                            <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                              {/* Checkbox */}
-                              <td className="py-2 px-3 text-center">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedItemIds.includes(item.id)}
-                                  onChange={() => toggleSelectItem(item.id)}
-                                  className="rounded text-[#EE4D2D] focus:ring-0 cursor-pointer"
-                                />
-                              </td>
-
-                              {/* Item details */}
-                              <td className="py-2 px-3">
-                                <div className="flex items-center gap-2">
-                                  <img 
-                                    src={item.image} 
-                                    alt={item.name}
-                                    className="w-8 h-8 rounded object-cover bg-slate-100 shrink-0" 
-                                    onError={(e) => {
-                                      e.target.onerror = null;
-                                      e.target.src = "https://images.pexels.com/photos/175039/pexels-photo-175039.jpeg?auto=compress&cs=tinysrgb&h=650&w=940";
-                                    }}
-                                  />
-                                  <div className="min-w-0">
-                                    <p className="font-bold text-slate-900 truncate max-w-xs">{item.name}</p>
-                                    <span className="font-mono text-[10px] text-slate-400">{item.id}</span>
-                                  </div>
-                                </div>
-                              </td>
-
-                              {/* Category */}
-                              <td className="py-2 px-3 text-slate-600">
-                                {item.category}
-                              </td>
-
-                              {/* Unit */}
-                              <td className="py-2 px-3 font-medium text-slate-700">
-                                {item.unit}
-                              </td>
-
-                              {/* Price */}
-                              <td className="py-2 px-3 text-right font-bold text-slate-900">
-                                ₱{item.price.toLocaleString()}
-                              </td>
-
-                              {/* Capital */}
-                              <td className="py-2 px-3 text-right text-slate-500">
-                                ₱{(item.capital || 0).toLocaleString()}
-                              </td>
-
-                              {/* Stock */}
-                              <td className="py-2 px-3 text-center">
-                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                  item.stock <= 0 ? 'bg-rose-100 text-rose-700' : item.stock < 10 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
-                                }`}>
-                                  {item.stock}
-                                </span>
-                              </td>
-
-                              {/* Discount % */}
-                              <td className="py-2 px-3 text-center">
-                                <span className="font-bold text-emerald-700">
-                                  {item.discount_percent || 0}%
-                                </span>
-                              </td>
-
-                              {/* Actions: Edit & Delete */}
-                              <td className="py-2 px-3 text-center">
-                                <div className="flex items-center justify-center gap-1.5">
-                                  <button
-                                    onClick={() => {
-                                      setEditingItem({ ...item });
-                                      setItemModal('edit');
-                                    }}
-                                    className="p-1 text-blue-600 hover:bg-blue-50 rounded cursor-pointer"
-                                    title="Edit Item"
-                                  >
-                                    <Edit3 className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteItem(item.id)}
-                                    className="p-1 text-rose-600 hover:bg-rose-50 rounded cursor-pointer"
-                                    title="Delete Item"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* 3. Live Customer Order Management */}
-                <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-xs space-y-3">
-                  <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
-                    <Package className="w-4 h-4 text-[#EE4D2D]" /> Live Orders Fulfillment Tracker ({orders.length})
-                  </h3>
-
-                  {orders.length === 0 ? (
-                    <p className="text-xs text-slate-400 py-6 text-center">No orders logged in system yet.</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {orders.map(o => (
-                        <div key={o.orderId} className="p-3.5 border border-slate-200 rounded-lg bg-slate-50 text-xs space-y-2">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <span className="font-mono font-black text-slate-900 text-sm">{o.orderId}</span>
-                              <p className="text-slate-500 text-[11px]">{o.date}</p>
-                            </div>
-                            <span className="font-black text-[#EE4D2D] text-base">₱{o.total.toLocaleString()}</span>
+                {/* ==================== SUBTAB: DISCOUNTS & FLASH SALE ==================== */}
+                {dashboardTab === 'promotions' && (
+                  <div className="bg-white p-4 sm:p-5 rounded-b-xl border border-slate-200 border-t-0 shadow-xs space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Storewide Flash Discount */}
+                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        <div className="flex items-center justify-between mb-2">
+                          <div>
+                            <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                              <Flame className="w-4 h-4 text-[#EE4D2D]" /> Storewide Flash Sale Discount
+                            </h3>
+                            <p className="text-[11px] text-slate-400">Controls live discount across all {products.length} products</p>
                           </div>
-
-                          <div className="text-xs text-slate-700 bg-white p-2.5 rounded border border-slate-200">
-                            <p><strong>Customer:</strong> {o.customer.fullName} ({o.customer.phone})</p>
-                            <p><strong>Site Address:</strong> {o.customer.address}</p>
-                            <p><strong>Payment:</strong> <span className="uppercase font-bold">{o.customer.paymentMethod}</span></p>
-                          </div>
-
-                          {/* Order Status Change Dropdown */}
-                          <div className="flex items-center justify-between pt-1">
-                            <span className="text-xs font-bold text-slate-600">Update Status:</span>
-                            <select
-                              value={o.status}
-                              onChange={e => handleOrderStatusUpdate(o.orderId, e.target.value)}
-                              className="text-xs font-bold border border-slate-300 rounded px-2.5 py-1.5 bg-white text-[#EE4D2D] focus:outline-none"
-                            >
-                              <option value="Order Placed">Order Placed</option>
-                              <option value="Processing">Processing</option>
-                              <option value="Packed">Packed</option>
-                              <option value="Out for Delivery">Out for Delivery</option>
-                              <option value="Delivered">Delivered</option>
-                              <option value="Cancelled">Cancelled</option>
-                            </select>
-                          </div>
+                          <span className="text-lg font-black text-[#EE4D2D]">{storewideDiscount}%</span>
                         </div>
-                      ))}
+                        <input
+                          type="range"
+                          min="0"
+                          max="50"
+                          step="5"
+                          value={storewideDiscount}
+                          onChange={e => setStorewideDiscount(Number(e.target.value))}
+                          className="w-full accent-[#EE4D2D] cursor-pointer"
+                        />
+                        <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+                          <span>0% (Standard)</span>
+                          <span>25%</span>
+                          <span>50% (Max)</span>
+                        </div>
+                      </div>
+
+                      {/* Active Voucher Codes (hardware 40%, builder 35%) */}
+                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        <h3 className="text-xs font-bold text-slate-900 mb-2 flex items-center gap-1.5">
+                          <Tag className="w-4 h-4 text-blue-600" /> Active Voucher Codes
+                        </h3>
+                        <div className="space-y-1.5">
+                          {discounts.map((d, i) => (
+                            <div key={d.code} className="flex items-center justify-between text-xs p-2 bg-white rounded border border-slate-200">
+                              <div>
+                                <span className="font-mono font-black text-[#EE4D2D] text-xs uppercase">{d.code}</span>
+                                <span className="ml-2 text-[10px] bg-orange-100 text-[#EE4D2D] font-bold px-1.5 py-0.2 rounded">
+                                  {d.value}% OFF
+                                </span>
+                                <span className="text-[10px] text-slate-500 ml-2">{d.description}</span>
+                              </div>
+                              <button
+                                onClick={() => setDiscounts(prev => prev.map((item, idx) => idx === i ? { ...item, active: !item.active } : item))}
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded cursor-pointer ${
+                                  d.active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-500'
+                                }`}
+                              >
+                                {d.active ? 'Active' : 'Disabled'}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
               </div>
             )}
@@ -2198,10 +2831,17 @@ export default function App() {
                       <p className="text-[11px] text-slate-500">Unit: {item.unit}</p>
                       <p className="text-xs text-[#EE4D2D] font-black mt-1">₱{item.price.toLocaleString()}</p>
                       <div className="flex items-center justify-between mt-2">
-                        <div className="flex items-center border border-slate-300 bg-white rounded text-xs">
-                          <button onClick={() => updateCartQty(item.id, -1)} className="px-2.5 py-0.5 text-slate-600 cursor-pointer">-</button>
-                          <span className="px-2.5 font-bold">{item.quantity}</span>
-                          <button onClick={() => updateCartQty(item.id, 1)} className="px-2.5 py-0.5 text-slate-600 cursor-pointer">+</button>
+                        <div className="flex items-center border border-slate-300 bg-white rounded text-xs shadow-2xs">
+                          <button onClick={() => updateCartQty(item.id, -1)} className="px-2.5 py-1 text-slate-600 hover:bg-slate-100 cursor-pointer font-bold select-none">-</button>
+                          <input
+                            type="number"
+                            min="1"
+                            max={item.stock || 9999}
+                            value={item.quantity}
+                            onChange={(e) => setCartItemQty(item.id, e.target.value)}
+                            className="w-14 text-center font-black text-xs py-1 border-x border-slate-200 focus:outline-none focus:bg-orange-50 text-slate-900"
+                          />
+                          <button onClick={() => updateCartQty(item.id, 1)} className="px-2.5 py-1 text-slate-600 hover:bg-slate-100 cursor-pointer font-bold select-none">+</button>
                         </div>
                         <button onClick={() => removeFromCart(item.id)} className="text-slate-400 hover:text-rose-600 cursor-pointer p-1">
                           <Trash2 className="w-4 h-4" />

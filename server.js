@@ -14,9 +14,70 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'asenso123';
 
+// Security Headers Middleware
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  next();
+});
+
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// In-Memory Sliding-Window Rate Limiter
+function createRateLimiter({ windowMs, max, message }) {
+  const hits = new Map();
+  setInterval(() => {
+    const now = Date.now();
+    for (const [key, record] of hits.entries()) {
+      if (now > record.resetTime) {
+        hits.delete(key);
+      }
+    }
+  }, 60000).unref();
+
+  return (req, res, next) => {
+    const ip = req.ip || req.connection?.remoteAddress || '127.0.0.1';
+    const now = Date.now();
+    const record = hits.get(ip) || { count: 0, resetTime: now + windowMs };
+
+    if (now > record.resetTime) {
+      record.count = 0;
+      record.resetTime = now + windowMs;
+    }
+
+    record.count += 1;
+    hits.set(ip, record);
+
+    const remaining = Math.max(0, max - record.count);
+    res.setHeader('X-RateLimit-Limit', max);
+    res.setHeader('X-RateLimit-Remaining', remaining);
+    res.setHeader('X-RateLimit-Reset', Math.ceil(record.resetTime / 1000));
+
+    if (record.count > max) {
+      res.setHeader('Retry-After', Math.ceil((record.resetTime - now) / 1000));
+      return res.status(429).json({
+        error: message || 'Too many requests. Please try again later.'
+      });
+    }
+    next();
+  };
+}
+
+const authRateLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 50,
+  message: 'Too many authentication attempts. Please try again after 15 minutes.'
+});
+
+const checkoutRateLimiter = createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 50,
+  message: 'Too many checkout attempts. Please slow down.'
+});
 
 // Server-side Honeypot Bot Interceptor Middleware
 const honeypotGuard = (req, res, next) => {
@@ -42,6 +103,40 @@ const adminAuth = (req, res, next) => {
   }
   next();
 };
+
+// ==================== DECEPTION & HONEYTOKEN DECOY ROUTES ====================
+app.get('/.env', (req, res) => {
+  console.warn(`[SECURITY ALERT - DECOY PROBED] Honeypot route '/.env' probed by IP: ${req.ip} | User-Agent: ${req.get('user-agent')}`);
+  res.type('text/plain').send(
+    '# MANNA ENVIRONMENT SECRETS (CANARY DECOY)\nPORT=4000\nDATABASE_URL=sqlite:///database.sqlite\nCANARY_TOKEN=CANARY_KEY_DEC_99824\nJWT_SECRET=super_secret_decoy_canary_key\nSTRIPE_SECRET=sk_live_canary_decoy_test_9921\n'
+  );
+});
+
+app.get('/api/admin/config-backup.json', (req, res) => {
+  console.warn(`[SECURITY ALERT - DECOY PROBED] Honeypot route '/api/admin/config-backup.json' probed by IP: ${req.ip}`);
+  res.status(200).json({
+    system: 'manna-core-hardware',
+    version: '2.0.4-decoy',
+    canary_token: 'CANARY_BACKUP_TOKEN_77218',
+    status: 'archived',
+    server_region: 'apac-ph-tacloban'
+  });
+});
+
+app.get(['/wp-login.php', '/administrator', '/phpmyadmin'], (req, res) => {
+  console.warn(`[SECURITY ALERT - BOT SCAN INTERCEPTED] Bot scan detected on '${req.path}' from IP: ${req.ip}`);
+  res.status(200).type('text/html').send('<html><head><title>Admin Login</title></head><body><!-- Decoy Gateway --><h1>Restricted Terminal</h1></body></html>');
+});
+
+app.get('/api/v1/internal/users-export', (req, res) => {
+  console.warn(`[SECURITY ALERT - DECOY PROBED] Honeypot route '/api/v1/internal/users-export' probed by IP: ${req.ip}`);
+  res.status(200).json({
+    export_id: 'exp_decoy_8819',
+    users: [
+      { id: 'usr_canary_1', email: 'decoy.admin@mannahardware.ph', role: 'admin', canary_token: 'CANARY_USER_EXPORT_6619' }
+    ]
+  });
+});
 
 // ==================== HEALTH & STATS ====================
 app.get('/api/health', (req, res) => {
@@ -398,7 +493,7 @@ app.post('/api/admin/settings/storewide-discount', adminAuth, (req, res) => {
 // ==================== USER AUTHENTICATION & ACCOUNT API ====================
 
 // User Registration
-app.post('/api/auth/register', honeypotGuard, (req, res) => {
+app.post('/api/auth/register', authRateLimiter, honeypotGuard, (req, res) => {
   const { fullName, email, phone, password, confirmPassword } = req.body;
 
   if (!fullName || !fullName.trim()) {
@@ -453,7 +548,7 @@ app.post('/api/auth/register', honeypotGuard, (req, res) => {
 });
 
 // User Login
-app.post('/api/auth/login', honeypotGuard, (req, res) => {
+app.post('/api/auth/login', authRateLimiter, honeypotGuard, (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !email.trim() || !password) {
@@ -519,7 +614,7 @@ app.get('/api/user/orders', requireAuth, (req, res) => {
 });
 
 // ==================== CHECKOUT & ORDERS API (ACCOUNT REQUIRED) ====================
-app.post('/api/checkout', honeypotGuard, requireAuth, (req, res) => {
+app.post('/api/checkout', checkoutRateLimiter, honeypotGuard, requireAuth, (req, res) => {
   const { customer, items, promoCode } = req.body || {};
 
   if (!customer || !customer.fullName || !customer.phone || !customer.address) {
@@ -723,12 +818,61 @@ app.patch('/api/admin/orders/:id/status', adminAuth, (req, res) => {
     return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
   }
 
-  const result = db.prepare("UPDATE orders SET status = ? WHERE id = ?").run(status, req.params.id);
-  if (result.changes === 0) {
+  const order = db.prepare("SELECT * FROM orders WHERE id = ?").get(req.params.id);
+  if (!order) {
     return res.status(404).json({ error: 'Order not found' });
   }
 
+  // Restore inventory if cancelled
+  if (status === 'Cancelled' && order.status !== 'Cancelled') {
+    const items = db.prepare("SELECT * FROM order_items WHERE order_id = ?").all(req.params.id);
+    const restoreStock = db.prepare("UPDATE products SET stock = stock + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+    for (const item of items) {
+      if (item.product_id) {
+        restoreStock.run(item.quantity, item.product_id);
+      }
+    }
+  }
+
+  const result = db.prepare("UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(status, req.params.id);
   res.json({ success: true, orderId: req.params.id, status });
+});
+
+// Customer Cancel Order endpoint (Protected with Anti-IDOR Composite Ownership Check)
+app.post('/api/orders/:id/cancel', optionalAuth, (req, res) => {
+  const order = db.prepare("SELECT * FROM orders WHERE id = ?").get(req.params.id);
+  if (!order) {
+    return res.status(404).json({ error: 'Order not found' });
+  }
+
+  // Anti-IDOR Check: If order is associated with a registered user,
+  // caller must be either that authenticated user OR the store merchant admin
+  const isAdmin = req.headers['x-admin-password'] === ADMIN_PASSWORD;
+  if (order.user_id && !isAdmin) {
+    if (!req.user || req.user.id !== order.user_id) {
+      return res.status(403).json({ error: 'Forbidden: You do not own this order.' });
+    }
+  }
+
+  if (order.status === 'Cancelled') {
+    return res.status(400).json({ error: 'Order is already cancelled' });
+  }
+
+  if (order.status === 'Delivered' || order.status === 'Out for Delivery') {
+    return res.status(400).json({ error: `Cannot cancel order in '${order.status}' status.` });
+  }
+
+  // Restore stock
+  const items = db.prepare("SELECT * FROM order_items WHERE order_id = ?").all(req.params.id);
+  const restoreStock = db.prepare("UPDATE products SET stock = stock + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+  for (const item of items) {
+    if (item.product_id) {
+      restoreStock.run(item.quantity, item.product_id);
+    }
+  }
+
+  db.prepare("UPDATE orders SET status = 'Cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(req.params.id);
+  res.json({ success: true, orderId: req.params.id, status: 'Cancelled', message: 'Order successfully cancelled and stock restored.' });
 });
 
 // Start server

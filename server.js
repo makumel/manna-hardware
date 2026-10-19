@@ -1,6 +1,14 @@
 const express = require('express');
 const cors = require('cors');
 const { db, seedProductsFromCatalog } = require('./db');
+const {
+  hashPassword,
+  verifyPassword,
+  generateToken,
+  verifyToken,
+  requireAuth,
+  optionalAuth
+} = require('./auth');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -12,7 +20,7 @@ app.use(express.json());
 
 // Server-side Honeypot Bot Interceptor Middleware
 const honeypotGuard = (req, res, next) => {
-  const { user_note_verification, honeypot } = req.body;
+  const { user_note_verification, honeypot } = req.body || {};
   if (user_note_verification || honeypot) {
     console.warn(`[SECURITY ALERT] Automated bot submission intercepted from IP: ${req.ip}`);
     return res.status(200).json({
@@ -146,6 +154,169 @@ app.patch('/api/admin/products/:id', adminAuth, (req, res) => {
   res.json({ success: true, product: updated });
 });
 
+// Admin Add New Product
+app.post('/api/admin/products', adminAuth, (req, res) => {
+  const { name, category, unit, price, capital, stock, discount_percent, image, description } = req.body;
+  if (!name || price === undefined) {
+    return res.status(400).json({ error: 'Product name and price are required' });
+  }
+
+  // Generate SKU MNA-XXXX
+  const lastProd = db.prepare("SELECT id FROM products WHERE id LIKE 'MNA-%' ORDER BY id DESC LIMIT 1").get();
+  let nextNum = 1001;
+  if (lastProd && lastProd.id) {
+    const m = lastProd.id.match(/MNA-(\d+)/);
+    if (m) nextNum = parseInt(m[1], 10) + 1;
+  }
+  const id = req.body.id || `MNA-${nextNum}`;
+
+  const numPrice = Number(price || 0);
+  const numCap = Number(capital || (numPrice * 0.78));
+  const numStock = Number(stock || 50);
+  const numDisc = Number(discount_percent || 0);
+
+  const insert = db.prepare(`
+    INSERT INTO products (id, name, category, unit, price, capital, stock, discount_percent, image, description)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  try {
+    insert.run(
+      id,
+      name.trim(),
+      category || 'General Hardware',
+      unit || 'pc',
+      numPrice,
+      numCap,
+      numStock,
+      numDisc,
+      image || 'https://images.pexels.com/photos/175039/pexels-photo-175039.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
+      description || 'Commercial building & hardware supply.'
+    );
+    const created = db.prepare("SELECT * FROM products WHERE id = ?").get(id);
+    res.status(201).json({ success: true, product: created });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Admin Full Update Product
+app.put('/api/admin/products/:id', adminAuth, (req, res) => {
+  const { name, category, unit, price, capital, stock, discount_percent, image, description } = req.body;
+  
+  const update = db.prepare(`
+    UPDATE products SET
+      name = COALESCE(?, name),
+      category = COALESCE(?, category),
+      unit = COALESCE(?, unit),
+      price = COALESCE(?, price),
+      capital = COALESCE(?, capital),
+      stock = COALESCE(?, stock),
+      discount_percent = COALESCE(?, discount_percent),
+      image = COALESCE(?, image),
+      description = COALESCE(?, description),
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `);
+
+  const result = update.run(
+    name, category, unit,
+    price !== undefined ? Number(price) : null,
+    capital !== undefined ? Number(capital) : null,
+    stock !== undefined ? Number(stock) : null,
+    discount_percent !== undefined ? Number(discount_percent) : null,
+    image, description,
+    req.params.id
+  );
+
+  if (result.changes === 0) {
+    return res.status(404).json({ error: 'Product not found' });
+  }
+
+  const updated = db.prepare("SELECT * FROM products WHERE id = ?").get(req.params.id);
+  res.json({ success: true, product: updated });
+});
+
+// Admin Delete Product
+app.delete('/api/admin/products/:id', adminAuth, (req, res) => {
+  const result = db.prepare("DELETE FROM products WHERE id = ?").run(req.params.id);
+  if (result.changes === 0) {
+    return res.status(404).json({ error: 'Product not found' });
+  }
+  res.json({ success: true, message: `Product ${req.params.id} deleted successfully` });
+});
+
+// Admin Bulk Actions
+app.post('/api/admin/products/bulk-discount', adminAuth, (req, res) => {
+  const { ids, discount_percent } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: 'ids array required' });
+  }
+  const val = Math.max(0, Math.min(100, Number(discount_percent || 0)));
+  const placeholders = ids.map(() => '?').join(',');
+  const result = db.prepare(`UPDATE products SET discount_percent = ?, updated_at = CURRENT_TIMESTAMP WHERE id IN (${placeholders})`)
+    .run(val, ...ids);
+  res.json({ success: true, updatedCount: result.changes });
+});
+
+app.post('/api/admin/products/bulk-delete', adminAuth, (req, res) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: 'ids array required' });
+  }
+  const placeholders = ids.map(() => '?').join(',');
+  const result = db.prepare(`DELETE FROM products WHERE id IN (${placeholders})`).run(...ids);
+  res.json({ success: true, deletedCount: result.changes });
+});
+
+app.post('/api/admin/products/bulk-import', adminAuth, (req, res) => {
+  const { items } = req.body;
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: 'items array required' });
+  }
+
+  const upsert = db.prepare(`
+    INSERT INTO products (id, name, category, unit, price, capital, stock, discount_percent, image, description)
+    VALUES (@id, @name, @category, @unit, @price, @capital, @stock, @discount_percent, @image, @description)
+    ON CONFLICT(id) DO UPDATE SET
+      name=excluded.name,
+      category=excluded.category,
+      unit=excluded.unit,
+      price=excluded.price,
+      capital=excluded.capital,
+      stock=excluded.stock,
+      discount_percent=COALESCE(excluded.discount_percent, products.discount_percent, 0),
+      image=COALESCE(excluded.image, products.image),
+      description=excluded.description,
+      updated_at=CURRENT_TIMESTAMP
+  `);
+
+  const runBatch = db.transaction((rows) => {
+    let count = 0;
+    for (const r of rows) {
+      if (r.name && r.price) {
+        upsert.run({
+          id: r.id || `MNA-${Date.now().toString().slice(-4)}${Math.floor(Math.random()*100)}`,
+          name: r.name,
+          category: r.category || 'General Hardware',
+          unit: r.unit || 'pc',
+          price: Number(r.price),
+          capital: Number(r.capital || (r.price * 0.78)),
+          stock: Number(r.stock || 50),
+          discount_percent: Number(r.discount_percent || 0),
+          image: r.image || 'https://images.pexels.com/photos/175039/pexels-photo-175039.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
+          description: r.description || 'Imported hardware item.'
+        });
+        count++;
+      }
+    }
+    return count;
+  });
+
+  const count = runBatch(items);
+  res.json({ success: true, importedCount: count });
+});
+
 // Admin batch per-item discount updater
 app.post('/api/admin/products/:id/discount', adminAuth, (req, res) => {
   const { discount_percent } = req.body;
@@ -224,9 +395,132 @@ app.post('/api/admin/settings/storewide-discount', adminAuth, (req, res) => {
   res.json({ success: true, discount_percentage: num });
 });
 
-// ==================== CHECKOUT & ORDERS API ====================
-app.post('/api/checkout', honeypotGuard, (req, res) => {
-  const { customer, items, promoCode } = req.body;
+// ==================== USER AUTHENTICATION & ACCOUNT API ====================
+
+// User Registration
+app.post('/api/auth/register', honeypotGuard, (req, res) => {
+  const { fullName, email, phone, password, confirmPassword } = req.body;
+
+  if (!fullName || !fullName.trim()) {
+    return res.status(400).json({ error: 'Full name is required.' });
+  }
+
+  if (!email || !email.trim() || !email.includes('@')) {
+    return res.status(400).json({ error: 'Valid email address is required.' });
+  }
+
+  if (!password || password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
+  }
+
+  if (confirmPassword !== undefined && password !== confirmPassword) {
+    return res.status(400).json({ error: 'Passwords do not match.' });
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+  const cleanPhone = phone ? phone.trim() : '';
+
+  // Check if email already registered
+  const existingUser = db.prepare('SELECT id FROM users WHERE LOWER(email) = ?').get(cleanEmail);
+  if (existingUser) {
+    return res.status(409).json({ error: 'An account with this email already exists. Please log in.' });
+  }
+
+  const { salt, hash } = hashPassword(password);
+  const crypto = require('crypto');
+  const userId = `usr_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+
+  db.prepare(`
+    INSERT INTO users (id, email, phone, full_name, password_hash, salt)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(userId, cleanEmail, cleanPhone, fullName.trim(), hash, salt);
+
+  const newUser = db.prepare('SELECT id, email, phone, full_name, created_at FROM users WHERE id = ?').get(userId);
+  const token = generateToken(newUser);
+
+  res.status(201).json({
+    success: true,
+    message: 'Account created successfully.',
+    token,
+    user: {
+      id: newUser.id,
+      email: newUser.email,
+      fullName: newUser.full_name,
+      phone: newUser.phone,
+      createdAt: newUser.created_at
+    }
+  });
+});
+
+// User Login
+app.post('/api/auth/login', honeypotGuard, (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !email.trim() || !password) {
+    return res.status(400).json({ error: 'Email/phone and password are required.' });
+  }
+
+  const identifier = email.trim().toLowerCase();
+
+  // Find user by email or phone
+  const user = db.prepare(`
+    SELECT * FROM users 
+    WHERE LOWER(email) = ? OR phone = ?
+  `).get(identifier, email.trim());
+
+  if (!user || !verifyPassword(password, user.salt, user.password_hash)) {
+    return res.status(401).json({ error: 'Invalid email/phone or password. Please try again.' });
+  }
+
+  const token = generateToken(user);
+
+  res.json({
+    success: true,
+    message: 'Login successful.',
+    token,
+    user: {
+      id: user.id,
+      email: user.email,
+      fullName: user.full_name,
+      phone: user.phone,
+      createdAt: user.created_at
+    }
+  });
+});
+
+// Get Current Logged-in User Profile
+app.get('/api/auth/me', requireAuth, (req, res) => {
+  res.json({
+    success: true,
+    user: req.user
+  });
+});
+
+// User Logout (stateless token acknowledgment)
+app.post('/api/auth/logout', (req, res) => {
+  res.json({ success: true, message: 'Logged out successfully.' });
+});
+
+// User Order History (protected by requireAuth)
+app.get('/api/user/orders', requireAuth, (req, res) => {
+  const orders = db.prepare(`
+    SELECT * FROM orders 
+    WHERE user_id = ? OR LOWER(customer_email) = LOWER(?)
+    ORDER BY created_at DESC
+  `).all(req.user.id, req.user.email);
+
+  const getItems = db.prepare("SELECT * FROM order_items WHERE order_id = ?");
+  const populated = orders.map(ord => ({
+    ...ord,
+    items: getItems.all(ord.id)
+  }));
+
+  res.json({ success: true, orders: populated });
+});
+
+// ==================== CHECKOUT & ORDERS API (ACCOUNT REQUIRED) ====================
+app.post('/api/checkout', honeypotGuard, requireAuth, (req, res) => {
+  const { customer, items, promoCode } = req.body || {};
 
   if (!customer || !customer.fullName || !customer.phone || !customer.address) {
     return res.status(400).json({ error: 'Full customer name, phone, and delivery address are required' });
@@ -305,18 +599,19 @@ app.post('/api/checkout', honeypotGuard, (req, res) => {
       decrementStock.run(item.quantity, item.id);
     }
 
-    // Insert order with initial status 'Order Placed'
+    // Insert order with initial status 'Order Placed' and bound authenticated user_id
     const orderId = `MNA-ORD-${Date.now().toString().slice(-6)}`;
     const insertOrder = db.prepare(`
-      INSERT INTO orders (id, customer_name, customer_phone, customer_email, delivery_address, payment_method, delivery_notes, subtotal, discount_amount, promo_code, shipping_fee, total, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Order Placed')
+      INSERT INTO orders (id, user_id, customer_name, customer_phone, customer_email, delivery_address, payment_method, delivery_notes, subtotal, discount_amount, promo_code, shipping_fee, total, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Order Placed')
     `);
 
     insertOrder.run(
       orderId,
-      customer.fullName,
-      customer.phone,
-      customer.email || null,
+      req.user.id,
+      customer.fullName || req.user.fullName,
+      customer.phone || req.user.phone || '',
+      customer.email || req.user.email,
       customer.address,
       customer.paymentMethod || 'cod',
       customer.notes || null,
@@ -339,7 +634,12 @@ app.post('/api/checkout', honeypotGuard, (req, res) => {
 
     return {
       orderId,
-      customer,
+      userId: req.user.id,
+      customer: {
+        ...customer,
+        fullName: customer.fullName || req.user.fullName,
+        email: customer.email || req.user.email
+      },
       items: validatedItems,
       subtotal,
       discountAmount: totalDiscountAmount,

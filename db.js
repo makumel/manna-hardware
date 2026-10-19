@@ -70,13 +70,42 @@ db.exec(`
     total_price REAL NOT NULL,
     FOREIGN KEY(order_id) REFERENCES orders(id)
   );
+  CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    phone TEXT,
+    full_name TEXT NOT NULL,
+    password_hash TEXT NOT NULL,
+    salt TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
-// Safe column migration for discount_percent if table existed previously
+// Safe column migration for discount_percent and user_id if table existed previously
 try {
   db.exec("ALTER TABLE products ADD COLUMN discount_percent REAL DEFAULT 0;");
 } catch (e) {
   // column already exists
+}
+
+try {
+  db.exec("ALTER TABLE orders ADD COLUMN user_id TEXT;");
+} catch (e) {
+  // column already exists
+}
+
+// Seed default demo user if users table is empty
+const checkUsers = db.prepare("SELECT COUNT(*) as count FROM users").get();
+if (checkUsers.count === 0) {
+  const crypto = require('crypto');
+  const demoSalt = crypto.randomBytes(16).toString('hex');
+  const demoHash = crypto.scryptSync('password123', demoSalt, 64).toString('hex');
+  db.prepare(`
+    INSERT INTO users (id, email, phone, full_name, password_hash, salt)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run('usr_demo_1', 'builder@example.com', '09171234567', 'Tacloban Builder', demoHash, demoSalt);
+  console.log('Seeded demo user: builder@example.com (password: password123)');
 }
 
 // Seed default settings and discounts

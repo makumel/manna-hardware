@@ -18,6 +18,7 @@ db.exec(`
     price REAL NOT NULL,
     capital REAL NOT NULL,
     stock INTEGER NOT NULL,
+    discount_percent REAL DEFAULT 0,
     rating REAL DEFAULT 4.8,
     reviews INTEGER DEFAULT 25,
     featured INTEGER DEFAULT 0,
@@ -71,7 +72,14 @@ db.exec(`
   );
 `);
 
-// Seed default settings and discounts if empty
+// Safe column migration for discount_percent if table existed previously
+try {
+  db.exec("ALTER TABLE products ADD COLUMN discount_percent REAL DEFAULT 0;");
+} catch (e) {
+  // column already exists
+}
+
+// Seed default settings and discounts
 const checkSettings = db.prepare("SELECT COUNT(*) as count FROM store_settings").get();
 if (checkSettings.count === 0) {
   const insertSetting = db.prepare("INSERT INTO store_settings (key, value) VALUES (?, ?)");
@@ -80,13 +88,22 @@ if (checkSettings.count === 0) {
   insertSetting.run('standard_shipping_fee', '150');
 }
 
-const checkDiscounts = db.prepare("SELECT COUNT(*) as count FROM discounts").get();
-if (checkDiscounts.count === 0) {
-  const insertDiscount = db.prepare("INSERT INTO discounts (code, type, value, min_spend, active, description) VALUES (?, ?, ?, ?, ?, ?)");
-  insertDiscount.run('MANNA10', 'percentage', 10, 1000, 1, '10% off for orders over ₱1,000');
-  insertDiscount.run('HARDWARE500', 'flat', 500, 5000, 1, '₱500 flat discount for orders over ₱5,000');
-  insertDiscount.run('BUILDER5', 'percentage', 5, 0, 1, '5% Contractor wholesale special');
-}
+// Ensure required promo codes: 'hardware' (40% off) and 'builder' (35% off)
+const upsertDiscount = db.prepare(`
+  INSERT INTO discounts (code, type, value, min_spend, active, description)
+  VALUES (?, ?, ?, ?, ?, ?)
+  ON CONFLICT(code) DO UPDATE SET
+    type=excluded.type,
+    value=excluded.value,
+    min_spend=excluded.min_spend,
+    active=excluded.active,
+    description=excluded.description
+`);
+
+upsertDiscount.run('HARDWARE', 'percentage', 40, 0, 1, '40% Storewide Discount for Hardware Orders');
+upsertDiscount.run('BUILDER', 'percentage', 35, 0, 1, '35% Contractor & Builder Discount');
+upsertDiscount.run('MANNA10', 'percentage', 10, 1000, 1, '10% off for orders over ₱1,000');
+upsertDiscount.run('HARDWARE500', 'flat', 500, 5000, 1, '₱500 flat discount for orders over ₱5,000');
 
 // Function to seed products from catalog.json
 function seedProductsFromCatalog() {
@@ -94,24 +111,24 @@ function seedProductsFromCatalog() {
   if (!fs.existsSync(catalogPath)) return;
   
   const catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf-8'));
-  const checkCount = db.prepare("SELECT COUNT(*) as count FROM products").get();
   
   const upsert = db.prepare(`
-    INSERT INTO products (id, name, category, unit, price, capital, stock, rating, reviews, featured, image, description)
-    VALUES (@id, @name, @category, @unit, @price, @capital, @stock, @rating, @reviews, @featured, @image, @description)
+    INSERT INTO products (id, name, category, unit, price, capital, stock, discount_percent, rating, reviews, featured, image, description)
+    VALUES (@id, @name, @category, @unit, @price, @capital, @stock, @discount_percent, @rating, @reviews, @featured, @image, @description)
     ON CONFLICT(id) DO UPDATE SET
       name=excluded.name,
       category=excluded.category,
       unit=excluded.unit,
       price=excluded.price,
       capital=excluded.capital,
+      stock=excluded.stock,
+      discount_percent=COALESCE(excluded.discount_percent, products.discount_percent, 0),
       image=COALESCE(excluded.image, products.image),
       description=excluded.description
   `);
 
   const runMany = db.transaction((items) => {
     for (const item of items) {
-      // Rebrand to MANNA if still FAN-
       const cleanId = item.id.replace('FAN-', 'MNA-');
       upsert.run({
         id: cleanId,
@@ -121,6 +138,7 @@ function seedProductsFromCatalog() {
         price: Number(item.price || 0),
         capital: Number(item.capital || 0),
         stock: Number(item.stock || 50),
+        discount_percent: Number(item.discount_percent || 0),
         rating: Number(item.rating || 4.8),
         reviews: Number(item.reviews || 20),
         featured: item.featured ? 1 : 0,

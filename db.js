@@ -105,6 +105,18 @@ try {
   // column already exists
 }
 
+try {
+  db.exec("ALTER TABLE orders ADD COLUMN distance_km REAL DEFAULT 0;");
+} catch (e) {
+  // column already exists
+}
+
+try {
+  db.exec("ALTER TABLE orders ADD COLUMN long_cargo_fee REAL DEFAULT 0;");
+} catch (e) {
+  // column already exists
+}
+
 // Seed default demo user if users table is empty
 const checkUsers = db.prepare("SELECT COUNT(*) as count FROM users").get();
 if (checkUsers.count === 0) {
@@ -148,8 +160,8 @@ const upsertDiscount = db.prepare(`
     description=excluded.description
 `);
 
-upsertDiscount.run('HARDWARE', 'percentage', 40, 0, 1, '40% Storewide Discount for Hardware Orders');
-upsertDiscount.run('BUILDER', 'percentage', 35, 0, 1, '35% Contractor & Builder Discount');
+upsertDiscount.run('HARDWARE', 'percentage', 40, 100000, 1, '40% Wholesale Discount for Hardware Orders (Min. ₱100,000)');
+upsertDiscount.run('BUILDER', 'percentage', 35, 50000, 1, '35% Contractor & Builder Discount (Min. ₱50,000)');
 upsertDiscount.run('MANNA10', 'percentage', 10, 1000, 1, '10% off for orders over ₱1,000');
 upsertDiscount.run('HARDWARE500', 'flat', 500, 5000, 1, '₱500 flat discount for orders over ₱5,000');
 

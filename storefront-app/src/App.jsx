@@ -13,6 +13,34 @@ import {
   TrendingUp, TrendingDown, DollarSign, PieChart, FileText, Receipt, ArrowUpRight, Percent, Coins, AlertTriangle
 } from 'lucide-react';
 
+// Helper to detect 10ft+ long structural and pipe items (Angle bar, C-Purlins, GI Pipe, Rebar, etc.)
+export const isLongCargoItem = (item) => {
+  if (!item || !item.name) return false;
+  const name = item.name.toLowerCase();
+  
+  // Exclude small accessories and hand tools
+  if (/(bolt|bracket|wrench|hinge|handle|cutter|clamp|fitting|threader|nipple|bushing|elbow|tee|cleaner|cement|glue|tape|lock|screw)/i.test(name)) {
+    return false;
+  }
+
+  // Matches 10ft+ long structural steel, purlins, angle bars, pipes, and metal bars
+  return (
+    /(\bpurlin|\bangle\s*bar|\bgi\s*pipe|\bg\.i\.\s*pipe|\bpipe\s*s-40|\bschedule\s*40|\btubular|\bsquare\s*tube|\bdeformed\s*bar|\brebar|\bplain\s*bar|\bi-bar|\bt-bar|\bflat\s*bar|\bchannel\s*bar|\bsteel\s*bar|10\s*ft|20\s*ft|6\s*m\b)/i.test(name)
+  );
+};
+
+export const TACLOBAN_DELIVERY_ZONES = [
+  { label: 'Tacloban North (Cabalwan / Abucay Warehouse Area)', km: 5 },
+  { label: 'Tacloban City Proper / Downtown / Port Area', km: 8 },
+  { label: 'Tacloban South (Marasbaras / San Jose / V&G)', km: 10 },
+  { label: 'Palo, Leyte (Government Center / Pawing)', km: 15 },
+  { label: 'Tanauan, Leyte', km: 24 },
+  { label: 'Alangalang, Leyte', km: 25 },
+  { label: 'Babatngon, Leyte', km: 22 },
+  { label: 'Basey, Samar (via San Juanico Bridge)', km: 28 },
+  { label: 'Custom Distance (Manual Km)', km: 0 }
+];
+
 export default function App() {
   // Navigation tabs: 'home' | 'catalog' | 'mall' | 'live' | 'notifications' | 'me' | 'track-order' | 'checkout' | 'order-success'
   const [activeTab, setActiveTab] = useState('home');
@@ -62,7 +90,17 @@ export default function App() {
   // ==================== CATALOG & INVENTORY ====================
   const [products, setProducts] = useState(() => {
     const saved = localStorage.getItem('manna_products');
-    return saved ? JSON.parse(saved) : initialCatalog;
+    const rawList = saved ? JSON.parse(saved) : initialCatalog;
+    // Guarantee MNA-1103 (LUX QDE Med. Brown) always has authentic paint can image (not human hair color)
+    return rawList.map(p => {
+      if (p.id === 'MNA-1103' || p.name === 'LUX QDE Med. Brown') {
+        return {
+          ...p,
+          image: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR1kVAYMpJTgWxNh5VMpl8dGuewXHpkZZzybncsM66Y3w&s=10'
+        };
+      }
+      return p;
+    });
   });
 
   const [cart, setCart] = useState(() => {
@@ -72,15 +110,26 @@ export default function App() {
   const [isCartOpen, setIsCartOpen] = useState(false);
 
   // ==================== DISCOUNTS & PROMOTIONS ====================
-  // Required promo codes: "hardware" (40% off), "builder" (35% off)
+  // Required promo codes: "builder" (35% off, activated ONLY at min ₱50k), "hardware" (40% off, activated ONLY at min ₱100k)
+  // Supports small caps or all caps entry
   const [discounts, setDiscounts] = useState(() => {
-    const saved = localStorage.getItem('manna_discounts');
-    return saved ? JSON.parse(saved) : [
-      { code: 'hardware', type: 'percentage', value: 40, minSpend: 0, active: true, description: '40% OFF Hardware Promo' },
-      { code: 'builder', type: 'percentage', value: 35, minSpend: 0, active: true, description: '35% OFF Builder Special' },
+    const defaultPromos = [
+      { code: 'builder', type: 'percentage', value: 35, minSpend: 50000, active: true, description: '35% Contractor & Builder Discount (Min. ₱50,000 spend)' },
+      { code: 'hardware', type: 'percentage', value: 40, minSpend: 100000, active: true, description: '40% Hardware Wholesale Discount (Min. ₱100,000 spend)' },
       { code: 'MANNA10', type: 'percentage', value: 10, minSpend: 1000, active: true, description: '10% OFF Min. Spend ₱1k' },
       { code: 'HARDWARE500', type: 'flat', value: 500, minSpend: 5000, active: true, description: '₱500 Flat Voucher' }
     ];
+    const saved = localStorage.getItem('manna_discounts');
+    if (!saved) return defaultPromos;
+    try {
+      const parsed = JSON.parse(saved);
+      return defaultPromos.map(def => {
+        const found = parsed.find(p => p.code.toLowerCase() === def.code.toLowerCase());
+        return found ? { ...found, minSpend: def.minSpend, value: def.value, description: def.description } : def;
+      });
+    } catch (e) {
+      return defaultPromos;
+    }
   });
 
   // Global Storewide Discount (%)
@@ -108,6 +157,9 @@ export default function App() {
     phone: '',
     email: '',
     address: 'Tacloban City, Leyte',
+    deliveryZone: 'Tacloban City Proper / Downtown / Port Area',
+    distanceKm: 8,
+    customDistance: false,
     paymentMethod: 'cod',
     honeypot: ''
   });
@@ -337,7 +389,7 @@ export default function App() {
 
   const discountAmount = useMemo(() => {
     let disc = 0;
-    if (appliedPromo) {
+    if (appliedPromo && cartSubtotal >= (appliedPromo.minSpend || 0)) {
       if (appliedPromo.type === 'percentage') disc += (cartSubtotal * (appliedPromo.value / 100));
       else disc += appliedPromo.value;
     }
@@ -345,7 +397,44 @@ export default function App() {
     return Math.min(disc, cartSubtotal);
   }, [cartSubtotal, appliedPromo, storewideDiscount]);
 
-  const shippingFee = cartSubtotal > 3000 || cart.length === 0 ? 0 : 150;
+  // Proactively deactivate promo code if cart subtotal drops below required spend
+  useEffect(() => {
+    if (appliedPromo && cartSubtotal < appliedPromo.minSpend) {
+      const diff = appliedPromo.minSpend - cartSubtotal;
+      setPromoMessage({
+        text: `Voucher "${appliedPromo.code.toUpperCase()}" removed: cart subtotal (₱${cartSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}) fell below ₱${appliedPromo.minSpend.toLocaleString()}. Add ₱${diff.toLocaleString(undefined, { minimumFractionDigits: 2 })} more to re-activate.`,
+        type: 'error'
+      });
+      setAppliedPromo(null);
+    }
+  }, [cartSubtotal, appliedPromo]);
+
+  // Long Cargo (10ft+ Structural Materials @ ₱50/km)
+  const hasLongCargo = useMemo(() => {
+    return cart.some(item => isLongCargoItem(item));
+  }, [cart]);
+
+  const longCargoItemsInCart = useMemo(() => {
+    return cart.filter(item => isLongCargoItem(item));
+  }, [cart]);
+
+  const deliveryDistanceKm = useMemo(() => {
+    return Math.max(1, Number(customer.distanceKm || 8));
+  }, [customer.distanceKm]);
+
+  const longCargoFee = useMemo(() => {
+    return hasLongCargo ? (deliveryDistanceKm * 50) : 0;
+  }, [hasLongCargo, deliveryDistanceKm]);
+
+  const baseShippingFee = useMemo(() => {
+    return cartSubtotal >= 3000 || cart.length === 0 ? 0 : 150;
+  }, [cartSubtotal, cart.length]);
+
+  const shippingFee = useMemo(() => {
+    if (cart.length === 0) return 0;
+    return baseShippingFee + longCargoFee;
+  }, [cart.length, baseShippingFee, longCargoFee]);
+
   const orderTotal = Math.max(0, cartSubtotal - discountAmount + shippingFee);
 
   // Sort helper function for indicators
@@ -805,23 +894,42 @@ export default function App() {
     setCart(prev => prev.filter(item => item.id !== id));
   };
 
-  // Promo code application (supports "hardware" 40%, "builder" 35%)
+  // Promo code application (builder: 35% off at min ₱50k, hardware: 40% off at min ₱100k; works in small caps or all caps)
   const applyPromoCode = (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     setPromoMessage({ text: '', type: '' });
-    const clean = promoInput.trim().toLowerCase();
     
+    if (!promoInput || !promoInput.trim()) {
+      setPromoMessage({ text: 'Please enter a promo code (e.g. builder or hardware).', type: 'error' });
+      return;
+    }
+
+    const clean = promoInput.trim().toLowerCase();
     const found = discounts.find(d => d.code.toLowerCase() === clean && d.active);
+    
     if (!found) {
-      setPromoMessage({ text: 'Invalid promo code. Try "hardware" or "builder"', type: 'error' });
+      setPromoMessage({ 
+        text: 'Invalid promo code. Active wholesale codes: "builder" (35% OFF, min ₱50K) or "hardware" (40% OFF, min ₱100K). Works in small or all caps.', 
+        type: 'error' 
+      });
       return;
     }
+
     if (cartSubtotal < found.minSpend) {
-      setPromoMessage({ text: `Minimum order of ₱${found.minSpend.toLocaleString()} required.`, type: 'error' });
+      const needed = found.minSpend - cartSubtotal;
+      setPromoMessage({ 
+        text: `Voucher "${clean.toUpperCase()}" requires a minimum purchase of ₱${found.minSpend.toLocaleString('en-PH')}. Your current cart is ₱${cartSubtotal.toLocaleString('en-PH', { minimumFractionDigits: 2 })}. Add ₱${needed.toLocaleString('en-PH', { minimumFractionDigits: 2 })} more to activate ${found.value}% OFF!`, 
+        type: 'error' 
+      });
       return;
     }
+
     setAppliedPromo(found);
-    setPromoMessage({ text: `Success! Code "${found.code.toUpperCase()}" applied (${found.value}% OFF)`, type: 'success' });
+    const savings = found.type === 'percentage' ? (cartSubtotal * (found.value / 100)) : found.value;
+    setPromoMessage({ 
+      text: `🎉 Code "${clean.toUpperCase()}" ACTIVATED! ${found.value}% wholesale discount applied (-₱${savings.toLocaleString('en-PH', { minimumFractionDigits: 2 })} savings).`, 
+      type: 'success' 
+    });
   };
 
   // Order status update & Cancellation
@@ -952,6 +1060,8 @@ export default function App() {
             phone: customer.phone || currentUser.phone || '',
             email: currentUser.email,
             address: customer.address,
+            deliveryZone: customer.deliveryZone || 'Tacloban City Proper / Downtown / Port Area',
+            distanceKm: deliveryDistanceKm,
             paymentMethod: customer.paymentMethod || 'cod',
             notes: customer.notes || ''
           },
@@ -988,6 +1098,11 @@ export default function App() {
         subtotal: data.order.subtotal,
         discountAmount: data.order.discountAmount,
         promoCode: appliedPromo ? appliedPromo.code : null,
+        baseShippingFee: data.order.baseShippingFee,
+        hasLongCargo: data.order.hasLongCargo,
+        longCargoFee: data.order.longCargoFee,
+        distanceKm: data.order.distanceKm,
+        shippingFee: data.order.shippingFee,
         total: data.order.finalTotal,
         status: data.order.status || 'Order Placed'
       };
@@ -1552,7 +1667,7 @@ export default function App() {
             <div className="bg-gradient-to-r from-amber-500 to-[#EE4D2D] text-white p-3 rounded-md mb-3 flex flex-wrap items-center justify-between gap-2 shadow-xs">
               <div className="flex items-center gap-2 text-xs sm:text-sm">
                 <Tag className="w-4 h-4 shrink-0" />
-                <span>Special Promo: Use code <strong className="underline uppercase font-black">hardware</strong> for 40% OFF or <strong className="underline uppercase font-black">builder</strong> for 35% OFF!</span>
+                <span>Special Wholesale Promo: Use code <strong className="underline uppercase font-black">builder</strong> for 35% OFF (Min. ₱50K) or <strong className="underline uppercase font-black">hardware</strong> for 40% OFF (Min. ₱100K)! <span className="opacity-90 text-[11px] font-normal">(Works in small or all caps)</span></span>
               </div>
               <button 
                 onClick={() => { setActiveTab('checkout'); setIsCartOpen(true); }} 
@@ -1621,7 +1736,7 @@ export default function App() {
                   {
                     id: 'faq-3',
                     q: 'How do I claim contractor volume discounts for structural purlins and fasteners?',
-                    a: 'You can apply promo code "builder" for 35% OFF or "hardware" for 40% OFF at checkout. For bulk projects over 500 purlins or 50 bags of cement, contact our dispatch hotline directly at 0917-882-9912.'
+                    a: 'You can apply promo code "builder" (small or all caps) for 35% OFF on orders ₱50,000 and above, or "hardware" for 40% OFF on wholesale purchases ₱100,000 and above. For project quotes over 500 purlins or full truckloads, contact our dispatch hotline directly at 0917-882-9912.'
                   },
                   {
                     id: 'faq-4',
@@ -1841,7 +1956,14 @@ export default function App() {
 
                             {/* Name */}
                             <td className="py-2.5 px-3">
-                              <p className="font-bold text-slate-900 leading-snug">{item.name}</p>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-bold text-slate-900 leading-snug">{item.name}</span>
+                                {isLongCargoItem(item) && (
+                                  <span className="inline-flex items-center gap-0.5 text-[9px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.5 rounded border border-amber-300">
+                                    <Truck className="w-2.5 h-2.5 text-amber-700" /> 10ft+ (₱50/km)
+                                  </span>
+                                )}
+                              </div>
                               {item.description && (
                                 <p className="text-[10px] text-slate-400 line-clamp-1">{item.description}</p>
                               )}
@@ -2087,7 +2209,18 @@ export default function App() {
                   <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1">
                     <p className="text-slate-700">Receiver: <strong>{trackedOrder.customer.fullName}</strong> ({trackedOrder.customer.phone})</p>
                     <p className="text-slate-700">Delivery Address: <strong>{trackedOrder.customer.address}</strong></p>
+                    {trackedOrder.customer.deliveryZone && (
+                      <p className="text-slate-700">Destination Zone: <strong>{trackedOrder.customer.deliveryZone}</strong></p>
+                    )}
                     <p className="text-slate-700">Payment: <strong className="uppercase">{trackedOrder.customer.paymentMethod}</strong></p>
+                    {(trackedOrder.long_cargo_fee > 0 || trackedOrder.longCargoFee > 0) && (
+                      <div className="mt-2 pt-2 border-t border-slate-200 text-amber-800 flex items-center justify-between text-xs font-semibold">
+                        <span className="flex items-center gap-1">
+                          <Truck className="w-3.5 h-3.5 text-amber-600" /> Long Cargo Delivery ({trackedOrder.distance_km || trackedOrder.distanceKm || 10} km @ ₱50/km):
+                        </span>
+                        <strong className="text-amber-900">₱{(trackedOrder.long_cargo_fee || trackedOrder.longCargoFee).toFixed(2)}</strong>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex justify-between items-baseline pt-2 text-base font-black text-slate-900">
@@ -2178,8 +2311,8 @@ export default function App() {
                 🏷️
               </div>
               <div className="flex-1 text-xs">
-                <p className="font-bold text-slate-900 text-sm">Voucher Code "hardware" Live!</p>
-                <p className="text-slate-500 mt-0.5">Save 40% OFF storewide with voucher code <strong className="text-slate-800">hardware</strong>.</p>
+                <p className="font-bold text-slate-900 text-sm">Wholesale Code "hardware" (40% OFF)</p>
+                <p className="text-slate-500 mt-0.5">Save 40% OFF wholesale hardware orders <strong>₱100,000+</strong> with voucher code <strong className="text-slate-800">hardware</strong> or <strong className="text-slate-800">HARDWARE</strong>.</p>
               </div>
             </div>
 
@@ -2188,8 +2321,8 @@ export default function App() {
                 🏗️
               </div>
               <div className="flex-1 text-xs">
-                <p className="font-bold text-slate-900 text-sm">Contractor Special "builder"</p>
-                <p className="text-slate-500 mt-0.5">Contractors and builders enjoy 35% discount with voucher code <strong className="text-slate-800">builder</strong>.</p>
+                <p className="font-bold text-slate-900 text-sm">Contractor Special "builder" (35% OFF)</p>
+                <p className="text-slate-500 mt-0.5">Contractors and builders enjoy 35% discount on purchases <strong>₱50,000+</strong> with voucher code <strong className="text-slate-800">builder</strong> or <strong className="text-slate-800">BUILDER</strong>.</p>
               </div>
             </div>
           </main>
@@ -4224,6 +4357,77 @@ export default function App() {
                     />
                   </div>
 
+                  {/* Delivery Destination Zone & Distance (₱50/km Long Cargo) */}
+                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <Truck className="w-4 h-4 text-[#EE4D2D]" /> Logistics Destination Zone & Distance
+                      </label>
+                      {hasLongCargo && (
+                        <span className="text-[10px] bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded-full border border-amber-300 flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3 text-amber-600" /> 10ft+ Long Cargo (@ ₱50/km)
+                        </span>
+                      )}
+                    </div>
+
+                    <select
+                      value={customer.deliveryZone}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const match = TACLOBAN_DELIVERY_ZONES.find(z => z.label === val);
+                        if (match) {
+                          setCustomer({
+                            ...customer,
+                            deliveryZone: match.label,
+                            distanceKm: match.km > 0 ? match.km : customer.distanceKm,
+                            customDistance: match.km === 0
+                          });
+                        }
+                      }}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:border-[#EE4D2D] focus:outline-none bg-white font-medium text-slate-800"
+                    >
+                      {TACLOBAN_DELIVERY_ZONES.map(zone => (
+                        <option key={zone.label} value={zone.label}>
+                          {zone.label} {zone.km > 0 ? `(${zone.km} km)` : ''}
+                        </option>
+                      ))}
+                    </select>
+
+                    {customer.customDistance ? (
+                      <div className="flex items-center gap-2 pt-1">
+                        <span className="text-xs text-slate-600 font-medium whitespace-nowrap">Custom Distance:</span>
+                        <input
+                          type="number"
+                          min="1"
+                          max="250"
+                          value={customer.distanceKm}
+                          onChange={(e) => setCustomer({ ...customer, distanceKm: Math.max(1, Number(e.target.value) || 1) })}
+                          className="w-20 px-2 py-1 text-xs border border-slate-300 rounded focus:outline-none focus:border-[#EE4D2D] font-bold text-slate-900 bg-white"
+                        />
+                        <span className="text-xs text-slate-500 font-bold">km from Cabalwan warehouse</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between text-[11px] text-slate-500 pt-0.5">
+                        <span>Origin: Cabalwan Warehouse, Tacloban</span>
+                        <span className="font-bold text-slate-700 bg-slate-200/70 px-2 py-0.5 rounded">{deliveryDistanceKm} km distance</span>
+                      </div>
+                    )}
+
+                    {hasLongCargo && (
+                      <div className="bg-amber-100/70 border border-amber-300 rounded-lg p-2.5 text-xs text-amber-950 space-y-1">
+                        <div className="flex items-center justify-between font-bold">
+                          <span className="flex items-center gap-1 text-amber-800">
+                            <Truck className="w-3.5 h-3.5 text-amber-700" /> Long Cargo Fee (₱50/km × {deliveryDistanceKm} km):
+                          </span>
+                          <span className="text-amber-900 font-black text-sm">₱{longCargoFee.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <p className="text-[11px] text-amber-800 leading-tight">
+                          Special heavy flatbed vehicle required for 10ft+ materials ({longCargoItemsInCart.map(i => i.name).slice(0, 3).join(', ')}{longCargoItemsInCart.length > 3 ? ` +${longCargoItemsInCart.length - 3} more` : ''}).
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">Payment Method</label>
                     <select
@@ -4239,11 +4443,14 @@ export default function App() {
 
                   {/* Promo Code Input Box */}
                   <div className="pt-2 border-t border-slate-100">
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Voucher / Promo Code</label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-bold text-slate-700">Voucher / Promo Code</label>
+                      <span className="text-[10px] text-slate-400">Small caps or all caps works</span>
+                    </div>
                     <div className="flex gap-2">
                       <input
                         type="text"
-                        placeholder="e.g. hardware (40%) or builder (35%)"
+                        placeholder="e.g. builder (35%) or hardware (40%)"
                         value={promoInput}
                         onChange={e => setPromoInput(e.target.value)}
                         className="flex-1 px-3 py-2 text-xs border border-slate-300 rounded-lg uppercase font-mono focus:outline-none focus:border-[#EE4D2D]"
@@ -4251,13 +4458,32 @@ export default function App() {
                       <button
                         type="button"
                         onClick={applyPromoCode}
-                        className="bg-slate-900 text-white px-4 py-2 rounded-lg text-xs font-bold cursor-pointer hover:bg-black"
+                        className="bg-slate-900 text-white px-4 py-2 rounded-lg text-xs font-bold cursor-pointer hover:bg-black transition-colors"
                       >
                         Apply
                       </button>
                     </div>
+
+                    {/* Quick Voucher Chips */}
+                    <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                      <button
+                        type="button"
+                        onClick={() => { setPromoInput('builder'); }}
+                        className="text-[10px] bg-blue-50 hover:bg-blue-100 text-blue-700 px-2 py-0.5 rounded border border-blue-200 font-mono font-bold cursor-pointer transition-colors"
+                      >
+                        builder (35% • Min ₱50K)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setPromoInput('hardware'); }}
+                        className="text-[10px] bg-amber-50 hover:bg-amber-100 text-amber-800 px-2 py-0.5 rounded border border-amber-200 font-mono font-bold cursor-pointer transition-colors"
+                      >
+                        hardware (40% • Min ₱100K)
+                      </button>
+                    </div>
+
                     {promoMessage.text && (
-                      <p className={`text-xs mt-1.5 font-bold ${promoMessage.type === 'success' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      <p className={`text-xs mt-2 font-bold p-2 rounded-md ${promoMessage.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}>
                         {promoMessage.text}
                       </p>
                     )}
@@ -4276,10 +4502,20 @@ export default function App() {
                       </div>
                     )}
                     <div className="flex justify-between text-slate-500">
-                      <span>Delivery Fee</span>
-                      <span>{shippingFee === 0 ? <strong className="text-emerald-600">FREE</strong> : `₱${shippingFee.toFixed(2)}`}</span>
+                      <span>Standard Base Delivery</span>
+                      <span>{baseShippingFee === 0 ? <strong className="text-emerald-600">FREE (Orders ₱3,000+)</strong> : `₱${baseShippingFee.toFixed(2)}`}</span>
                     </div>
-                    <div className="flex justify-between text-base font-black text-slate-900 pt-2 border-t border-slate-100">
+                    {hasLongCargo && (
+                      <div className="flex justify-between text-amber-800 font-semibold bg-amber-50 px-2 py-1 rounded border border-amber-200">
+                        <span>Long Cargo Delivery (10ft+ @ ₱50/km × {deliveryDistanceKm} km)</span>
+                        <span className="font-bold">₱{longCargoFee.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-slate-700 font-bold pt-1 border-t border-slate-100">
+                      <span>Total Shipping & Logistics</span>
+                      <span>₱{shippingFee.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-base font-black text-slate-900 pt-2 border-t border-slate-200">
                       <span>Total Payable:</span>
                       <span className="text-[#EE4D2D]">₱{orderTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                     </div>
@@ -4312,6 +4548,16 @@ export default function App() {
             </div>
             <h2 className="text-lg font-black text-slate-900">Order Placed Successfully!</h2>
             <p className="text-xs text-slate-500 mt-1 mb-2">Tracking ID: <strong className="font-mono text-slate-900 font-bold text-sm">{placedOrder.orderId}</strong></p>
+            {placedOrder.longCargoFee > 0 && (
+              <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-lg p-2.5 text-xs text-left max-w-xs mx-auto mb-3">
+                <span className="font-bold flex items-center gap-1">
+                  <Truck className="w-3.5 h-3.5 text-amber-700" /> 10ft+ Long Cargo Delivery Added
+                </span>
+                <p className="text-[11px] text-amber-800 mt-0.5">
+                  Distance: <strong>{placedOrder.distanceKm || 10} km</strong> • Surcharge: <strong>₱{placedOrder.longCargoFee.toFixed(2)}</strong> (₱50/km)
+                </p>
+              </div>
+            )}
             <p className="text-xs text-slate-400 max-w-xs mx-auto mb-6">
               Your materials are being allocated at Manna Hardware Tacloban. You can track fulfillment status live anytime.
             </p>
@@ -4462,10 +4708,93 @@ export default function App() {
 
             {cart.length > 0 && (
               <div className="p-4 border-t border-slate-200 bg-slate-50 space-y-3">
-                <div className="flex justify-between text-xs sm:text-sm text-slate-600">
-                  <span>Subtotal</span>
-                  <span className="font-black text-[#EE4D2D] text-base">₱{cartSubtotal.toLocaleString()}</span>
+                {/* Promo Code Input in Drawer */}
+                <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="font-bold text-slate-700 flex items-center gap-1">
+                      <Tag className="w-3.5 h-3.5 text-[#EE4D2D]" /> Voucher Code
+                    </span>
+                    <span className="text-[10px] text-slate-400">Small caps or all caps works</span>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <input
+                      type="text"
+                      placeholder="e.g. builder (35%) or hardware (40%)"
+                      value={promoInput}
+                      onChange={e => setPromoInput(e.target.value)}
+                      className="flex-1 px-2.5 py-1.5 text-xs border border-slate-300 rounded font-mono uppercase focus:outline-none focus:border-[#EE4D2D]"
+                    />
+                    <button
+                      type="button"
+                      onClick={applyPromoCode}
+                      className="bg-slate-900 hover:bg-black text-white px-3 py-1.5 rounded text-xs font-bold cursor-pointer transition-colors"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                  {/* Quick voucher chip tags */}
+                  <div className="flex flex-wrap items-center gap-1 pt-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setPromoInput('builder')}
+                      className="text-[9px] bg-blue-50 hover:bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200 font-mono font-bold cursor-pointer"
+                    >
+                      builder (35% • Min ₱50k)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPromoInput('hardware')}
+                      className="text-[9px] bg-amber-50 hover:bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200 font-mono font-bold cursor-pointer"
+                    >
+                      hardware (40% • Min ₱100k)
+                    </button>
+                  </div>
+                  {promoMessage.text && (
+                    <p className={`text-[11px] font-bold p-1.5 rounded ${promoMessage.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}>
+                      {promoMessage.text}
+                    </p>
+                  )}
                 </div>
+
+                {hasLongCargo && (
+                  <div className="bg-amber-50 border border-amber-300 rounded-lg p-2.5 text-xs text-amber-900 space-y-1">
+                    <div className="flex items-center gap-1.5 font-bold text-amber-900">
+                      <Truck className="w-4 h-4 text-amber-700 shrink-0" />
+                      <span>10ft+ Long Cargo Delivery (@ ₱50/km)</span>
+                    </div>
+                    <p className="text-[11px] text-amber-800 leading-snug">
+                      Your cart includes long materials (e.g., {longCargoItemsInCart.map(i => i.name).slice(0, 2).join(', ')}{longCargoItemsInCart.length > 2 ? ` +${longCargoItemsInCart.length - 2} more` : ''}). Surcharge calculated at ₱50 per km from our Cabalwan warehouse.
+                    </p>
+                  </div>
+                )}
+
+                <div className="space-y-1 text-xs">
+                  <div className="flex justify-between text-slate-600">
+                    <span>Subtotal</span>
+                    <span className="font-bold text-slate-800">₱{cartSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  {discountAmount > 0 && (
+                    <div className="flex justify-between text-emerald-600 font-bold">
+                      <span>Voucher Discount</span>
+                      <span>-₱{discountAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-slate-600">
+                    <span>Base Delivery</span>
+                    <span>{baseShippingFee === 0 ? <strong className="text-emerald-600">FREE</strong> : `₱${baseShippingFee.toFixed(2)}`}</span>
+                  </div>
+                  {hasLongCargo && (
+                    <div className="flex justify-between text-amber-800 font-medium">
+                      <span>Long Cargo ({deliveryDistanceKm} km @ ₱50/km)</span>
+                      <span className="font-bold">₱{longCargoFee.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-slate-900 font-black text-sm pt-1.5 border-t border-slate-200">
+                    <span>Estimated Total</span>
+                    <span className="text-[#EE4D2D]">₱{orderTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                  </div>
+                </div>
+
                 <button
                   onClick={() => {
                     if (!currentUser) {
@@ -5139,6 +5468,11 @@ function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = f
             <span className="border border-emerald-600 text-emerald-700 text-[8px] font-bold px-1 rounded-xs leading-none py-0.5 bg-emerald-50">
               Tacloban Stock
             </span>
+            {isLongCargoItem(product) && (
+              <span className="bg-amber-600 text-white text-[8px] font-bold px-1 rounded-xs leading-none py-0.5 flex items-center gap-0.5">
+                <Truck className="w-2.5 h-2.5" /> 10ft+ (₱50/km)
+              </span>
+            )}
             <span className="bg-[#EE4D2D] text-white text-[8px] font-bold px-1 rounded-xs leading-none py-0.5">
               Wholesale Deal
             </span>

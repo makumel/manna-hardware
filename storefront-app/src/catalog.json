@@ -379,7 +379,7 @@
     "reviews": 18,
     "featured": false,
     "description": "Authentic commercial-grade Pressure Switch (White Box) SD sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ1QkjwmYk5g3roBEWW3O7lrVx_6Iv62FwOSttX25CfhQ&s",
+    "image": "/images/pressure_switch_clean.jpg",
     "archetype": "electrical_switch_socket",
     "discount_percent": 0
   },
@@ -395,7 +395,7 @@
     "reviews": 24,
     "featured": false,
     "description": "Authentic commercial-grade PVC Floor Drain LD sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRFyHWo8JhuVYQFilOIe9rTVoWYHYEYf0xsHHMP29_H5g&s=10",
+    "image": "/images/floor_drain_clean.jpg",
     "archetype": "sink_and_drain",
     "discount_percent": 0
   },
@@ -459,7 +459,7 @@
     "reviews": 34,
     "featured": false,
     "description": "Authentic commercial-grade Stikwel (GLn) sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS20uVYntzqz98IlF-MQ98PKdGrXRDy-isqGCJCY8B8rw&s=10",
+    "image": "/images/stikwel_clean.jpg",
     "archetype": "wood_glue_adhesive",
     "discount_percent": 0
   },
@@ -923,7 +923,7 @@
     "reviews": 39,
     "featured": false,
     "description": "Authentic commercial-grade HASP Lock Amerilock #4 sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRrZUqYIkHf4H8Jq4QbtkdF5a2RLp_Zx7jr-uZcBIFB1A&s=10",
+    "image": "/images/hasp_lock_clean.jpg",
     "archetype": "amerilock_door_hardware",
     "discount_percent": 0
   },
@@ -939,7 +939,7 @@
     "reviews": 30,
     "featured": false,
     "description": "Authentic commercial-grade Hasp Lock #4 PH sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRVRVBQeBu-vDtK5Yb8PXboA_fXH-PCYXbnPgohLQ2PiQ&s=10",
+    "image": "/images/hasp_lock_clean.jpg",
     "archetype": "padlocks_and_locks",
     "discount_percent": 0
   },
@@ -1051,7 +1051,7 @@
     "reviews": 28,
     "featured": false,
     "description": "Authentic commercial-grade Plumb Bob 200g sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSJBUgT0CXhJNA4ePSVvXi5dI7o_tBBpMeydDyZlEhsDQ&s",
+    "image": "/images/plumb_bob_clean.jpg",
     "archetype": "measuring_tools",
     "discount_percent": 0
   },
@@ -1067,7 +1067,7 @@
     "reviews": 17,
     "featured": false,
     "description": "Authentic commercial-grade Plumb Bob 250g sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQphrYb6cc4yWEVg1BevGoKhvtraxt5YK0fhggdISkw2g&s",
+    "image": "/images/plumb_bob_clean.jpg",
     "archetype": "measuring_tools",
     "discount_percent": 0
   },
@@ -1083,7 +1083,7 @@
     "reviews": 32,
     "featured": false,
     "description": "Authentic commercial-grade Plumb Bob300g sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS2DTfW0doxqzpUfXBXNiAQz7eZY6n-frwPmkFq54p9hw&s",
+    "image": "/images/plumb_bob_clean.jpg",
     "archetype": "measuring_tools",
     "discount_percent": 0
   },
@@ -1115,7 +1115,7 @@
     "reviews": 13,
     "featured": false,
     "description": "Authentic commercial-grade Safety Hasp DH 4.5\" sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTRXDjvv6eGomgOQVF5ZcRfOmCKw1zNxkKDQaOh6XkomA&s=10",
+    "image": "/images/hasp_lock_clean.jpg",
     "archetype": "padlocks_and_locks",
     "discount_percent": 0
   },
@@ -1211,7 +1211,7 @@
     "reviews": 21,
     "featured": false,
     "description": "Authentic commercial-grade Safety Hasp DH 2\" sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQM61-O3ZtIMII_2_dkbknPsy5sN3YSEWJkxX68py6iBA&s=10",
+    "image": "/images/hasp_lock_clean.jpg",
     "archetype": "padlocks_and_locks",
     "discount_percent": 0
   },
@@ -1387,7 +1387,7 @@
     "reviews": 34,
     "featured": false,
     "description": "Authentic commercial-grade PVC WATER JAG Faucet ROSCO 3/8 sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRqtqU1UByaLBB4kEdPM7-yFGTuGbpr4-SZQ40tMpGwjw&s",
+    "image": "/images/rosco_water_jug_faucet_clean.jpg",
     "archetype": "water_faucet",
     "discount_percent": 0
   },
@@ -1483,7 +1483,7 @@
     "reviews": 14,
     "featured": false,
     "description": "Authentic commercial-grade SALE Gooseneck SUNRISE1321/1312 sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTE42Pss_FMiyAW4eFfpMWTATvGPA73PH_4Gt_1pYl_iA&s=10",
+    "image": "/images/gooseneck_faucet_clean.jpg",
     "archetype": "shower_and_faucet",
     "discount_percent": 0
   },
@@ -1531,7 +1531,7 @@
     "reviews": 14,
     "featured": false,
     "description": "Authentic commercial-grade SALE Check Valve #3/4 SW sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRiyd5rWMCe-pExvGHT0pnBqwLFGjb1WyTwZHoAu8zFPA&s=10",
+    "image": "/images/brass_swing_valve_clean.jpg",
     "archetype": "plumbing_valve",
     "discount_percent": 0
   },
@@ -1547,7 +1547,7 @@
     "reviews": 38,
     "featured": false,
     "description": "Authentic commercial-grade SALE Check Valve #1/2 SW sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSm3NbAiNaAoyzNO8IIG5uT_H6mXl0a5-4qTu6N4-2E_A&s=10",
+    "image": "/images/brass_swing_valve_clean.jpg",
     "archetype": "plumbing_valve",
     "discount_percent": 0
   },
@@ -1563,7 +1563,7 @@
     "reviews": 38,
     "featured": false,
     "description": "Authentic commercial-grade SALE Check Valve #1 SW sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTMLO3B-zl19gh7tX3UNmHuIt5YMMmRezuGeIeZWfNrmw&s",
+    "image": "/images/brass_swing_valve_clean.jpg",
     "archetype": "plumbing_valve",
     "discount_percent": 0
   },
@@ -1643,7 +1643,7 @@
     "reviews": 20,
     "featured": false,
     "description": "Authentic commercial-grade LUX QDE Med. Brown sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ8Hx-rIiQMWfNjZho_zWR5e9u1_sTx53TdhFtkQE1J_w&s=10",
+    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR1kVAYMpJTgWxNh5VMpl8dGuewXHpkZZzybncsM66Y3w&s=10",
     "archetype": "paint_can_generic",
     "discount_percent": 0
   },
@@ -1739,7 +1739,7 @@
     "reviews": 19,
     "featured": false,
     "description": "Authentic commercial-grade Boysen OTC Bulitine Red (1/4) sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTW0EksZWgixOHpQASOA4bJya-YEoG_J-u8NpGJPLrlnQ&s=10",
+    "image": "/images/boysen_lacquer_can_clean.jpg",
     "archetype": "paint_can_boysen",
     "discount_percent": 0
   },
@@ -1755,7 +1755,7 @@
     "reviews": 34,
     "featured": false,
     "description": "Authentic commercial-grade Boysen OTC Raw Sienna (1/4) sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQqsjRbR9I0teoid6iJOLqOCokROXUcI6gTWaqQoEqaVw&s=10",
+    "image": "/images/boysen_lacquer_can_clean.jpg",
     "archetype": "paint_can_boysen",
     "discount_percent": 0
   },
@@ -1771,7 +1771,7 @@
     "reviews": 31,
     "featured": false,
     "description": "Authentic commercial-grade Island OTC Bulletin Red (1/4) sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQBXfGzwkTl91qzgntrui5zZ-zjNJYryH4TWOVI_Vl7Yw&s=10",
+    "image": "/images/island_qde_clean.png",
     "archetype": "paint_can_island",
     "discount_percent": 0
   },
@@ -1787,7 +1787,7 @@
     "reviews": 14,
     "featured": false,
     "description": "Authentic commercial-grade Island OTC Raw Sienna (1/4) sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQqsjRbR9I0teoid6iJOLqOCokROXUcI6gTWaqQoEqaVw&s=10",
+    "image": "/images/island_qde_clean.png",
     "archetype": "paint_can_island",
     "discount_percent": 0
   },
@@ -2091,7 +2091,7 @@
     "reviews": 20,
     "featured": false,
     "description": "Authentic commercial-grade Plumb Bob 150g SILVER sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSfsddB-pCkYufFTKBuhQuG5_-X8dczPrsl-BDarmV2gA&s=10",
+    "image": "/images/plumb_bob_clean.jpg",
     "archetype": "measuring_tools",
     "discount_percent": 0
   },
@@ -2651,7 +2651,7 @@
     "reviews": 36,
     "featured": false,
     "description": "Authentic commercial-grade Lavatory Hose 1/2X1/2X12 SUNRIS sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSTUTp24KaOy-hZhCcADTCWiH-1nAGxi-hdLTnqDKjZcQ&s=10",
+    "image": "/images/flexible_hose_clean.jpg",
     "archetype": "flexible_plumbing_hose",
     "discount_percent": 0
   },
@@ -2667,7 +2667,7 @@
     "reviews": 14,
     "featured": false,
     "description": "Authentic commercial-grade Lavatory Hose #1/2X1/2X12 SHARK sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR2-Am5pvByrDFTJHGvrLDyRluqKiZpLvTotC22uQf1dQ&s=10",
+    "image": "/images/flexible_hose_clean.jpg",
     "archetype": "shark_plumbing_fixture",
     "discount_percent": 0
   },
@@ -2683,7 +2683,7 @@
     "reviews": 42,
     "featured": false,
     "description": "Authentic commercial-grade Lavatory Hose #1/2X1/2X12 LAMCO sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSCHUEYu0Y-fxIiMuBpydBvtgiz32aYyq_sdCWoYEmtlw&s=10",
+    "image": "/images/flexible_hose_clean.jpg",
     "archetype": "flexible_plumbing_hose",
     "discount_percent": 0
   },
@@ -2699,7 +2699,7 @@
     "reviews": 24,
     "featured": false,
     "description": "Authentic commercial-grade Lavatory Hose #3/8X1/2X12 LAMCO sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRYfCpk_qavWYW0sA78Poi5VtTdtQTpi1fLn0HakpmcXQ&s=10",
+    "image": "/images/flexible_hose_clean.jpg",
     "archetype": "flexible_plumbing_hose",
     "discount_percent": 0
   },
@@ -2715,7 +2715,7 @@
     "reviews": 38,
     "featured": false,
     "description": "Authentic commercial-grade Lavatory Hose #3/8X1/2X14 LAMCO sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRYfCpk_qavWYW0sA78Poi5VtTdtQTpi1fLn0HakpmcXQ&s=10",
+    "image": "/images/flexible_hose_clean.jpg",
     "archetype": "flexible_plumbing_hose",
     "discount_percent": 0
   },
@@ -2731,7 +2731,7 @@
     "reviews": 42,
     "featured": false,
     "description": "Authentic commercial-grade Lavatory Hose #3/8X1/2X18 R/D sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT1cqKTuLWYv_oarYkfDvSZv7h7qivct3q-ZtFXspRVXg&s",
+    "image": "/images/flexible_hose_clean.jpg",
     "archetype": "flexible_plumbing_hose",
     "discount_percent": 0
   },
@@ -4043,7 +4043,7 @@
     "reviews": 28,
     "featured": false,
     "description": "Authentic commercial-grade Lacquer Flo (Btl) sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSy0j52Yj_GUfQ7mJ61_TjK7c-UnpdIoCRbvrC3p-P8NQ&s=10",
+    "image": "/images/lacquer_flo_clean.jpg",
     "archetype": "wood_varnish",
     "discount_percent": 0
   },
@@ -5051,7 +5051,7 @@
     "reviews": 45,
     "featured": false,
     "description": "Authentic commercial-grade 2-Way Faucet FLEXCO FC9007 sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTsSEmT0PjnBWl43q9i6r1PoSGzTuGGtmqon7uRHFCjYQ&s",
+    "image": "/images/two_way_faucet_clean.jpg",
     "archetype": "water_faucet",
     "discount_percent": 0
   },
@@ -5115,7 +5115,7 @@
     "reviews": 16,
     "featured": false,
     "description": "Authentic commercial-grade Swing Valve SHARK #1/2 sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR2-Am5pvByrDFTJHGvrLDyRluqKiZpLvTotC22uQf1dQ&s=10",
+    "image": "/images/brass_swing_valve_clean.jpg",
     "archetype": "shark_plumbing_fixture",
     "discount_percent": 0
   },
@@ -5227,7 +5227,7 @@
     "reviews": 16,
     "featured": false,
     "description": "Authentic commercial-grade 2-Way Faucet Sunrise S-1102 sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRPNntwGiRjShSlUHQM6gW0x3jG-h9j63RrOtrg2ih18A&s",
+    "image": "/images/two_way_faucet_clean.jpg",
     "archetype": "water_faucet",
     "discount_percent": 0
   },
@@ -6091,7 +6091,7 @@
     "reviews": 27,
     "featured": false,
     "description": "Authentic commercial-grade SALE Gooseneck SUNRISE 1206 sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSzJEQPVL4osGX9v0mSPDB2Y8jXEeUpw9d_02N6eREsww&s=10",
+    "image": "/images/gooseneck_faucet_clean.jpg",
     "archetype": "shower_and_faucet",
     "discount_percent": 0
   },
@@ -6107,7 +6107,7 @@
     "reviews": 23,
     "featured": false,
     "description": "Authentic commercial-grade SALE Gooseneck S-1332 Sunrise sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQBVnAFYcnTDOXE_0EuY1WVZf1PMj4Vy6fCOv3-5Jh15w&s=10",
+    "image": "/images/gooseneck_faucet_clean.jpg",
     "archetype": "shower_and_faucet",
     "discount_percent": 0
   },
@@ -6171,7 +6171,7 @@
     "reviews": 19,
     "featured": false,
     "description": "Authentic commercial-grade SALE Check Valve SHARK 1/2 sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR2-Am5pvByrDFTJHGvrLDyRluqKiZpLvTotC22uQf1dQ&s=10",
+    "image": "/images/brass_swing_valve_clean.jpg",
     "archetype": "shark_plumbing_fixture",
     "discount_percent": 0
   },
@@ -6187,7 +6187,7 @@
     "reviews": 15,
     "featured": false,
     "description": "Authentic commercial-grade SALE Check Valve SHARK 3/4 sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR2-Am5pvByrDFTJHGvrLDyRluqKiZpLvTotC22uQf1dQ&s=10",
+    "image": "/images/brass_swing_valve_clean.jpg",
     "archetype": "shark_plumbing_fixture",
     "discount_percent": 0
   },
@@ -6203,7 +6203,7 @@
     "reviews": 22,
     "featured": false,
     "description": "Authentic commercial-grade SALE Check Valve SHARK #1 sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR2-Am5pvByrDFTJHGvrLDyRluqKiZpLvTotC22uQf1dQ&s=10",
+    "image": "/images/brass_swing_valve_clean.jpg",
     "archetype": "shark_plumbing_fixture",
     "discount_percent": 0
   },
@@ -6267,7 +6267,7 @@
     "reviews": 23,
     "featured": false,
     "description": "Authentic commercial-grade SALE PVC GooseneckFaucetLAMCO sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQomQgdpE57iz0MVIHDUrQMwQWA4Ziu8PxW9PSKstA1uw&s=10",
+    "image": "/images/gooseneck_faucet_clean.jpg",
     "archetype": "shower_and_faucet",
     "discount_percent": 0
   },
@@ -6923,7 +6923,7 @@
     "reviews": 33,
     "featured": false,
     "description": "Authentic commercial-grade Hasp Lock #3 PH sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSmQ-dFloI_g2nueD07hvrq4Zg0ERhzWyOENR6YGBo2kA&s=10",
+    "image": "/images/hasp_lock_clean.jpg",
     "archetype": "padlocks_and_locks",
     "discount_percent": 0
   },
@@ -7291,7 +7291,7 @@
     "reviews": 26,
     "featured": false,
     "description": "Authentic commercial-grade Swing Valve SHARK #1 sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR2-Am5pvByrDFTJHGvrLDyRluqKiZpLvTotC22uQf1dQ&s=10",
+    "image": "/images/brass_swing_valve_clean.jpg",
     "archetype": "shark_plumbing_fixture",
     "discount_percent": 0
   },
@@ -7371,7 +7371,7 @@
     "reviews": 16,
     "featured": false,
     "description": "Authentic commercial-grade Swing Valve WB #1 sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTghG7DY-Opq-SSMuJduJLtZKPBNSZ1Qq011HMvQXVYEg&s=10",
+    "image": "/images/brass_swing_valve_clean.jpg",
     "archetype": "plumbing_valve",
     "discount_percent": 0
   },
@@ -7387,7 +7387,7 @@
     "reviews": 20,
     "featured": false,
     "description": "Authentic commercial-grade Swing Valve WB #1/2 sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTghG7DY-Opq-SSMuJduJLtZKPBNSZ1Qq011HMvQXVYEg&s=10",
+    "image": "/images/brass_swing_valve_clean.jpg",
     "archetype": "plumbing_valve",
     "discount_percent": 0
   },

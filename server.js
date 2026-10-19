@@ -613,6 +613,54 @@ app.get('/api/user/orders', requireAuth, (req, res) => {
   res.json({ success: true, orders: populated });
 });
 
+// Helper to detect 10ft+ long structural and pipe items (Angle bar, C-Purlins, GI Pipe, Rebar, etc.)
+function isLongCargoItem(item) {
+  if (!item || !item.name) return false;
+  const name = item.name.toLowerCase();
+  
+  // Exclude small accessories and hand tools
+  if (/(bolt|bracket|wrench|hinge|handle|cutter|clamp|fitting|threader|nipple|bushing|elbow|tee|cleaner|cement|glue|tape|lock|screw)/i.test(name)) {
+    return false;
+  }
+
+  // Matches 10ft+ long structural steel, purlins, angle bars, pipes, and metal bars
+  return (
+    /(\bpurlin|\bangle\s*bar|\bgi\s*pipe|\bg\.i\.\s*pipe|\bpipe\s*s-40|\bschedule\s*40|\btubular|\bsquare\s*tube|\bdeformed\s*bar|\brebar|\bplain\s*bar|\bi-bar|\bt-bar|\bflat\s*bar|\bchannel\s*bar|\bsteel\s*bar|10\s*ft|20\s*ft|6\s*m\b)/i.test(name)
+  );
+}
+
+// Public Shipping & Long Cargo Calculator API
+app.post('/api/shipping/calculate', (req, res) => {
+  const { items, distanceKm, subtotal } = req.body || {};
+  const distance = Math.max(1, Number(distanceKm || 10));
+  let hasLongCargo = false;
+  const longItems = [];
+
+  if (Array.isArray(items)) {
+    for (const item of items) {
+      if (isLongCargoItem(item)) {
+        hasLongCargo = true;
+        longItems.push(item.name || item.id);
+      }
+    }
+  }
+
+  const numSubtotal = Number(subtotal || 0);
+  const baseShippingFee = numSubtotal >= 3000 ? 0 : 150;
+  const longCargoFee = hasLongCargo ? (distance * 50) : 0;
+  const totalShippingFee = baseShippingFee + longCargoFee;
+
+  res.json({
+    hasLongCargo,
+    longItems,
+    distanceKm: distance,
+    ratePerKm: 50,
+    longCargoFee,
+    baseShippingFee,
+    totalShippingFee
+  });
+});
+
 // ==================== CHECKOUT & ORDERS API (ACCOUNT REQUIRED) ====================
 app.post('/api/checkout', checkoutRateLimiter, honeypotGuard, requireAuth, (req, res) => {
   const { customer, items, promoCode } = req.body || {};
@@ -648,6 +696,8 @@ app.post('/api/checkout', checkoutRateLimiter, honeypotGuard, requireAuth, (req,
       const itemTotal = effectiveUnitPrice * item.quantity;
       subtotal += itemTotal;
 
+      const isLong = isLongCargoItem(liveProduct);
+
       validatedItems.push({
         id: liveProduct.id,
         name: liveProduct.name,
@@ -655,6 +705,7 @@ app.post('/api/checkout', checkoutRateLimiter, honeypotGuard, requireAuth, (req,
         price: liveProduct.price,
         effectivePrice: effectiveUnitPrice,
         discountPercent: itemDiscountPercent,
+        isLongCargo: isLong,
         quantity: item.quantity,
         total: itemTotal
       });
@@ -685,8 +736,24 @@ app.post('/api/checkout', checkoutRateLimiter, honeypotGuard, requireAuth, (req,
     }
 
     const totalDiscountAmount = Math.min(promoDiscountAmount, subtotal);
-    const shippingFee = subtotal >= 3000 ? 0 : 150;
-    const finalTotal = Math.max(0, subtotal - totalDiscountAmount + shippingFee);
+
+    // ==================== 10FT+ LONG CARGO (50/KM) SHIPPING CALCULATION ====================
+    // Check if order contains 10ft+ long materials (anglebar, c-purlins, gi pipe, etc.)
+    const longItemsInOrder = validatedItems.filter(i => i.isLongCargo);
+    const hasLongCargo = longItemsInOrder.length > 0;
+
+    // Delivery distance in km (default: 10 km if unspecified)
+    const distanceKm = Math.max(1, Number(customer.distanceKm || customer.distance_km || 10));
+
+    // Long cargo delivery fee: ₱50 per km
+    const longCargoRatePerKm = 50;
+    const longCargoFee = hasLongCargo ? (distanceKm * longCargoRatePerKm) : 0;
+
+    // Base standard shipping fee (Free if subtotal >= ₱3,000)
+    const baseShippingFee = subtotal >= 3000 ? 0 : 150;
+    const totalShippingFee = baseShippingFee + longCargoFee;
+
+    const finalTotal = Math.max(0, subtotal - totalDiscountAmount + totalShippingFee);
 
     // Decrement stock
     const decrementStock = db.prepare("UPDATE products SET stock = stock - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
@@ -697,8 +764,8 @@ app.post('/api/checkout', checkoutRateLimiter, honeypotGuard, requireAuth, (req,
     // Insert order with initial status 'Order Placed' and bound authenticated user_id
     const orderId = `MNA-ORD-${Date.now().toString().slice(-6)}`;
     const insertOrder = db.prepare(`
-      INSERT INTO orders (id, user_id, customer_name, customer_phone, customer_email, delivery_address, payment_method, delivery_notes, subtotal, discount_amount, promo_code, shipping_fee, total, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Order Placed')
+      INSERT INTO orders (id, user_id, customer_name, customer_phone, customer_email, delivery_address, payment_method, delivery_notes, subtotal, discount_amount, promo_code, shipping_fee, distance_km, long_cargo_fee, total, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Order Placed')
     `);
 
     insertOrder.run(
@@ -713,7 +780,9 @@ app.post('/api/checkout', checkoutRateLimiter, honeypotGuard, requireAuth, (req,
       subtotal,
       totalDiscountAmount,
       appliedCode,
-      shippingFee,
+      totalShippingFee,
+      distanceKm,
+      longCargoFee,
       finalTotal
     );
 
@@ -733,12 +802,19 @@ app.post('/api/checkout', checkoutRateLimiter, honeypotGuard, requireAuth, (req,
       customer: {
         ...customer,
         fullName: customer.fullName || req.user.fullName,
-        email: customer.email || req.user.email
+        email: customer.email || req.user.email,
+        distanceKm
       },
       items: validatedItems,
       subtotal,
       discountAmount: totalDiscountAmount,
-      shippingFee,
+      baseShippingFee,
+      hasLongCargo,
+      longCargoItems: longItemsInOrder.map(i => ({ id: i.id, name: i.name })),
+      distanceKm,
+      ratePerKm: longCargoRatePerKm,
+      longCargoFee,
+      shippingFee: totalShippingFee,
       finalTotal,
       status: 'Order Placed',
       createdAt: new Date().toISOString()

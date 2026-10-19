@@ -163,6 +163,10 @@ export default function App() {
   const [salesLogSearch, setSalesLogSearch] = useState('');
   const [salesLogDateFilter, setSalesLogDateFilter] = useState('all'); // 'all' | 'today' | 'week' | 'month'
   const [salesLogStatusFilter, setSalesLogStatusFilter] = useState('all'); // 'all' | 'active' | 'cancelled'
+  const [valuationSearch, setValuationSearch] = useState('');
+  const [valuationCategory, setValuationCategory] = useState('All');
+  const [valuationSortField, setValuationSortField] = useState('originalIndex');
+  const [valuationSortOrder, setValuationSortOrder] = useState('asc');
 
   // CSV/PDF Upload state
   const [uploadModal, setUploadModal] = useState(false);
@@ -608,6 +612,140 @@ export default function App() {
     const link = document.createElement('a');
     link.href = url;
     link.setAttribute('download', `manna_sales_log_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // ==================== OWNER INVENTORY COST & POTENTIAL VALUATION REPORT ====================
+  const handleValuationSort = (field) => {
+    if (valuationSortField === field) {
+      setValuationSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setValuationSortField(field);
+      setValuationSortOrder('asc');
+    }
+  };
+
+  const handleInlineCapitalChange = (id, newCapital) => {
+    const capVal = Math.max(0, parseFloat(newCapital) || 0);
+    setProducts(prev => prev.map(p => p.id === id ? { ...p, capital: capVal } : p));
+    fetch(`/api/admin/products/${id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-key': 'asenso123'
+      },
+      body: JSON.stringify({ capital: capVal })
+    }).catch(() => {});
+  };
+
+  const valuationRows = useMemo(() => {
+    const list = products.filter(p => {
+      const matchCat = valuationCategory === 'All' || p.category === valuationCategory;
+      if (!matchCat) return false;
+      if (!valuationSearch) return true;
+      const q = valuationSearch.toLowerCase();
+      return p.name.toLowerCase().includes(q) || (p.id && p.id.toLowerCase().includes(q));
+    });
+
+    const mapped = list.map((p, idx) => {
+      const qty = Math.max(0, Number(p.stock || 0));
+      const unitCapital = Number(p.capital || 0);
+      const totalCapital = qty * unitCapital;
+      const unitPrice = Number(p.price || 0);
+      const totalSellingPrice = qty * unitPrice;
+      const potentialProfit = totalSellingPrice - totalCapital;
+      const marginPct = totalSellingPrice > 0 ? ((potentialProfit / totalSellingPrice) * 100).toFixed(1) : '0';
+
+      return {
+        ...p,
+        rowIndex: idx + 1,
+        qty,
+        unitCapital,
+        totalCapital,
+        unitPrice,
+        totalSellingPrice,
+        potentialProfit,
+        marginPct
+      };
+    });
+
+    return mapped.sort((a, b) => {
+      let valA = a[valuationSortField];
+      let valB = b[valuationSortField];
+
+      if (['rowIndex', 'qty', 'unitCapital', 'totalCapital', 'unitPrice', 'totalSellingPrice', 'potentialProfit', 'marginPct'].includes(valuationSortField)) {
+        valA = Number(valA || 0);
+        valB = Number(valB || 0);
+        return valuationSortOrder === 'asc' ? valA - valB : valB - valA;
+      }
+
+      valA = (valA || '').toString().toLowerCase();
+      valB = (valB || '').toString().toLowerCase();
+      if (valA < valB) return valuationSortOrder === 'asc' ? -1 : 1;
+      if (valA > valB) return valuationSortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [products, valuationCategory, valuationSearch, valuationSortField, valuationSortOrder]);
+
+  const valuationTotals = useMemo(() => {
+    let totalQty = 0;
+    let totalCostCapital = 0;
+    let totalPotentialSelling = 0;
+
+    valuationRows.forEach(r => {
+      totalQty += r.qty;
+      totalCostCapital += r.totalCapital;
+      totalPotentialSelling += r.totalSellingPrice;
+    });
+
+    const totalProfit = totalPotentialSelling - totalCostCapital;
+    const overallMarginPct = totalPotentialSelling > 0 ? ((totalProfit / totalPotentialSelling) * 100).toFixed(1) : '0';
+
+    return {
+      totalQty,
+      totalCostCapital,
+      totalPotentialSelling,
+      totalProfit,
+      overallMarginPct
+    };
+  }, [valuationRows]);
+
+  const exportValuationSheetToCSV = () => {
+    const headers = ['#', 'Qty', 'U/M', 'Item Description', 'Unit Capital', 'Total Capital', 'Unit Price', 'Total Selling Price', 'Potential Profit', 'Margin %'];
+    const rows = valuationRows.map((r, i) => [
+      i + 1,
+      r.qty,
+      `"${r.unit || 'pc'}"`,
+      `"${r.name.replace(/"/g, '""')}"`,
+      r.unitCapital.toFixed(2),
+      r.totalCapital.toFixed(2),
+      r.unitPrice.toFixed(2),
+      r.totalSellingPrice.toFixed(2),
+      r.potentialProfit.toFixed(2),
+      `${r.marginPct}%`
+    ]);
+
+    rows.push([
+      'TOTALS',
+      valuationTotals.totalQty,
+      '',
+      `"Total across ${valuationRows.length} items"`,
+      '',
+      valuationTotals.totalCostCapital.toFixed(2),
+      '',
+      valuationTotals.totalPotentialSelling.toFixed(2),
+      valuationTotals.totalProfit.toFixed(2),
+      `${valuationTotals.overallMarginPct}%`
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `manna_inventory_cost_and_potential_report_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -2382,6 +2520,21 @@ export default function App() {
                   </button>
 
                   <button
+                    onClick={() => setDashboardTab('valuation')}
+                    className={`pb-3 px-3 text-xs sm:text-sm font-bold flex items-center gap-1.5 border-b-2 cursor-pointer transition-colors whitespace-nowrap ${
+                      dashboardTab === 'valuation' 
+                        ? 'border-[#1E3A8A] text-[#1E3A8A]' 
+                        : 'border-transparent text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    <FileSpreadsheet className="w-4 h-4 text-[#1E3A8A]" />
+                    Cost &amp; Potential Report
+                    <span className="bg-amber-100 text-amber-900 text-[10px] px-1.5 py-0.2 rounded-full font-bold">
+                      Owner Only
+                    </span>
+                  </button>
+
+                  <button
                     onClick={() => setDashboardTab('sales-log')}
                     className={`pb-3 px-3 text-xs sm:text-sm font-bold flex items-center gap-1.5 border-b-2 cursor-pointer transition-colors whitespace-nowrap ${
                       dashboardTab === 'sales-log' 
@@ -2844,6 +2997,307 @@ export default function App() {
                           </tr>
                         </tbody>
                       </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* ==================== SUBTAB: OWNER INVENTORY COST & POTENTIAL VALUATION REPORT ==================== */}
+                {dashboardTab === 'valuation' && (
+                  <div className="bg-white p-4 sm:p-6 rounded-b-xl border border-slate-200 border-t-0 shadow-xs space-y-6">
+                    {/* Header with Title & Action Buttons */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                            <FileSpreadsheet className="w-5 h-5 text-[#1E3A8A]" /> Owner's Inventory Cost &amp; Potential Report
+                          </h3>
+                          <span className="text-[10px] bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded-full border border-amber-200">
+                            🔒 Confidential • Owner Only
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Formatted directly to your inventory quote spreadsheet. Edit <strong>Unit Capital</strong> inline to immediately calculate Total Capital, Gross Selling Potential, and Net Profit.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                        <button
+                          onClick={exportValuationSheetToCSV}
+                          className="bg-[#1E3A8A] hover:bg-[#152a65] text-white px-3.5 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                        >
+                          <Download className="w-4 h-4" /> Export Excel / CSV
+                        </button>
+                        <button
+                          onClick={() => window.print()}
+                          className="bg-slate-100 hover:bg-slate-200 text-slate-800 px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer border border-slate-200 transition-colors"
+                        >
+                          <Printer className="w-4 h-4" /> Print Sheet
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 4 Grand Summary Metric Cards (Primary User Goal) */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                      {/* Total Inventory Cost / Capital */}
+                      <div className="bg-blue-50/60 p-4 rounded-xl border border-blue-200 shadow-2xs">
+                        <span className="text-[11px] font-bold text-blue-900 uppercase tracking-wider block">
+                          Total Inventory Cost (Total Capital)
+                        </span>
+                        <p className="text-2xl font-black text-blue-900 mt-1">
+                          ₱{valuationTotals.totalCostCapital.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-[10px] text-blue-700 mt-0.5">
+                          Total capital invested across {valuationRows.length} SKUs
+                        </p>
+                      </div>
+
+                      {/* Total Potential Selling Price */}
+                      <div className="bg-emerald-50/60 p-4 rounded-xl border border-emerald-200 shadow-2xs">
+                        <span className="text-[11px] font-bold text-emerald-900 uppercase tracking-wider block">
+                          Total Potential Selling Price
+                        </span>
+                        <p className="text-2xl font-black text-emerald-900 mt-1">
+                          ₱{valuationTotals.totalPotentialSelling.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-[10px] text-emerald-700 mt-0.5">
+                          Gross potential retail revenue
+                        </p>
+                      </div>
+
+                      {/* Total Potential Gross Profit */}
+                      <div className="bg-amber-50/60 p-4 rounded-xl border border-amber-200 shadow-2xs">
+                        <span className="text-[11px] font-bold text-amber-900 uppercase tracking-wider block">
+                          Total Potential Gross Profit
+                        </span>
+                        <p className="text-2xl font-black text-amber-900 mt-1">
+                          +₱{valuationTotals.totalProfit.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-[10px] text-amber-700 mt-0.5">
+                          Projected gross markup profit
+                        </p>
+                      </div>
+
+                      {/* Overall Margin % & Total Quantity */}
+                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-2xs">
+                        <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+                          Overall Potential Margin %
+                        </span>
+                        <p className="text-2xl font-black text-slate-900 mt-1">
+                          {valuationTotals.overallMarginPct}%
+                        </p>
+                        <p className="text-[10px] text-slate-500 mt-0.5">
+                          {valuationTotals.totalQty.toLocaleString()} total physical items in warehouse
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Filter, Search & Instructions Bar */}
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                      <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                        <div className="relative w-full sm:w-72">
+                          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                          <input
+                            type="text"
+                            placeholder="Search item description, e.g. Entrance Cap, PVC..."
+                            value={valuationSearch}
+                            onChange={e => setValuationSearch(e.target.value)}
+                            className="w-full text-xs pl-8 pr-3 py-1.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-[#1E3A8A]"
+                          />
+                        </div>
+
+                        <select
+                          value={valuationCategory}
+                          onChange={e => setValuationCategory(e.target.value)}
+                          className="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:border-[#1E3A8A]"
+                        >
+                          {categories.map(c => (
+                            <option key={c} value={c}>{c === 'All' ? 'All Categories' : c}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="text-[11px] text-slate-500 flex items-center gap-1.5">
+                        <span className="w-3 h-3 bg-[#FEF9C3] border border-amber-300 inline-block rounded"></span>
+                        <span>Yellow column is editable. Type any <strong>Unit Capital</strong> to update live.</span>
+                      </div>
+                    </div>
+
+                    {/* EXACT SPREADSHEET TABLE FORMAT (MATCHES USER SCREENSHOT) */}
+                    <div className="overflow-x-auto border border-slate-300 rounded-lg shadow-2xs max-h-[650px]">
+                      <table className="w-full text-left text-xs border-collapse">
+                        {/* Dark Royal Blue Header */}
+                        <thead className="bg-[#1E3A8A] text-white font-bold uppercase text-[11px] sticky top-0 z-20 shadow-xs">
+                          <tr>
+                            <th 
+                              onClick={() => handleValuationSort('rowIndex')}
+                              className="py-3 px-3 w-12 text-center border-r border-blue-900/60 cursor-pointer hover:bg-[#152a65] select-none"
+                            >
+                              #
+                            </th>
+                            <th 
+                              onClick={() => handleValuationSort('qty')}
+                              className="py-3 px-3 w-20 text-center border-r border-blue-900/60 cursor-pointer hover:bg-[#152a65] select-none"
+                            >
+                              Qty {renderSortIndicator('qty', valuationSortField, valuationSortOrder)}
+                            </th>
+                            <th className="py-3 px-3 w-20 text-center border-r border-blue-900/60">
+                              U/M
+                            </th>
+                            <th 
+                              onClick={() => handleValuationSort('name')}
+                              className="py-3 px-4 border-r border-blue-900/60 cursor-pointer hover:bg-[#152a65] select-none"
+                            >
+                              Item Description {renderSortIndicator('name', valuationSortField, valuationSortOrder)}
+                            </th>
+                            <th 
+                              onClick={() => handleValuationSort('unitCapital')}
+                              className="py-3 px-3 w-32 text-right bg-[#1B365D] border-r border-blue-900/60 cursor-pointer hover:bg-[#152a65] select-none"
+                            >
+                              Unit Capital [Edit] {renderSortIndicator('unitCapital', valuationSortField, valuationSortOrder)}
+                            </th>
+                            <th 
+                              onClick={() => handleValuationSort('totalCapital')}
+                              className="py-3 px-3 w-32 text-right border-r border-blue-900/60 cursor-pointer hover:bg-[#152a65] select-none"
+                            >
+                              Total Capital {renderSortIndicator('totalCapital', valuationSortField, valuationSortOrder)}
+                            </th>
+                            <th 
+                              onClick={() => handleValuationSort('unitPrice')}
+                              className="py-3 px-3 w-28 text-right border-r border-blue-900/60 cursor-pointer hover:bg-[#152a65] select-none"
+                            >
+                              Unit Price {renderSortIndicator('unitPrice', valuationSortField, valuationSortOrder)}
+                            </th>
+                            <th 
+                              onClick={() => handleValuationSort('totalSellingPrice')}
+                              className="py-3 px-3 w-36 text-right border-r border-blue-900/60 cursor-pointer hover:bg-[#152a65] select-none"
+                            >
+                              Total Selling Price {renderSortIndicator('totalSellingPrice', valuationSortField, valuationSortOrder)}
+                            </th>
+                            <th 
+                              onClick={() => handleValuationSort('potentialProfit')}
+                              className="py-3 px-3 w-32 text-right border-r border-blue-900/60 cursor-pointer hover:bg-[#152a65] select-none"
+                            >
+                              Potential Profit {renderSortIndicator('potentialProfit', valuationSortField, valuationSortOrder)}
+                            </th>
+                            <th 
+                              onClick={() => handleValuationSort('marginPct')}
+                              className="py-3 px-3 w-24 text-center cursor-pointer hover:bg-[#152a65] select-none"
+                            >
+                              Margin % {renderSortIndicator('marginPct', valuationSortField, valuationSortOrder)}
+                            </th>
+                          </tr>
+                        </thead>
+
+                        <tbody className="divide-y divide-slate-200 bg-white">
+                          {valuationRows.length === 0 ? (
+                            <tr>
+                              <td colSpan={10} className="py-12 text-center text-slate-400">
+                                No hardware items found matching your filter.
+                              </td>
+                            </tr>
+                          ) : (
+                            valuationRows.map((r, idx) => (
+                              <tr key={r.id} className="hover:bg-blue-50/30 transition-colors">
+                                {/* Row Number */}
+                                <td className="py-2 px-3 text-center text-slate-400 border-r border-slate-200 font-mono text-[11px]">
+                                  {idx + 1}
+                                </td>
+
+                                {/* Qty */}
+                                <td className="py-2 px-3 text-center font-mono font-bold text-slate-900 border-r border-slate-200">
+                                  {r.qty}
+                                </td>
+
+                                {/* U/M */}
+                                <td className="py-2 px-3 text-center text-slate-600 border-r border-slate-200">
+                                  {r.unit || 'pc'}
+                                </td>
+
+                                {/* Item Description */}
+                                <td className="py-2 px-4 font-bold text-slate-900 border-r border-slate-200">
+                                  <span>{r.name}</span>
+                                  <span className="text-[10px] text-slate-400 font-mono font-normal ml-2">({r.id})</span>
+                                </td>
+
+                                {/* Unit Capital [Edit] - Creamy Light Yellow Highlight */}
+                                <td className="py-1.5 px-2 text-right bg-[#FEF9C3] border-r border-amber-300">
+                                  <input
+                                    type="number"
+                                    step="0.5"
+                                    min="0"
+                                    value={r.unitCapital}
+                                    onChange={e => handleInlineCapitalChange(r.id, e.target.value)}
+                                    className="w-24 px-2 py-1 text-right font-mono font-bold text-slate-900 bg-white border border-amber-400 rounded focus:ring-2 focus:ring-[#1E3A8A] focus:outline-none"
+                                    title="Type to edit unit capital cost"
+                                  />
+                                </td>
+
+                                {/* Total Capital */}
+                                <td className="py-2 px-3 text-right font-mono font-bold text-blue-900 border-r border-slate-200">
+                                  {r.totalCapital.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </td>
+
+                                {/* Unit Price */}
+                                <td className="py-2 px-3 text-right font-mono text-slate-800 border-r border-slate-200">
+                                  {r.unitPrice.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </td>
+
+                                {/* Total Selling Price */}
+                                <td className="py-2 px-3 text-right font-mono font-black text-slate-950 border-r border-slate-200">
+                                  {r.totalSellingPrice.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </td>
+
+                                {/* Potential Profit */}
+                                <td className="py-2 px-3 text-right font-mono font-bold text-emerald-700 border-r border-slate-200">
+                                  +₱{r.potentialProfit.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </td>
+
+                                {/* Margin % */}
+                                <td className="py-2 px-3 text-center font-mono font-bold text-emerald-800">
+                                  {r.marginPct}%
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+
+                        {/* Grand Totals Footer Row */}
+                        <tfoot className="bg-slate-900 text-white font-bold text-xs sticky bottom-0 z-10 border-t-2 border-slate-900">
+                          <tr>
+                            <td className="py-3 px-3 text-center border-r border-slate-700">
+                              TOTALS
+                            </td>
+                            <td className="py-3 px-3 text-center font-mono border-r border-slate-700">
+                              {valuationTotals.totalQty.toLocaleString()}
+                            </td>
+                            <td className="py-3 px-3 text-center border-r border-slate-700">-</td>
+                            <td className="py-3 px-4 border-r border-slate-700">
+                              Grand Total across {valuationRows.length} Hardware SKUs
+                            </td>
+                            <td className="py-3 px-3 text-right border-r border-slate-700 font-mono text-amber-300">
+                              -
+                            </td>
+                            <td className="py-3 px-3 text-right border-r border-slate-700 font-mono text-blue-300 text-sm">
+                              ₱{valuationTotals.totalCostCapital.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                            <td className="py-3 px-3 text-right border-r border-slate-700 font-mono">-</td>
+                            <td className="py-3 px-3 text-right border-r border-slate-700 font-mono text-emerald-300 text-sm">
+                              ₱{valuationTotals.totalPotentialSelling.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                            <td className="py-3 px-3 text-right border-r border-slate-700 font-mono text-emerald-300">
+                              +₱{valuationTotals.totalProfit.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                            <td className="py-3 px-3 text-center font-mono text-emerald-300">
+                              {valuationTotals.overallMarginPct}%
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
+                      <span>Report reflects current warehouse inventory of <strong>{valuationTotals.totalQty.toLocaleString()} units</strong> across <strong>{valuationRows.length}</strong> items.</span>
+                      <span className="text-[11px] text-slate-400">Unit Capital edits sync live to database and adjust company P&amp;L automatically.</span>
                     </div>
                   </div>
                 )}

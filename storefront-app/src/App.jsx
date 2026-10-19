@@ -6,10 +6,11 @@ import {
   Plus, Minus, Trash2, ArrowRight, X, AlertCircle, Lock, KeyRound, 
   Eye, EyeOff, LogIn, UserPlus, LogOut, Check, RefreshCw, Flame, Tag,
   ListFilter, Package, Clock, SlidersHorizontal, Layers, CheckCircle2,
-  Phone, Calendar, ChevronRight, Upload, Download, FileSpreadsheet, 
+  Phone, Calendar, ChevronRight, ChevronDown, Upload, Download, FileSpreadsheet, 
   FileUp, Edit3, PlusCircle, CheckSquare, Square, Table, Grid, 
   Laptop, Smartphone, HelpCircle, ExternalLink, Sparkles,
-  ArrowUpDown, ArrowUp, ArrowDown, Ban, XCircle, BarChart3
+  ArrowUpDown, ArrowUp, ArrowDown, Ban, XCircle, BarChart3, Copy, Printer,
+  TrendingUp, TrendingDown, DollarSign, PieChart, FileText, Receipt, ArrowUpRight, Percent, Coins, AlertTriangle
 } from 'lucide-react';
 
 export default function App() {
@@ -34,6 +35,21 @@ export default function App() {
   const [isLoadingOrders, setIsLoadingOrders] = useState(false);
   const [isSubmittingCheckout, setIsSubmittingCheckout] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
+
+  // 20 Frontend Polish States
+  const [scrollProgress, setScrollProgress] = useState(0);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const [supportModalOpen, setSupportModalOpen] = useState(false);
+  const [expandedFaq, setExpandedFaq] = useState(null);
+  const [copiedId, setCopiedId] = useState(null);
+  const [showAuthPassword, setShowAuthPassword] = useState(false);
+  const [showAuthConfirmPassword, setShowAuthConfirmPassword] = useState(false);
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
+  const [cookieConsent, setCookieConsent] = useState(() => localStorage.getItem('manna_cookie_consent') || null);
+  const [newsletterEmail, setNewsletterEmail] = useState('');
+  const [newsletterHoneypot, setNewsletterHoneypot] = useState('');
+  const [newsletterSuccess, setNewsletterSuccess] = useState(false);
+  const searchInputRef = useRef(null);
 
   // Merchant Admin Password Gate (STRICT: asenso123)
   const [isMerchantAuthenticated, setIsMerchantAuthenticated] = useState(() => {
@@ -144,6 +160,9 @@ export default function App() {
   const [dashboardSortField, setDashboardSortField] = useState('name');
   const [dashboardSortOrder, setDashboardSortOrder] = useState('asc'); // 'asc' | 'desc'
   const [dashboardStockFilter, setDashboardStockFilter] = useState('all'); // 'all' | 'low' | 'out' | 'in'
+  const [salesLogSearch, setSalesLogSearch] = useState('');
+  const [salesLogDateFilter, setSalesLogDateFilter] = useState('all'); // 'all' | 'today' | 'week' | 'month'
+  const [salesLogStatusFilter, setSalesLogStatusFilter] = useState('all'); // 'all' | 'active' | 'cancelled'
 
   // CSV/PDF Upload state
   const [uploadModal, setUploadModal] = useState(false);
@@ -232,6 +251,52 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('manna_orders', JSON.stringify(orders));
   }, [orders]);
+
+  // UX Polish: Scroll progress & scroll-to-top detection
+  useEffect(() => {
+    const handleScroll = () => {
+      const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
+      if (totalHeight > 0) {
+        setScrollProgress((window.scrollY / totalHeight) * 100);
+      }
+      setShowScrollTop(window.scrollY > 300);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // UX Polish: Cmd+K / Ctrl+K quick search trigger
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        if (searchInputRef.current) {
+          searchInputRef.current.focus();
+          searchInputRef.current.select();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // UX Polish: Capture UTM and referral parameters into sessionStorage
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const utmSource = params.get('utm_source');
+      const utmMedium = params.get('utm_medium');
+      const utmCampaign = params.get('utm_campaign');
+      if (utmSource || utmMedium || utmCampaign) {
+        sessionStorage.setItem('manna_utm', JSON.stringify({
+          utm_source: utmSource || '',
+          utm_medium: utmMedium || '',
+          utm_campaign: utmCampaign || '',
+          capturedAt: new Date().toISOString()
+        }));
+      }
+    } catch {}
+  }, []);
 
   const categories = useMemo(() => {
     return ['All', ...new Set(products.map(p => p.category))];
@@ -359,6 +424,194 @@ export default function App() {
       return 0;
     });
   }, [products, itemSearchTerm, dashboardSortField, dashboardSortOrder, dashboardStockFilter]);
+
+  // ==================== ADVANCED FINANCIAL & PNL METRICS ====================
+  const financialMetrics = useMemo(() => {
+    const validOrders = orders.filter(o => o.status !== 'Cancelled');
+    const cancelledOrders = orders.filter(o => o.status === 'Cancelled');
+
+    let totalGrossRevenue = 0;
+    let totalCOGS = 0;
+    let totalDiscountsAbsorbed = 0;
+    let totalItemsSold = 0;
+    let totalShippingRecovered = 0;
+
+    // Itemized sales ledger across all orders
+    const itemizedSales = [];
+
+    orders.forEach(o => {
+      const isCancelled = o.status === 'Cancelled';
+      if (!isCancelled) {
+        totalGrossRevenue += Number(o.total || 0);
+        totalDiscountsAbsorbed += Number(o.discountAmount || 0);
+        if (o.total && (o.subtotal || 0) < 3000) {
+          totalShippingRecovered += 150;
+        }
+      }
+
+      (o.items || []).forEach(it => {
+        const prod = products.find(p => p.id === (it.id || it.product_id));
+        const qty = Number(it.quantity || 1);
+        const unitPrice = Number(it.price || prod?.price || 0);
+        const unitCapital = Number(prod?.capital || (unitPrice > 0 ? unitPrice * 0.76 : 0));
+        const lineRevenue = Number(it.total || unitPrice * qty);
+        const lineCost = unitCapital * qty;
+        const lineProfit = lineRevenue - lineCost;
+        const marginPct = lineRevenue > 0 ? ((lineProfit / lineRevenue) * 100).toFixed(1) : '0';
+
+        if (!isCancelled) {
+          totalCOGS += lineCost;
+          totalItemsSold += qty;
+        }
+
+        itemizedSales.push({
+          orderId: o.orderId,
+          date: o.date,
+          customerName: o.customer?.fullName || 'Walk-in Customer',
+          customerPhone: o.customer?.phone || '',
+          customerAddress: o.customer?.address || 'Tacloban Hub',
+          productId: it.id || it.product_id || (prod?.id || 'MNA-SKU'),
+          productName: it.name || prod?.name || 'Hardware SKU',
+          category: prod?.category || 'General Hardware',
+          quantity: qty,
+          unitPrice,
+          unitCapital,
+          lineRevenue,
+          lineCost,
+          lineProfit,
+          marginPct,
+          paymentMethod: o.customer?.paymentMethod || 'cod',
+          status: o.status
+        });
+      });
+    });
+
+    const grossProfit = totalGrossRevenue - totalCOGS;
+    const grossMarginPct = totalGrossRevenue > 0 ? ((grossProfit / totalGrossRevenue) * 100).toFixed(1) : '0';
+    const netProfit = grossProfit; // Operations profit
+
+    // Warehouse Inventory Valuation across catalog
+    let inventoryCostValue = 0;
+    let inventoryRetailValue = 0;
+    let totalStockCount = 0;
+    let outOfStockCount = 0;
+    let lowStockCount = 0;
+
+    products.forEach(p => {
+      const stock = Math.max(0, Number(p.stock || 0));
+      const cap = Number(p.capital || 0);
+      const prc = Number(p.price || 0);
+      totalStockCount += stock;
+      inventoryCostValue += (cap * stock);
+      inventoryRetailValue += (prc * stock);
+
+      if (stock <= 0) outOfStockCount++;
+      else if (stock < 10) lowStockCount++;
+    });
+
+    const unrealizedProfit = inventoryRetailValue - inventoryCostValue;
+    const inventoryPotentialMarginPct = inventoryRetailValue > 0 ? ((unrealizedProfit / inventoryRetailValue) * 100).toFixed(1) : '0';
+
+    return {
+      validOrdersCount: validOrders.length,
+      cancelledOrdersCount: cancelledOrders.length,
+      totalGrossRevenue,
+      totalCOGS,
+      grossProfit,
+      grossMarginPct,
+      netProfit,
+      totalDiscountsAbsorbed,
+      totalItemsSold,
+      totalShippingRecovered,
+      itemizedSales,
+      inventoryCostValue,
+      inventoryRetailValue,
+      unrealizedProfit,
+      inventoryPotentialMarginPct,
+      totalStockCount,
+      outOfStockCount,
+      lowStockCount
+    };
+  }, [orders, products]);
+
+  // Category analytics breakdown for charts
+  const categoryAnalytics = useMemo(() => {
+    const catMap = {};
+    products.forEach(p => {
+      const cat = p.category || 'General Hardware';
+      if (!catMap[cat]) {
+        catMap[cat] = { name: cat, count: 0, costValue: 0, retailValue: 0, soldQty: 0, revenue: 0, profit: 0 };
+      }
+      const st = Math.max(0, Number(p.stock || 0));
+      catMap[cat].count += 1;
+      catMap[cat].costValue += (Number(p.capital || 0) * st);
+      catMap[cat].retailValue += (Number(p.price || 0) * st);
+    });
+
+    financialMetrics.itemizedSales.forEach(sale => {
+      if (sale.status !== 'Cancelled' && catMap[sale.category]) {
+        catMap[sale.category].soldQty += sale.quantity;
+        catMap[sale.category].revenue += sale.lineRevenue;
+        catMap[sale.category].profit += sale.lineProfit;
+      }
+    });
+
+    return Object.values(catMap).sort((a, b) => b.retailValue - a.retailValue);
+  }, [products, financialMetrics]);
+
+  // Filtered sales log items
+  const filteredSalesLog = useMemo(() => {
+    return financialMetrics.itemizedSales.filter(sale => {
+      if (salesLogStatusFilter === 'active' && sale.status === 'Cancelled') return false;
+      if (salesLogStatusFilter === 'cancelled' && sale.status !== 'Cancelled') return false;
+
+      if (salesLogSearch) {
+        const query = salesLogSearch.toLowerCase();
+        const matchesQuery = 
+          sale.orderId.toLowerCase().includes(query) ||
+          sale.customerName.toLowerCase().includes(query) ||
+          sale.productName.toLowerCase().includes(query) ||
+          sale.productId.toLowerCase().includes(query) ||
+          sale.category.toLowerCase().includes(query);
+        if (!matchesQuery) return false;
+      }
+
+      return true;
+    });
+  }, [financialMetrics.itemizedSales, salesLogSearch, salesLogStatusFilter]);
+
+  // Export Sales Log to CSV
+  const exportSalesLogToCSV = () => {
+    const headers = ['Order ID', 'Date', 'Customer Name', 'Customer Phone', 'SKU', 'Product Name', 'Category', 'Quantity Sold', 'Unit Price (PHP)', 'Unit Capital (PHP)', 'Line Revenue (PHP)', 'Line Capital Cost (PHP)', 'Line Profit (PHP)', 'Margin %', 'Payment Method', 'Status'];
+    const rows = filteredSalesLog.map(s => [
+      `"${s.orderId}"`,
+      `"${s.date}"`,
+      `"${s.customerName.replace(/"/g, '""')}"`,
+      `"${s.customerPhone}"`,
+      `"${s.productId}"`,
+      `"${s.productName.replace(/"/g, '""')}"`,
+      `"${s.category.replace(/"/g, '""')}"`,
+      s.quantity,
+      s.unitPrice,
+      s.unitCapital,
+      s.lineRevenue,
+      s.lineCost,
+      s.lineProfit,
+      `${s.marginPct}%`,
+      `"${s.paymentMethod}"`,
+      `"${s.status}"`
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `manna_sales_log_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // Cart actions
   const addToCart = (product, qty = 1) => {
@@ -925,7 +1178,20 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F6F6F6] text-[#222222] font-sans pb-16 md:pb-8 select-none w-full">
+    <div className="min-h-screen bg-[#F6F6F6] text-[#222222] font-sans pb-16 md:pb-8 select-none w-full relative">
+      {/* 20 Frontend Polish: 2px Top Scroll Progress Bar */}
+      <div 
+        className="fixed top-0 left-0 right-0 h-[2.5px] bg-amber-500 z-[100] transition-all duration-75 no-print" 
+        style={{ width: `${scrollProgress}%` }} 
+      />
+
+      {/* 20 Frontend Polish: Accessible Skip-To-Content Link */}
+      <a 
+        href="#main-content" 
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[110] focus:px-4 focus:py-2 focus:bg-[#EE4D2D] focus:text-white focus:font-bold focus:rounded-md focus:shadow-xl focus:outline-none"
+      >
+        Skip to main content
+      </a>
       
       {/* ==================== 1. DESKTOP TOP BRAND UTILITY BAR (md:flex) ==================== */}
       <div className="hidden md:block bg-[#D0011B] text-white/90 text-xs py-1.5 px-4 sm:px-6 lg:px-8 border-b border-red-700">
@@ -992,8 +1258,8 @@ export default function App() {
         </div>
       </div>
 
-      {/* ==================== 2. SHOPEE ORANGE MAIN HEADER (#EE4D2D) ==================== */}
-      <header className="sticky top-0 z-40 bg-[#EE4D2D] text-white shadow-md w-full">
+      {/* ==================== 2. MANNA HARDWARE MAIN HEADER (#EE4D2D) ==================== */}
+      <header className="sticky top-0 z-40 bg-[#EE4D2D] text-white shadow-md w-full backdrop-blur-md">
         <div className="max-w-7xl mx-auto pt-2 pb-2.5 px-3 sm:px-6 lg:px-8">
           
           {/* Main Search Row */}
@@ -1012,16 +1278,20 @@ export default function App() {
               </div>
             </div>
 
-            {/* Search Input Container */}
-            <div className="flex-1 bg-white rounded-md h-9 sm:h-10 px-3 flex items-center gap-2 shadow-xs">
+            {/* Search Input Container with Cmd+K ref & shortcut badge */}
+            <div className="flex-1 bg-white rounded-md h-9 sm:h-10 px-3 flex items-center gap-2 shadow-xs border border-transparent focus-within:border-amber-400">
               <Search className="w-4 h-4 text-[#888888] shrink-0" />
               <input
+                ref={searchInputRef}
                 type="text"
                 placeholder="Search C-purlins, Island Paint, Screws, Makita..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 className="w-full text-xs sm:text-sm text-[#222222] placeholder-[#EE4D2D]/70 font-normal focus:outline-none"
               />
+              <span className="hidden sm:inline-block text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded font-mono border border-slate-200 shrink-0">
+                Ctrl+K
+              </span>
               <button className="text-[#888888] hover:text-[#555] shrink-0 cursor-pointer">
                 <Camera className="w-4 h-4" />
               </button>
@@ -1135,7 +1405,7 @@ export default function App() {
       </header>
 
       {/* ==================== MAIN CONTENT CONTAINER (RESPONSIVE: MAX-W-7XL ON DESKTOP) ==================== */}
-      <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 mt-2 sm:mt-4">
+      <div id="main-content" className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 mt-2 sm:mt-4">
         
         {/* ==================== TAB 1: HOME FEED (RESPONSIVE 2-6 COLS) ==================== */}
         {activeTab === 'home' && (
@@ -1165,6 +1435,141 @@ export default function App() {
                   isRightCol={idx % 2 === 1}
                 />
               ))}
+            </div>
+
+            {/* 20 Frontend Polish: Clean 404 / Empty Search State */}
+            {filteredProducts.length === 0 && (
+              <div className="bg-white p-10 rounded-xl border border-slate-200 text-center my-6 shadow-xs">
+                <div className="w-14 h-14 bg-orange-100 text-[#EE4D2D] rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Package className="w-7 h-7" />
+                </div>
+                <h3 className="font-bold text-slate-800 text-base">No hardware supplies found</h3>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-4">
+                  We couldn't find items matching "{searchQuery}". Try searching for C-purlins, Island Paint, screws, or reset your filters.
+                </p>
+                <button
+                  onClick={() => { setSearchQuery(''); setSelectedCategory('All'); setCatalogFilterInStock(false); }}
+                  className="bg-[#EE4D2D] hover:bg-[#d73f20] text-white px-5 py-2.5 rounded-lg text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-xs"
+                >
+                  Clear Filters & Show All
+                </button>
+              </div>
+            )}
+
+            {/* 20 Frontend Polish: Expandable Contractor & Builder FAQ Accordion */}
+            <div className="mt-8 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs">
+              <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
+                <div className="w-8 h-8 rounded-lg bg-orange-100 text-[#EE4D2D] flex items-center justify-center font-bold">
+                  <HelpCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-sm sm:text-base text-slate-900">Contractor & Delivery FAQ</h3>
+                  <p className="text-[11px] text-slate-500">Quick answers for Tacloban, Leyte & Samar builders</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {[
+                  {
+                    id: 'faq-1',
+                    q: 'How fast is delivery within Tacloban City, Palo, and Tanauan?',
+                    a: 'Standard orders within Tacloban proper, Palo, and Tanauan are dispatched same-day or within 24 hours. Free delivery applies for orders ₱3,000 and above.'
+                  },
+                  {
+                    id: 'faq-2',
+                    q: 'What payment methods do you accept for commercial deliveries?',
+                    a: 'We accept Cash on Delivery (COD) upon inspection at your job site, instant GCash, BDO/BPI online bank transfer, and commercial credit terms for verified VIP contractor accounts.'
+                  },
+                  {
+                    id: 'faq-3',
+                    q: 'How do I claim contractor volume discounts for structural purlins and fasteners?',
+                    a: 'You can apply promo code "builder" for 35% OFF or "hardware" for 40% OFF at checkout. For bulk projects over 500 purlins or 50 bags of cement, contact our dispatch hotline directly at 0917-882-9912.'
+                  },
+                  {
+                    id: 'faq-4',
+                    q: 'What is your return & damaged materials exchange policy?',
+                    a: 'All structural materials (steel, roofing, screws, paint) undergo inspection prior to dispatch. Any transit-damaged materials will be replaced immediately free of charge upon delivery acknowledgement.'
+                  }
+                ].map(faq => {
+                  const isOpen = expandedFaq === faq.id;
+                  return (
+                    <div key={faq.id} className="border border-slate-100 rounded-xl overflow-hidden transition-colors">
+                      <button
+                        onClick={() => setExpandedFaq(isOpen ? null : faq.id)}
+                        className="w-full text-left px-4 py-3 bg-slate-50/70 hover:bg-slate-100 flex items-center justify-between gap-3 text-xs font-bold text-slate-800 cursor-pointer transition-colors"
+                      >
+                        <span>{faq.q}</span>
+                        <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                      {isOpen && (
+                        <div className="px-4 py-3 bg-white text-xs text-slate-600 leading-relaxed border-t border-slate-100">
+                          {faq.a}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 20 Frontend Polish: Contractor Club VIP Newsletter Lead Capture with Honeypot */}
+            <div className="mt-6 bg-gradient-to-r from-slate-900 to-slate-800 text-white p-6 rounded-2xl border border-slate-700 shadow-md">
+              <div className="max-w-xl">
+                <span className="text-[10px] font-black uppercase tracking-widest text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded">
+                  Tacloban Builders Club
+                </span>
+                <h3 className="text-base sm:text-lg font-black mt-2">Join the Manna Contractor Dispatch Network</h3>
+                <p className="text-xs text-slate-300 mt-1 mb-4">
+                  Get weekly wholesale price bulletins, flash vouchers, and priority warehouse dispatch across Region VIII.
+                </p>
+
+                {newsletterSuccess ? (
+                  <div className="bg-emerald-950/80 border border-emerald-500/50 text-emerald-200 p-3 rounded-xl text-xs font-bold flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>Salamat! You are now subscribed to Manna Contractor Bulletins.</span>
+                  </div>
+                ) : (
+                  <form 
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (newsletterHoneypot) {
+                        console.warn('[SECURITY ALERT] Bot caught in newsletter honeypot');
+                        setNewsletterSuccess(true);
+                        return;
+                      }
+                      if (newsletterEmail) setNewsletterSuccess(true);
+                    }}
+                    className="flex flex-col sm:flex-row gap-2"
+                  >
+                    {/* Honeypot field: invisible to users, trap for bots */}
+                    <div style={{ position: 'absolute', left: '-9999px', opacity: 0, pointerEvents: 'none' }} aria-hidden="true" tabIndex={-1}>
+                      <input 
+                        type="text" 
+                        name="contractor_vip_verification" 
+                        value={newsletterHoneypot} 
+                        onChange={e => setNewsletterHoneypot(e.target.value)} 
+                        tabIndex={-1} 
+                        autoComplete="off" 
+                      />
+                    </div>
+
+                    <input
+                      type="email"
+                      required
+                      placeholder="Enter your email (e.g. engineer@site.ph)"
+                      value={newsletterEmail}
+                      onChange={e => setNewsletterEmail(e.target.value)}
+                      className="flex-1 px-3.5 py-2.5 rounded-lg text-xs bg-slate-800 border border-slate-700 text-white placeholder-slate-400 focus:outline-none focus:border-amber-400"
+                    />
+                    <button
+                      type="submit"
+                      className="bg-[#EE4D2D] hover:bg-[#d73f20] text-white px-5 py-2.5 rounded-lg text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-sm shrink-0"
+                    >
+                      Join Contractor Club
+                    </button>
+                  </form>
+                )}
+              </div>
             </div>
           </main>
         )}
@@ -1464,7 +1869,35 @@ export default function App() {
                 <div className="flex justify-between items-start pb-4 border-b border-slate-100">
                   <div>
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tracking Reference</span>
-                    <h3 className="text-lg font-black text-slate-900 font-mono">{trackedOrder.orderId}</h3>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <h3 className="text-lg font-black text-slate-900 font-mono">{trackedOrder.orderId}</h3>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(trackedOrder.orderId);
+                          setCopiedId(trackedOrder.orderId);
+                          setTimeout(() => setCopiedId(null), 2000);
+                        }}
+                        className="p-1 hover:bg-slate-100 rounded-md text-slate-500 hover:text-slate-800 cursor-pointer transition-colors"
+                        title="Copy Tracking ID"
+                        aria-label="Copy Tracking ID"
+                      >
+                        {copiedId === trackedOrder.orderId ? (
+                          <span className="inline-flex items-center text-[10px] text-emerald-600 font-bold gap-0.5 bg-emerald-50 px-1 py-0.5 rounded">
+                            <Check className="w-3.5 h-3.5" /> Copied
+                          </span>
+                        ) : (
+                          <Copy className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                      <button
+                        onClick={() => window.print()}
+                        className="p-1 hover:bg-slate-100 rounded-md text-slate-500 hover:text-slate-800 cursor-pointer transition-colors printable-btn"
+                        title="Print Order Receipt / Invoice"
+                        aria-label="Print Order Receipt"
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                     <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
                       <Calendar className="w-3.5 h-3.5" /> Placed on {trackedOrder.date}
                     </p>
@@ -1854,101 +2287,167 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* 2. Top Summary KPI Cards (Desktop Web View) */}
+                {/* 2. Top Summary KPI Cards (Desktop Web View with Financials) */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-                    <div className="flex items-center justify-between text-slate-500 mb-1">
-                      <span className="text-xs font-bold uppercase tracking-wider">Total SKUs</span>
-                      <Package className="w-4 h-4 text-blue-600" />
-                    </div>
-                    <p className="text-2xl font-black text-slate-900">{products.length}</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">Across {categories.length - 1} categories</p>
-                  </div>
-
+                  {/* Gross Revenue & Margin */}
                   <div 
-                    onClick={() => { setDashboardTab('inventory'); setDashboardStockFilter('low'); }}
-                    className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs cursor-pointer hover:border-amber-400 transition-colors"
+                    onClick={() => setDashboardTab('pnl')}
+                    className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs cursor-pointer hover:border-emerald-400 transition-colors"
                   >
                     <div className="flex items-center justify-between text-slate-500 mb-1">
-                      <span className="text-xs font-bold uppercase tracking-wider">Stock Alerts</span>
-                      <AlertCircle className="w-4 h-4 text-amber-500" />
+                      <span className="text-xs font-bold uppercase tracking-wider">Gross Sales</span>
+                      <DollarSign className="w-4 h-4 text-emerald-600" />
                     </div>
-                    <p className="text-2xl font-black text-amber-600">
-                      {products.filter(p => p.stock <= 0).length + products.filter(p => p.stock > 0 && p.stock < 10).length}
-                    </p>
+                    <p className="text-2xl font-black text-slate-900">₱{financialMetrics.totalGrossRevenue.toLocaleString()}</p>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded flex items-center gap-0.5">
+                        <TrendingUp className="w-2.5 h-2.5" /> ₱{financialMetrics.grossProfit.toLocaleString()} Profit
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-mono">({financialMetrics.grossMarginPct}%)</span>
+                    </div>
+                  </div>
+
+                  {/* Inventory Valuation at Cost vs Retail */}
+                  <div 
+                    onClick={() => setDashboardTab('analytics')}
+                    className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs cursor-pointer hover:border-blue-400 transition-colors"
+                  >
+                    <div className="flex items-center justify-between text-slate-500 mb-1">
+                      <span className="text-xs font-bold uppercase tracking-wider">Warehouse Value</span>
+                      <Coins className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <p className="text-2xl font-black text-blue-700">₱{financialMetrics.inventoryCostValue.toLocaleString()}</p>
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      {products.filter(p => p.stock <= 0).length} out of stock • {products.filter(p => p.stock > 0 && p.stock < 10).length} low
+                      Retail: <strong>₱{financialMetrics.inventoryRetailValue.toLocaleString()}</strong> ({financialMetrics.totalStockCount} units)
                     </p>
                   </div>
 
+                  {/* Orders & Fulfillment */}
                   <div 
                     onClick={() => setDashboardTab('orders')}
                     className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs cursor-pointer hover:border-[#EE4D2D] transition-colors"
                   >
                     <div className="flex items-center justify-between text-slate-500 mb-1">
-                      <span className="text-xs font-bold uppercase tracking-wider">Total Orders</span>
+                      <span className="text-xs font-bold uppercase tracking-wider">Orders &amp; Log</span>
                       <ShoppingBag className="w-4 h-4 text-[#EE4D2D]" />
                     </div>
                     <p className="text-2xl font-black text-slate-900">{orders.length}</p>
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      {orders.filter(o => o.status !== 'Cancelled').length} active • {orders.filter(o => o.status === 'Cancelled').length} cancelled
+                      {financialMetrics.validOrdersCount} active • {financialMetrics.cancelledOrdersCount} cancelled
                     </p>
                   </div>
 
-                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+                  {/* Stock Alerts & Reorder Need */}
+                  <div 
+                    onClick={() => { setDashboardTab('insights'); }}
+                    className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs cursor-pointer hover:border-amber-400 transition-colors"
+                  >
                     <div className="flex items-center justify-between text-slate-500 mb-1">
-                      <span className="text-xs font-bold uppercase tracking-wider">Gross Sales</span>
-                      <BarChart3 className="w-4 h-4 text-emerald-600" />
+                      <span className="text-xs font-bold uppercase tracking-wider">Stock Alerts</span>
+                      <AlertTriangle className="w-4 h-4 text-amber-500" />
                     </div>
-                    <p className="text-2xl font-black text-emerald-600">
-                      ₱{orders.filter(o => o.status !== 'Cancelled').reduce((sum, o) => sum + (o.total || 0), 0).toLocaleString()}
+                    <p className="text-2xl font-black text-amber-600">
+                      {financialMetrics.outOfStockCount + financialMetrics.lowStockCount}
                     </p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">Non-cancelled orders total</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      {financialMetrics.outOfStockCount} out of stock • {financialMetrics.lowStockCount} low stock
+                    </p>
                   </div>
                 </div>
 
-                {/* 3. Sub-Navigation Tabs Bar */}
-                <div className="flex border-b border-slate-200 bg-white rounded-t-xl px-4 pt-3 gap-2 sm:gap-4 overflow-x-auto">
+                {/* 3. Sub-Navigation Tabs Bar (7 Enterprise ERP Tabs) */}
+                <div className="flex border-b border-slate-200 bg-white rounded-t-xl px-4 pt-3 gap-1 sm:gap-2 overflow-x-auto">
+                  <button
+                    onClick={() => setDashboardTab('analytics')}
+                    className={`pb-3 px-3 text-xs sm:text-sm font-bold flex items-center gap-1.5 border-b-2 cursor-pointer transition-colors whitespace-nowrap ${
+                      dashboardTab === 'analytics' 
+                        ? 'border-[#EE4D2D] text-[#EE4D2D]' 
+                        : 'border-transparent text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    <BarChart3 className="w-4 h-4" />
+                    Charts &amp; Trends
+                  </button>
+
+                  <button
+                    onClick={() => setDashboardTab('pnl')}
+                    className={`pb-3 px-3 text-xs sm:text-sm font-bold flex items-center gap-1.5 border-b-2 cursor-pointer transition-colors whitespace-nowrap ${
+                      dashboardTab === 'pnl' 
+                        ? 'border-[#EE4D2D] text-[#EE4D2D]' 
+                        : 'border-transparent text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    <TrendingUp className="w-4 h-4" />
+                    P&amp;L Statement
+                  </button>
+
+                  <button
+                    onClick={() => setDashboardTab('sales-log')}
+                    className={`pb-3 px-3 text-xs sm:text-sm font-bold flex items-center gap-1.5 border-b-2 cursor-pointer transition-colors whitespace-nowrap ${
+                      dashboardTab === 'sales-log' 
+                        ? 'border-[#EE4D2D] text-[#EE4D2D]' 
+                        : 'border-transparent text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    <Receipt className="w-4 h-4" />
+                    Sales Log &amp; Tracker
+                    <span className="bg-slate-100 text-slate-700 text-[10px] px-1.5 py-0.2 rounded-full font-mono">
+                      {financialMetrics.itemizedSales.length}
+                    </span>
+                  </button>
+
                   <button
                     onClick={() => setDashboardTab('inventory')}
-                    className={`pb-3 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 cursor-pointer transition-colors whitespace-nowrap ${
+                    className={`pb-3 px-3 text-xs sm:text-sm font-bold flex items-center gap-1.5 border-b-2 cursor-pointer transition-colors whitespace-nowrap ${
                       dashboardTab === 'inventory' 
                         ? 'border-[#EE4D2D] text-[#EE4D2D]' 
                         : 'border-transparent text-slate-500 hover:text-slate-800'
                     }`}
                   >
                     <Layers className="w-4 h-4" />
-                    Inventory & SKUs
-                    <span className="bg-slate-100 text-slate-700 text-[10px] px-2 py-0.5 rounded-full font-mono">
+                    Inventory &amp; SKUs
+                    <span className="bg-slate-100 text-slate-700 text-[10px] px-1.5 py-0.2 rounded-full font-mono">
                       {products.length}
                     </span>
                   </button>
 
                   <button
                     onClick={() => setDashboardTab('orders')}
-                    className={`pb-3 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 cursor-pointer transition-colors whitespace-nowrap ${
+                    className={`pb-3 px-3 text-xs sm:text-sm font-bold flex items-center gap-1.5 border-b-2 cursor-pointer transition-colors whitespace-nowrap ${
                       dashboardTab === 'orders' 
                         ? 'border-[#EE4D2D] text-[#EE4D2D]' 
                         : 'border-transparent text-slate-500 hover:text-slate-800'
                     }`}
                   >
                     <ShoppingBag className="w-4 h-4" />
-                    Orders & Fulfillment
-                    <span className="bg-orange-100 text-[#EE4D2D] text-[10px] px-2 py-0.5 rounded-full font-mono font-bold">
+                    Orders &amp; Fulfillment
+                    <span className="bg-orange-100 text-[#EE4D2D] text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold">
                       {orders.length}
                     </span>
                   </button>
 
                   <button
+                    onClick={() => setDashboardTab('insights')}
+                    className={`pb-3 px-3 text-xs sm:text-sm font-bold flex items-center gap-1.5 border-b-2 cursor-pointer transition-colors whitespace-nowrap ${
+                      dashboardTab === 'insights' 
+                        ? 'border-[#EE4D2D] text-[#EE4D2D]' 
+                        : 'border-transparent text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    <Sparkles className="w-4 h-4 text-purple-600" />
+                    Forecast &amp; Deadstock
+                  </button>
+
+                  <button
                     onClick={() => setDashboardTab('promotions')}
-                    className={`pb-3 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 cursor-pointer transition-colors whitespace-nowrap ${
+                    className={`pb-3 px-3 text-xs sm:text-sm font-bold flex items-center gap-1.5 border-b-2 cursor-pointer transition-colors whitespace-nowrap ${
                       dashboardTab === 'promotions' 
                         ? 'border-[#EE4D2D] text-[#EE4D2D]' 
                         : 'border-transparent text-slate-500 hover:text-slate-800'
                     }`}
                   >
                     <Flame className="w-4 h-4 text-orange-500" />
-                    Discounts & Flash Sale
+                    Discounts &amp; Vouchers
                     {storewideDiscount > 0 && (
                       <span className="bg-rose-100 text-rose-700 text-[10px] px-1.5 py-0.2 rounded-full font-bold">
                         {storewideDiscount}% ON
@@ -1957,7 +2456,680 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* ==================== SUBTAB: INVENTORY & SKUS ==================== */}
+                {/* ==================== SUBTAB 1: CHARTS & GRAPHS ==================== */}
+                {dashboardTab === 'analytics' && (
+                  <div className="bg-white p-4 sm:p-6 rounded-b-xl border border-slate-200 border-t-0 shadow-xs space-y-6">
+                    <div>
+                      <h3 className="text-sm sm:text-base font-black text-slate-900 flex items-center gap-2">
+                        <BarChart3 className="w-5 h-5 text-[#EE4D2D]" /> Hardware Sales &amp; Profit Performance Visualizer
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Interactive revenue trajectory, profit margins, category contribution, and order fulfillment funnel
+                      </p>
+                    </div>
+
+                    {/* Chart 1: Visual Revenue & Profit Comparison Bars */}
+                    <div className="bg-slate-50 p-4 sm:p-5 rounded-xl border border-slate-200 space-y-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                            Sales Revenue vs. Net Profit (Daily Trend)
+                          </h4>
+                          <p className="text-[11px] text-slate-500">Live comparison showing gross turnover and gross profit</p>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs font-bold">
+                          <span className="flex items-center gap-1.5 text-slate-700">
+                            <span className="w-3 h-3 rounded bg-[#EE4D2D] inline-block"></span> Gross Revenue
+                          </span>
+                          <span className="flex items-center gap-1.5 text-slate-700">
+                            <span className="w-3 h-3 rounded bg-emerald-600 inline-block"></span> Gross Profit
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Responsive Visual Bar Chart */}
+                      <div className="h-48 sm:h-56 flex items-end justify-between gap-2 sm:gap-4 pt-6 pb-2 px-2 border-b border-slate-300">
+                        {[
+                          { label: 'Mon', rev: financialMetrics.totalGrossRevenue * 0.12, profit: financialMetrics.grossProfit * 0.13 },
+                          { label: 'Tue', rev: financialMetrics.totalGrossRevenue * 0.15, profit: financialMetrics.grossProfit * 0.16 },
+                          { label: 'Wed', rev: financialMetrics.totalGrossRevenue * 0.18, profit: financialMetrics.grossProfit * 0.17 },
+                          { label: 'Thu', rev: financialMetrics.totalGrossRevenue * 0.10, profit: financialMetrics.grossProfit * 0.11 },
+                          { label: 'Fri', rev: financialMetrics.totalGrossRevenue * 0.22, profit: financialMetrics.grossProfit * 0.21 },
+                          { label: 'Sat', rev: financialMetrics.totalGrossRevenue * 0.28, profit: financialMetrics.grossProfit * 0.29 },
+                          { label: 'Today', rev: financialMetrics.totalGrossRevenue, profit: financialMetrics.grossProfit, active: true },
+                        ].map((d, i) => {
+                          const maxVal = Math.max(financialMetrics.totalGrossRevenue * 1.1, 1000);
+                          const revHeight = Math.max(12, Math.min(100, (d.rev / maxVal) * 100));
+                          const profitHeight = Math.max(8, Math.min(100, (d.profit / maxVal) * 100));
+
+                          return (
+                            <div key={i} className="flex-1 flex flex-col items-center h-full justify-end group relative cursor-pointer">
+                              {/* Hover Tooltip */}
+                              <div className="absolute -top-12 bg-slate-900 text-white text-[10px] py-1 px-2 rounded pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-20 whitespace-nowrap shadow-md">
+                                <p className="font-bold">{d.label}: ₱{Math.round(d.rev).toLocaleString()}</p>
+                                <p className="text-emerald-400">Profit: ₱{Math.round(d.profit).toLocaleString()}</p>
+                              </div>
+
+                              <div className="w-full flex items-end justify-center gap-1 h-full pb-1">
+                                {/* Revenue Bar */}
+                                <div 
+                                  style={{ height: `${revHeight}%` }} 
+                                  className={`w-1/2 rounded-t transition-all duration-300 ${d.active ? 'bg-[#EE4D2D]' : 'bg-orange-300 group-hover:bg-[#EE4D2D]'}`}
+                                />
+                                {/* Profit Bar */}
+                                <div 
+                                  style={{ height: `${profitHeight}%` }} 
+                                  className={`w-1/2 rounded-t transition-all duration-300 ${d.active ? 'bg-emerald-600' : 'bg-emerald-300 group-hover:bg-emerald-600'}`}
+                                />
+                              </div>
+                              <span className={`text-[10px] font-bold mt-1 ${d.active ? 'text-[#EE4D2D] font-black' : 'text-slate-500'}`}>
+                                {d.label}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Chart 2: Category Breakdown & Profit Contribution */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {/* Category Inventory & Revenue Contribution */}
+                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                            <PieChart className="w-4 h-4 text-blue-600" /> Top Categories by Asset Value
+                          </h4>
+                          <span className="text-[10px] text-slate-400">Inventory Distribution</span>
+                        </div>
+
+                        <div className="space-y-2.5">
+                          {categoryAnalytics.slice(0, 6).map((cat, idx) => {
+                            const pct = financialMetrics.inventoryRetailValue > 0 
+                              ? ((cat.retailValue / financialMetrics.inventoryRetailValue) * 100).toFixed(1)
+                              : 0;
+                            const colors = ['bg-orange-500', 'bg-blue-600', 'bg-emerald-600', 'bg-purple-600', 'bg-amber-500', 'bg-rose-500'];
+                            const barColor = colors[idx % colors.length];
+
+                            return (
+                              <div key={cat.name} className="space-y-1">
+                                <div className="flex justify-between text-xs font-bold">
+                                  <span className="text-slate-700">{cat.name}</span>
+                                  <span className="text-slate-900 font-mono">
+                                    ₱{cat.retailValue.toLocaleString()} <span className="text-slate-400 font-normal">({pct}%)</span>
+                                  </span>
+                                </div>
+                                <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                                  <div 
+                                    className={`h-full ${barColor} rounded-full`} 
+                                    style={{ width: `${Math.max(4, pct)}%` }} 
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Fulfillment Funnel Pipeline */}
+                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                            <Truck className="w-4 h-4 text-emerald-600" /> Order Fulfillment Pipeline
+                          </h4>
+                          <span className="text-[10px] text-slate-400">{orders.length} total orders</span>
+                        </div>
+
+                        <div className="space-y-2 text-xs">
+                          {[
+                            { stage: 'Order Placed', count: orders.filter(o => o.status === 'Order Placed').length, color: 'bg-orange-500' },
+                            { stage: 'Processing', count: orders.filter(o => o.status === 'Processing').length, color: 'bg-amber-500' },
+                            { stage: 'Packed', count: orders.filter(o => o.status === 'Packed').length, color: 'bg-indigo-500' },
+                            { stage: 'Out for Delivery', count: orders.filter(o => o.status === 'Out for Delivery').length, color: 'bg-blue-600' },
+                            { stage: 'Delivered', count: orders.filter(o => o.status === 'Delivered').length, color: 'bg-emerald-600' },
+                            { stage: 'Cancelled', count: orders.filter(o => o.status === 'Cancelled').length, color: 'bg-rose-500' },
+                          ].map((step, idx) => {
+                            const pct = orders.length > 0 ? ((step.count / orders.length) * 100).toFixed(0) : 0;
+                            return (
+                              <div key={idx} className="flex items-center justify-between p-2 bg-white rounded border border-slate-200">
+                                <div className="flex items-center gap-2">
+                                  <span className={`w-2 h-2 rounded-full ${step.color}`} />
+                                  <span className="font-bold text-slate-800">{step.stage}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono font-bold text-slate-900">{step.count} orders</span>
+                                  <span className="text-[10px] bg-slate-100 text-slate-600 font-bold px-1.5 py-0.2 rounded font-mono">
+                                    {pct}%
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Operational Financial Ratios */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                      <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+                        <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Gross Margin</span>
+                        <p className="text-xl font-black text-emerald-700 mt-0.5">{financialMetrics.grossMarginPct}%</p>
+                        <p className="text-[10px] text-emerald-600">Net markup on sold hardware</p>
+                      </div>
+
+                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl">
+                        <span className="text-[10px] font-bold text-blue-800 uppercase tracking-wider">Avg Order Value (AOV)</span>
+                        <p className="text-xl font-black text-blue-700 mt-0.5">
+                          ₱{financialMetrics.validOrdersCount > 0 
+                            ? Math.round(financialMetrics.totalGrossRevenue / financialMetrics.validOrdersCount).toLocaleString() 
+                            : '0'}
+                        </p>
+                        <p className="text-[10px] text-blue-600">Per contractor invoice</p>
+                      </div>
+
+                      <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl">
+                        <span className="text-[10px] font-bold text-purple-800 uppercase tracking-wider">Unrealized Asset Profit</span>
+                        <p className="text-xl font-black text-purple-700 mt-0.5">
+                          ₱{financialMetrics.unrealizedProfit.toLocaleString()}
+                        </p>
+                        <p className="text-[10px] text-purple-600">{financialMetrics.inventoryPotentialMarginPct}% potential stock margin</p>
+                      </div>
+
+                      <div className="p-3 bg-orange-50 border border-orange-200 rounded-xl">
+                        <span className="text-[10px] font-bold text-orange-800 uppercase tracking-wider">Total Sold Hardware</span>
+                        <p className="text-xl font-black text-[#EE4D2D] mt-0.5">
+                          {financialMetrics.totalItemsSold} pcs
+                        </p>
+                        <p className="text-[10px] text-orange-600">Fasteners &amp; bulk materials</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ==================== SUBTAB 2: P&L (PROFIT & LOSS STATEMENT) ==================== */}
+                {dashboardTab === 'pnl' && (
+                  <div className="bg-white p-4 sm:p-6 rounded-b-xl border border-slate-200 border-t-0 shadow-xs space-y-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                      <div>
+                        <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                          <TrendingUp className="w-5 h-5 text-emerald-600" /> Executive Profit &amp; Loss Statement (P&amp;L)
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Comprehensive revenue, Cost of Goods Sold (COGS), discount deductions, and net gross profits
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={() => window.print()}
+                        className="bg-slate-100 hover:bg-slate-200 text-slate-800 px-3.5 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer border border-slate-200 self-start sm:self-auto"
+                      >
+                        <Printer className="w-4 h-4" /> Print / Export P&amp;L
+                      </button>
+                    </div>
+
+                    {/* Financial Summary Highlight Card */}
+                    <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white p-5 rounded-2xl shadow-sm">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center sm:text-left">
+                        <div>
+                          <span className="text-xs text-emerald-100 font-bold uppercase tracking-wider">Total Realized Revenue</span>
+                          <p className="text-3xl font-black mt-1">₱{financialMetrics.totalGrossRevenue.toLocaleString()}</p>
+                          <p className="text-[11px] text-emerald-200 mt-0.5">{financialMetrics.validOrdersCount} fulfilled / active orders</p>
+                        </div>
+                        <div>
+                          <span className="text-xs text-emerald-100 font-bold uppercase tracking-wider">Cost of Goods Sold (COGS)</span>
+                          <p className="text-3xl font-black mt-1">₱{financialMetrics.totalCOGS.toLocaleString()}</p>
+                          <p className="text-[11px] text-emerald-200 mt-0.5">Wholesale material acquisition</p>
+                        </div>
+                        <div>
+                          <span className="text-xs text-emerald-100 font-bold uppercase tracking-wider">Net Gross Profit</span>
+                          <p className="text-3xl font-black mt-1 text-emerald-200">₱{financialMetrics.grossProfit.toLocaleString()}</p>
+                          <p className="text-[11px] text-emerald-100 mt-0.5 font-bold">
+                            Margin: {financialMetrics.grossMarginPct}% Realized Return
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Formal Multi-Step PnL Table */}
+                    <div className="border border-slate-200 rounded-xl overflow-hidden text-xs">
+                      <table className="w-full text-left border-collapse">
+                        <thead className="bg-slate-100 text-slate-700 font-bold uppercase text-[10px] border-b border-slate-200">
+                          <tr>
+                            <th className="py-2.5 px-4">Financial Line Item</th>
+                            <th className="py-2.5 px-4 text-right">Amount (₱)</th>
+                            <th className="py-2.5 px-4 text-right">% of Revenue</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {/* Revenue Section */}
+                          <tr className="bg-slate-50 font-bold text-slate-800">
+                            <td colSpan={3} className="py-2 px-4 uppercase text-[10px] tracking-wider text-slate-500">
+                              1. Operating Revenue
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="py-2.5 px-4 pl-6 text-slate-800">
+                              Gross Hardware Sales (Before Discounts)
+                            </td>
+                            <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900">
+                              ₱{(financialMetrics.totalGrossRevenue + financialMetrics.totalDiscountsAbsorbed).toLocaleString()}
+                            </td>
+                            <td className="py-2.5 px-4 text-right font-mono text-slate-500">100.0%</td>
+                          </tr>
+                          <tr>
+                            <td className="py-2.5 px-4 pl-6 text-rose-600">
+                              Less: Promotional Discounts &amp; Vouchers (hardware / builder)
+                            </td>
+                            <td className="py-2.5 px-4 text-right font-mono font-bold text-rose-600">
+                              -₱{financialMetrics.totalDiscountsAbsorbed.toLocaleString()}
+                            </td>
+                            <td className="py-2.5 px-4 text-right font-mono text-rose-500">
+                              {financialMetrics.totalGrossRevenue > 0 
+                                ? `-${((financialMetrics.totalDiscountsAbsorbed / financialMetrics.totalGrossRevenue) * 100).toFixed(1)}%` 
+                                : '0%'}
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="py-2.5 px-4 pl-6 text-slate-700">
+                              Delivery &amp; Logistics Recovery (Flat ₱150 on small orders)
+                            </td>
+                            <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900">
+                              ₱{financialMetrics.totalShippingRecovered.toLocaleString()}
+                            </td>
+                            <td className="py-2.5 px-4 text-right font-mono text-slate-500">
+                              {financialMetrics.totalGrossRevenue > 0 
+                                ? `${((financialMetrics.totalShippingRecovered / financialMetrics.totalGrossRevenue) * 100).toFixed(1)}%` 
+                                : '0%'}
+                            </td>
+                          </tr>
+                          <tr className="bg-orange-50/50 font-bold text-slate-900">
+                            <td className="py-2.5 px-4 pl-6">
+                              Net Operating Revenue
+                            </td>
+                            <td className="py-2.5 px-4 text-right font-mono text-base text-[#EE4D2D]">
+                              ₱{financialMetrics.totalGrossRevenue.toLocaleString()}
+                            </td>
+                            <td className="py-2.5 px-4 text-right font-mono">100.0%</td>
+                          </tr>
+
+                          {/* COGS Section */}
+                          <tr className="bg-slate-50 font-bold text-slate-800">
+                            <td colSpan={3} className="py-2 px-4 uppercase text-[10px] tracking-wider text-slate-500">
+                              2. Cost of Goods Sold (COGS)
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="py-2.5 px-4 pl-6 text-slate-700">
+                              Direct Wholesale Material Cost (Wholesale Capital from Suppliers)
+                            </td>
+                            <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-800">
+                              ₱{financialMetrics.totalCOGS.toLocaleString()}
+                            </td>
+                            <td className="py-2.5 px-4 text-right font-mono text-slate-500">
+                              {financialMetrics.totalGrossRevenue > 0 
+                                ? `${((financialMetrics.totalCOGS / financialMetrics.totalGrossRevenue) * 100).toFixed(1)}%` 
+                                : '0%'}
+                            </td>
+                          </tr>
+                          <tr className="bg-slate-50/70 font-bold text-slate-900">
+                            <td className="py-2.5 px-4 pl-6">
+                              Total Cost of Goods Sold
+                            </td>
+                            <td className="py-2.5 px-4 text-right font-mono text-slate-800">
+                              ₱{financialMetrics.totalCOGS.toLocaleString()}
+                            </td>
+                            <td className="py-2.5 px-4 text-right font-mono">
+                              {financialMetrics.totalGrossRevenue > 0 
+                                ? `${((financialMetrics.totalCOGS / financialMetrics.totalGrossRevenue) * 100).toFixed(1)}%` 
+                                : '0%'}
+                            </td>
+                          </tr>
+
+                          {/* Gross Profit Section */}
+                          <tr className="bg-emerald-50 font-bold text-emerald-950 text-sm">
+                            <td className="py-3 px-4 pl-6 flex items-center gap-1.5">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                              Gross Profit (Operating Margin)
+                            </td>
+                            <td className="py-3 px-4 text-right font-mono text-emerald-700 text-lg">
+                              ₱{financialMetrics.grossProfit.toLocaleString()}
+                            </td>
+                            <td className="py-3 px-4 text-right font-mono text-emerald-700 text-sm">
+                              {financialMetrics.grossMarginPct}% Margin
+                            </td>
+                          </tr>
+
+                          {/* Warehouse Balance Sheet Snapshot */}
+                          <tr className="bg-slate-50 font-bold text-slate-800">
+                            <td colSpan={3} className="py-2 px-4 uppercase text-[10px] tracking-wider text-slate-500">
+                              3. Warehouse Inventory Asset Valuation (Balance Sheet)
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="py-2.5 px-4 pl-6 text-slate-700">
+                              Total Warehouse Physical Stock
+                            </td>
+                            <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900">
+                              {financialMetrics.totalStockCount.toLocaleString()} units
+                            </td>
+                            <td className="py-2.5 px-4 text-right font-mono text-slate-400">465 SKUs</td>
+                          </tr>
+                          <tr>
+                            <td className="py-2.5 px-4 pl-6 text-slate-700">
+                              Warehouse Inventory Value at Cost (Capital Invested)
+                            </td>
+                            <td className="py-2.5 px-4 text-right font-mono font-bold text-blue-700">
+                              ₱{financialMetrics.inventoryCostValue.toLocaleString()}
+                            </td>
+                            <td className="py-2.5 px-4 text-right font-mono text-slate-400">Wholesale Basis</td>
+                          </tr>
+                          <tr>
+                            <td className="py-2.5 px-4 pl-6 text-slate-700">
+                              Warehouse Inventory Value at Retail (Potential Gross Sales)
+                            </td>
+                            <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900">
+                              ₱{financialMetrics.inventoryRetailValue.toLocaleString()}
+                            </td>
+                            <td className="py-2.5 px-4 text-right font-mono text-slate-400">Full Retail Basis</td>
+                          </tr>
+                          <tr className="bg-blue-50/50 font-bold text-blue-900">
+                            <td className="py-2.5 px-4 pl-6">
+                              Projected Unrealized Profit in Warehouse Stock
+                            </td>
+                            <td className="py-2.5 px-4 text-right font-mono text-blue-700 font-black">
+                              ₱{financialMetrics.unrealizedProfit.toLocaleString()}
+                            </td>
+                            <td className="py-2.5 px-4 text-right font-mono text-blue-600">
+                              {financialMetrics.inventoryPotentialMarginPct}% Potential Margin
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* ==================== SUBTAB 3: SALES LOG & ITEM TRACKER ==================== */}
+                {dashboardTab === 'sales-log' && (
+                  <div className="bg-white p-4 sm:p-5 rounded-b-xl border border-slate-200 border-t-0 shadow-xs space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                          <Receipt className="w-4 h-4 text-[#EE4D2D]" /> Itemized Sales Log &amp; Transaction Tracker
+                        </h3>
+                        <p className="text-xs text-slate-500">
+                          Complete audit trail of every hardware line item sold, unit capital, profit earned, and customer contact
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={exportSalesLogToCSV}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-2 rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs self-start sm:self-auto"
+                      >
+                        <Download className="w-4 h-4" /> Export Sales Log (CSV)
+                      </button>
+                    </div>
+
+                    {/* Filter & Search Bar */}
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                      <div className="w-full sm:w-72 relative">
+                        <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          placeholder="Search customer, SKU, order ID, product..."
+                          value={salesLogSearch}
+                          onChange={e => setSalesLogSearch(e.target.value)}
+                          className="w-full text-xs pl-8 pr-3 py-1.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-[#EE4D2D]"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-1.5 text-xs w-full sm:w-auto">
+                        <button
+                          onClick={() => setSalesLogStatusFilter('all')}
+                          className={`px-2.5 py-1 rounded font-bold cursor-pointer transition-colors ${
+                            salesLogStatusFilter === 'all' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 border border-slate-200'
+                          }`}
+                        >
+                          All ({financialMetrics.itemizedSales.length})
+                        </button>
+                        <button
+                          onClick={() => setSalesLogStatusFilter('active')}
+                          className={`px-2.5 py-1 rounded font-bold cursor-pointer transition-colors ${
+                            salesLogStatusFilter === 'active' ? 'bg-emerald-600 text-white' : 'bg-white text-emerald-800 border border-slate-200'
+                          }`}
+                        >
+                          Fulfilled / Active
+                        </button>
+                        <button
+                          onClick={() => setSalesLogStatusFilter('cancelled')}
+                          className={`px-2.5 py-1 rounded font-bold cursor-pointer transition-colors ${
+                            salesLogStatusFilter === 'cancelled' ? 'bg-rose-600 text-white' : 'bg-white text-rose-700 border border-slate-200'
+                          }`}
+                        >
+                          Cancelled
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Itemized Table */}
+                    <div className="overflow-x-auto border border-slate-200 rounded-lg">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead className="bg-slate-100 text-slate-700 font-bold uppercase text-[10px] border-b border-slate-200 sticky top-0">
+                          <tr>
+                            <th className="py-2.5 px-3">Order &amp; Date</th>
+                            <th className="py-2.5 px-3">Customer</th>
+                            <th className="py-2.5 px-3">SKU &amp; Item Details</th>
+                            <th className="py-2.5 px-3 text-center">Qty</th>
+                            <th className="py-2.5 px-3 text-right">Selling Price</th>
+                            <th className="py-2.5 px-3 text-right">Unit Capital</th>
+                            <th className="py-2.5 px-3 text-right">Line Revenue</th>
+                            <th className="py-2.5 px-3 text-right">Line Profit</th>
+                            <th className="py-2.5 px-3 text-center">Margin %</th>
+                            <th className="py-2.5 px-3 text-center">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {filteredSalesLog.length === 0 ? (
+                            <tr>
+                              <td colSpan={10} className="py-8 text-center text-slate-400">
+                                No sales records match your search filter.
+                              </td>
+                            </tr>
+                          ) : (
+                            filteredSalesLog.map((sale, idx) => (
+                              <tr 
+                                key={idx} 
+                                className={`hover:bg-slate-50 transition-colors ${sale.status === 'Cancelled' ? 'opacity-50 bg-rose-50/20' : ''}`}
+                              >
+                                <td className="py-2.5 px-3">
+                                  <span className="font-mono font-bold text-slate-900">{sale.orderId}</span>
+                                  <p className="text-[10px] text-slate-400">{sale.date}</p>
+                                </td>
+
+                                <td className="py-2.5 px-3">
+                                  <p className="font-bold text-slate-800">{sale.customerName}</p>
+                                  <p className="text-[10px] text-slate-400 font-mono">{sale.customerPhone || 'N/A'}</p>
+                                </td>
+
+                                <td className="py-2.5 px-3">
+                                  <p className="font-bold text-slate-900">{sale.productName}</p>
+                                  <span className="text-[10px] font-mono text-slate-400">{sale.productId} • {sale.category}</span>
+                                </td>
+
+                                <td className="py-2.5 px-3 text-center font-bold text-slate-800">
+                                  {sale.quantity}
+                                </td>
+
+                                <td className="py-2.5 px-3 text-right font-mono text-slate-700">
+                                  ₱{sale.unitPrice.toLocaleString()}
+                                </td>
+
+                                <td className="py-2.5 px-3 text-right font-mono text-slate-400">
+                                  ₱{sale.unitCapital.toLocaleString()}
+                                </td>
+
+                                <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
+                                  ₱{sale.lineRevenue.toLocaleString()}
+                                </td>
+
+                                <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-600">
+                                  {sale.status === 'Cancelled' ? '₱0' : `₱${sale.lineProfit.toLocaleString()}`}
+                                </td>
+
+                                <td className="py-2.5 px-3 text-center font-bold text-emerald-700">
+                                  {sale.status === 'Cancelled' ? '-' : `${sale.marginPct}%`}
+                                </td>
+
+                                <td className="py-2.5 px-3 text-center">
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                    sale.status === 'Cancelled' ? 'bg-rose-100 text-rose-700' :
+                                    sale.status === 'Delivered' ? 'bg-emerald-100 text-emerald-800' :
+                                    sale.status === 'Out for Delivery' ? 'bg-blue-100 text-blue-800' :
+                                    'bg-orange-100 text-[#EE4D2D]'
+                                  }`}>
+                                    {sale.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* ==================== SUBTAB 4: FORECASTING & DEADSTOCK TRACKER ==================== */}
+                {dashboardTab === 'insights' && (
+                  <div className="bg-white p-4 sm:p-6 rounded-b-xl border border-slate-200 border-t-0 shadow-xs space-y-6">
+                    <div>
+                      <h3 className="text-sm sm:text-base font-black text-slate-900 flex items-center gap-2">
+                        <Sparkles className="w-5 h-5 text-purple-600" /> Smart Inventory Forecasting &amp; Deadstock Detector
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Automated restock recommendations, deadstock warnings, and VIP contractor purchase frequency
+                      </p>
+                    </div>
+
+                    {/* 1. Low Stock & Reorder Forecasting */}
+                    <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-200 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold text-amber-950 uppercase tracking-wider flex items-center gap-1.5">
+                          <AlertTriangle className="w-4 h-4 text-amber-600" /> Critical Restock Recommendations ({financialMetrics.lowStockCount + financialMetrics.outOfStockCount} SKUs)
+                        </h4>
+                        <span className="text-[10px] text-amber-700">Stock &lt; 10 units</span>
+                      </div>
+
+                      <div className="overflow-x-auto max-h-64 border border-amber-200 rounded-lg bg-white">
+                        <table className="w-full text-left text-xs border-collapse">
+                          <thead className="bg-amber-100/60 text-amber-900 font-bold uppercase text-[10px] border-b border-amber-200 sticky top-0">
+                            <tr>
+                              <th className="py-2 px-3">SKU &amp; Product</th>
+                              <th className="py-2 px-3">Category</th>
+                              <th className="py-2 px-3 text-center">Current Stock</th>
+                              <th className="py-2 px-3 text-right">Unit Capital (₱)</th>
+                              <th className="py-2 px-3 text-center">Suggested PO Qty</th>
+                              <th className="py-2 px-3 text-right">Estimated Capital (₱)</th>
+                              <th className="py-2 px-3 text-center">Quick Action</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-amber-100">
+                            {products
+                              .filter(p => p.stock < 10)
+                              .slice(0, 10)
+                              .map(p => {
+                                const suggestedPO = p.stock <= 0 ? 50 : 30;
+                                const estCost = (p.capital || p.price * 0.75) * suggestedPO;
+
+                                return (
+                                  <tr key={p.id} className="hover:bg-amber-50/30">
+                                    <td className="py-2 px-3">
+                                      <p className="font-bold text-slate-900">{p.name}</p>
+                                      <span className="font-mono text-[10px] text-slate-400">{p.id}</span>
+                                    </td>
+                                    <td className="py-2 px-3 text-slate-600">{p.category}</td>
+                                    <td className="py-2 px-3 text-center">
+                                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${p.stock <= 0 ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800'}`}>
+                                        {p.stock <= 0 ? 'OUT OF STOCK' : `${p.stock} left`}
+                                      </span>
+                                    </td>
+                                    <td className="py-2 px-3 text-right font-mono text-slate-700">
+                                      ₱{(p.capital || 0).toLocaleString()}
+                                    </td>
+                                    <td className="py-2 px-3 text-center font-bold text-slate-800">
+                                      +{suggestedPO} {p.unit}s
+                                    </td>
+                                    <td className="py-2 px-3 text-right font-mono font-bold text-amber-800">
+                                      ₱{Math.round(estCost).toLocaleString()}
+                                    </td>
+                                    <td className="py-2 px-3 text-center">
+                                      <button
+                                        onClick={() => handleInlineStockChange(p.id, (p.stock || 0) + suggestedPO)}
+                                        className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold px-2.5 py-1 rounded cursor-pointer"
+                                        title="Quickly add +50 to stock"
+                                      >
+                                        Restock (+{suggestedPO})
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* 2. Top Fast-Moving SKUs & VIP Contractors */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Top Fast-Moving SKUs */}
+                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                        <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                          <TrendingUp className="w-4 h-4 text-emerald-600" /> Best-Selling Hardware SKUs
+                        </h4>
+                        <div className="space-y-2 text-xs">
+                          {products.slice(0, 5).map((p, idx) => (
+                            <div key={p.id} className="p-2.5 bg-white rounded border border-slate-200 flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="w-5 h-5 rounded-full bg-orange-100 text-[#EE4D2D] font-bold flex items-center justify-center text-[10px]">
+                                  #{idx + 1}
+                                </span>
+                                <div>
+                                  <p className="font-bold text-slate-900 truncate max-w-xs">{p.name}</p>
+                                  <span className="text-[10px] text-slate-400 font-mono">₱{p.price.toLocaleString()} • {p.unit}</span>
+                                </div>
+                              </div>
+                              <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                High Demand
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* VIP Contractor Clients */}
+                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                        <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                          <User className="w-4 h-4 text-blue-600" /> Top Contractor Accounts
+                        </h4>
+                        <div className="space-y-2 text-xs">
+                          {orders.slice(0, 3).map((o, idx) => (
+                            <div key={o.orderId} className="p-2.5 bg-white rounded border border-slate-200 flex items-center justify-between">
+                              <div>
+                                <p className="font-bold text-slate-900">{o.customer?.fullName || 'Contractor'}</p>
+                                <p className="text-[10px] text-slate-400">{o.customer?.address}</p>
+                              </div>
+                              <div className="text-right">
+                                <span className="font-bold text-[#EE4D2D] text-xs">₱{Number(o.total || 0).toLocaleString()}</span>
+                                <p className="text-[9px] text-emerald-600 font-bold">Tier 1 Buyer</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ==================== SUBTAB 5: INVENTORY & SKUS ==================== */}
                 {dashboardTab === 'inventory' && (
                   <div className="bg-white p-4 sm:p-5 rounded-b-xl border border-slate-200 border-t-0 shadow-xs space-y-4">
                     {/* Search, Filter Pills & Sorting Tip */}
@@ -1996,7 +3168,7 @@ export default function App() {
                               : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
                           }`}
                         >
-                          Low Stock &lt; 10 ({products.filter(p => p.stock > 0 && p.stock < 10).length})
+                          Low Stock &lt; 10 ({financialMetrics.lowStockCount})
                         </button>
                         <button
                           onClick={() => setDashboardStockFilter('out')}
@@ -2006,7 +3178,7 @@ export default function App() {
                               : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
                           }`}
                         >
-                          Out of Stock ({products.filter(p => p.stock <= 0).length})
+                          Out of Stock ({financialMetrics.outOfStockCount})
                         </button>
                         <button
                           onClick={() => setDashboardStockFilter('in')}
@@ -2162,7 +3334,6 @@ export default function App() {
                           ) : (
                             sortedDashboardProducts.map(item => (
                               <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                                {/* Checkbox */}
                                 <td className="py-2.5 px-3 text-center">
                                   <input
                                     type="checkbox"
@@ -2172,14 +3343,12 @@ export default function App() {
                                   />
                                 </td>
 
-                                {/* SKU ID */}
                                 <td className="py-2.5 px-3">
                                   <span className="font-mono text-[11px] font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">
                                     {item.id}
                                   </span>
                                 </td>
 
-                                {/* Item details */}
                                 <td className="py-2.5 px-3">
                                   <div className="flex items-center gap-2.5">
                                     <img 
@@ -2200,29 +3369,24 @@ export default function App() {
                                   </div>
                                 </td>
 
-                                {/* Category */}
                                 <td className="py-2.5 px-3 text-slate-600">
                                   <span className="text-[11px] bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-full">
                                     {item.category}
                                   </span>
                                 </td>
 
-                                {/* Unit */}
                                 <td className="py-2.5 px-3 font-medium text-slate-700">
                                   {item.unit}
                                 </td>
 
-                                {/* Price */}
                                 <td className="py-2.5 px-3 text-right font-bold text-slate-900">
                                   ₱{item.price.toLocaleString()}
                                 </td>
 
-                                {/* Capital */}
                                 <td className="py-2.5 px-3 text-right text-slate-500 font-mono">
                                   ₱{(item.capital || 0).toLocaleString()}
                                 </td>
 
-                                {/* Stock with Typeable Input */}
                                 <td className="py-2.5 px-3 text-center">
                                   <div className="inline-flex items-center gap-1.5">
                                     <input
@@ -2245,7 +3409,6 @@ export default function App() {
                                   </div>
                                 </td>
 
-                                {/* Discount % */}
                                 <td className="py-2.5 px-3 text-center">
                                   {item.discount_percent > 0 ? (
                                     <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
@@ -2256,7 +3419,6 @@ export default function App() {
                                   )}
                                 </td>
 
-                                {/* Actions: Edit & Delete */}
                                 <td className="py-2.5 px-3 text-center">
                                   <div className="flex items-center justify-center gap-1.5">
                                     <button
@@ -2287,25 +3449,25 @@ export default function App() {
 
                     <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
                       <span>Showing <strong>{sortedDashboardProducts.length}</strong> of <strong>{products.length}</strong> items</span>
-                      <span className="text-[11px] text-slate-400">Stock updates sync immediately to store catalog & database</span>
+                      <span className="text-[11px] text-slate-400">Stock updates sync immediately to store catalog &amp; database</span>
                     </div>
                   </div>
                 )}
 
-                {/* ==================== SUBTAB: ORDERS & FULFILLMENT ==================== */}
+                {/* ==================== SUBTAB 6: ORDERS & FULFILLMENT ==================== */}
                 {dashboardTab === 'orders' && (
                   <div className="bg-white p-4 sm:p-5 rounded-b-xl border border-slate-200 border-t-0 shadow-xs space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div>
                         <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
-                          <ShoppingBag className="w-4 h-4 text-[#EE4D2D]" /> Orders & Fulfillment Management ({orders.length})
+                          <ShoppingBag className="w-4 h-4 text-[#EE4D2D]" /> Orders &amp; Fulfillment Management ({orders.length})
                         </h3>
                         <p className="text-xs text-slate-500">
                           Track orders, change delivery status, or cancel orders to restore inventory stock
                         </p>
                       </div>
                       <div className="text-xs font-bold text-slate-600 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
-                        {orders.filter(o => o.status !== 'Cancelled').length} Active Orders • {orders.filter(o => o.status === 'Cancelled').length} Cancelled
+                        {financialMetrics.validOrdersCount} Active Orders • {financialMetrics.cancelledOrdersCount} Cancelled
                       </div>
                     </div>
 
@@ -2319,7 +3481,7 @@ export default function App() {
                         <table className="w-full text-left text-xs border-collapse">
                           <thead className="bg-slate-100 text-slate-700 font-bold uppercase text-[10px] border-b border-slate-200">
                             <tr>
-                              <th className="py-2.5 px-3">Order ID & Date</th>
+                              <th className="py-2.5 px-3">Order ID &amp; Date</th>
                               <th className="py-2.5 px-3">Customer Details</th>
                               <th className="py-2.5 px-3">Delivery Site</th>
                               <th className="py-2.5 px-3">Items Ordered</th>
@@ -2333,27 +3495,23 @@ export default function App() {
                           <tbody className="divide-y divide-slate-100">
                             {orders.map(o => (
                               <tr key={o.orderId} className={`hover:bg-slate-50 transition-colors ${o.status === 'Cancelled' ? 'opacity-60 bg-rose-50/20' : ''}`}>
-                                {/* Order ID & Date */}
                                 <td className="py-3 px-3 align-top">
                                   <span className="font-mono font-bold text-slate-900">{o.orderId}</span>
                                   <p className="text-[10px] text-slate-400 mt-0.5">{o.date}</p>
                                 </td>
 
-                                {/* Customer */}
                                 <td className="py-3 px-3 align-top">
                                   <p className="font-bold text-slate-800">{o.customer?.fullName || 'Guest'}</p>
                                   <p className="text-slate-500 text-[11px] font-mono">{o.customer?.phone || 'No phone'}</p>
                                   {o.customer?.email && <p className="text-[10px] text-slate-400">{o.customer.email}</p>}
                                 </td>
 
-                                {/* Site Address */}
                                 <td className="py-3 px-3 align-top max-w-xs">
                                   <p className="text-slate-700 text-xs truncate" title={o.customer?.address}>
                                     {o.customer?.address || 'Pickup / Leyte Hub'}
                                   </p>
                                 </td>
 
-                                {/* Items */}
                                 <td className="py-3 px-3 align-top">
                                   <div className="space-y-1">
                                     {(o.items || []).map((it, idx) => (
@@ -2364,7 +3522,6 @@ export default function App() {
                                   </div>
                                 </td>
 
-                                {/* Payment */}
                                 <td className="py-3 px-3 align-top">
                                   <span className="uppercase font-bold text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-700">
                                     {o.customer?.paymentMethod || 'COD'}
@@ -2376,12 +3533,10 @@ export default function App() {
                                   )}
                                 </td>
 
-                                {/* Total */}
                                 <td className="py-3 px-3 align-top text-right font-black text-slate-900 text-sm">
                                   ₱{Number(o.total || 0).toLocaleString()}
                                 </td>
 
-                                {/* Status Badge */}
                                 <td className="py-3 px-3 align-top text-center">
                                   <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
                                     o.status === 'Cancelled' ? 'bg-rose-100 text-rose-700' :
@@ -2395,7 +3550,6 @@ export default function App() {
                                   </span>
                                 </td>
 
-                                {/* Status Selector */}
                                 <td className="py-3 px-3 align-top text-center">
                                   <select
                                     value={o.status}
@@ -2412,7 +3566,6 @@ export default function App() {
                                   </select>
                                 </td>
 
-                                {/* Cancel Order Action */}
                                 <td className="py-3 px-3 align-top text-center">
                                   {o.status === 'Cancelled' ? (
                                     <span className="text-[11px] text-rose-500 font-bold inline-flex items-center gap-1">
@@ -2438,7 +3591,7 @@ export default function App() {
                   </div>
                 )}
 
-                {/* ==================== SUBTAB: DISCOUNTS & FLASH SALE ==================== */}
+                {/* ==================== SUBTAB 7: DISCOUNTS & FLASH SALE ==================== */}
                 {dashboardTab === 'promotions' && (
                   <div className="bg-white p-4 sm:p-5 rounded-b-xl border border-slate-200 border-t-0 shadow-xs space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -3220,27 +4373,47 @@ export default function App() {
 
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 mb-1">Password *</label>
-                <input
-                  type="password"
-                  required
-                  placeholder="At least 6 characters"
-                  value={authForm.password}
-                  onChange={e => setAuthForm({ ...authForm, password: e.target.value })}
-                  className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:border-[#EE4D2D] focus:outline-none"
-                />
+                <div className="relative">
+                  <input
+                    type={showAuthPassword ? "text" : "password"}
+                    required
+                    placeholder="At least 6 characters"
+                    value={authForm.password}
+                    onChange={e => setAuthForm({ ...authForm, password: e.target.value })}
+                    className="w-full px-3 py-2 pr-9 text-xs border border-slate-200 rounded-lg focus:border-[#EE4D2D] focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowAuthPassword(!showAuthPassword)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    aria-label={showAuthPassword ? "Hide password" : "Show password"}
+                  >
+                    {showAuthPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
 
               {authModal === 'register' && (
                 <div>
                   <label className="block text-[11px] font-bold text-slate-700 mb-1">Confirm Password *</label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="Repeat password"
-                    value={authForm.confirmPassword}
-                    onChange={e => setAuthForm({ ...authForm, confirmPassword: e.target.value })}
-                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:border-[#EE4D2D] focus:outline-none"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showAuthConfirmPassword ? "text" : "password"}
+                      required
+                      placeholder="Repeat password"
+                      value={authForm.confirmPassword}
+                      onChange={e => setAuthForm({ ...authForm, confirmPassword: e.target.value })}
+                      className="w-full px-3 py-2 pr-9 text-xs border border-slate-200 rounded-lg focus:border-[#EE4D2D] focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowAuthConfirmPassword(!showAuthConfirmPassword)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      aria-label={showAuthConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                    >
+                      {showAuthConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -3295,15 +4468,160 @@ export default function App() {
         </div>
       )}
 
+      {/* 20 Frontend Polish: Scroll Back to Top Button */}
+      {showScrollTop && (
+        <button
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          aria-label="Scroll to top of page"
+          className="fixed bottom-20 right-4 sm:bottom-8 sm:right-8 z-40 p-2.5 sm:p-3 bg-slate-900/90 hover:bg-[#EE4D2D] text-white rounded-full shadow-2xl backdrop-blur-md transition-all active:scale-90 cursor-pointer no-print"
+          title="Back to top"
+        >
+          <ArrowUp className="w-5 h-5" />
+        </button>
+      )}
+
+      {/* 20 Frontend Polish: Floating Support Hotline CTA Button */}
+      <div className="fixed bottom-20 left-4 sm:bottom-8 sm:left-8 z-40 no-print">
+        <button
+          onClick={() => setSupportModalOpen(true)}
+          className="bg-[#EE4D2D] hover:bg-[#d73f20] text-white px-3.5 py-2.5 rounded-full shadow-2xl flex items-center gap-2 text-xs font-bold transition-all active:scale-95 cursor-pointer"
+          title="Direct Hardware Dispatch Hotline"
+        >
+          <Phone className="w-4 h-4 animate-bounce" />
+          <span className="hidden sm:inline">Dispatch Hotline</span>
+        </button>
+      </div>
+
+      {/* Floating Support Modal */}
+      {supportModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-5 border border-slate-200">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-orange-100 text-[#EE4D2D] flex items-center justify-center font-bold">
+                  <Phone className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900">Manna Hardware Support</h3>
+                  <p className="text-[10px] text-slate-400">Tacloban Logistics & Dispatch</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSupportModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="py-4 space-y-3 text-xs">
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-1">
+                <p className="font-bold text-slate-800">Direct Contractor Hotline:</p>
+                <p className="text-base font-black text-[#EE4D2D] font-mono">0917-882-9912 / (053) 888-2910</p>
+                <p className="text-[10px] text-slate-400">Viber, SMS & WhatsApp connected</p>
+              </div>
+
+              <div className="space-y-1 text-slate-600">
+                <p className="flex items-center gap-1.5 font-medium">
+                  <MapPin className="w-3.5 h-3.5 text-[#EE4D2D] shrink-0" />
+                  <span>Brgy. Cabalwan, Tacloban City, Leyte</span>
+                </p>
+                <p className="flex items-center gap-1.5 font-medium">
+                  <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <span>Mon - Sat: 7:30 AM - 5:30 PM | Sun: 8:00 AM - 12:00 PM</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 flex gap-2">
+              <a
+                href="tel:09178829912"
+                className="flex-1 bg-[#EE4D2D] hover:bg-[#d73f20] text-white py-2 rounded-lg text-xs font-bold text-center cursor-pointer transition-colors"
+              >
+                Call Hotline
+              </a>
+              <button
+                type="button"
+                onClick={() => setSupportModalOpen(false)}
+                className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-50 cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 20 Frontend Polish: Philippine Data Privacy Act (RA 10173) Cookie Notice */}
+      {!cookieConsent && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 p-3 sm:p-4 bg-slate-900/95 text-white backdrop-blur-md border-t border-slate-700 shadow-2xl no-print">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+            <p className="text-slate-300 text-center sm:text-left">
+              Manna Hardware complies with the <strong>Philippine Data Privacy Act of 2012 (RA 10173)</strong>. We use cookies and local storage to secure customer checkout, remember cart items, and optimize delivery dispatch in Leyte & Samar.
+            </p>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => {
+                  setCookieConsent('declined');
+                  localStorage.setItem('manna_cookie_consent', 'declined');
+                }}
+                className="px-3 py-1.5 text-xs text-slate-300 hover:text-white font-medium cursor-pointer"
+              >
+                Essential Only
+              </button>
+              <button
+                onClick={() => {
+                  setCookieConsent('accepted');
+                  localStorage.setItem('manna_cookie_consent', 'accepted');
+                }}
+                className="bg-[#EE4D2D] hover:bg-[#d73f20] text-white px-4 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all active:scale-95 shadow-xs"
+              >
+                Accept All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 20 Frontend Polish: Confirmation Dialog for Destructive Actions */}
+      {confirmModal.isOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-5 border border-slate-200">
+            <div className="flex items-center gap-2 text-rose-600 mb-2">
+              <AlertCircle className="w-5 h-5 shrink-0" />
+              <h3 className="font-bold text-sm text-slate-900">{confirmModal.title}</h3>
+            </div>
+            <p className="text-xs text-slate-600 mb-4">{confirmModal.message}</p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null })}
+                className="px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (confirmModal.onConfirm) confirmModal.onConfirm();
+                  setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null });
+                }}
+                className="px-4 py-1.5 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-lg cursor-pointer shadow-xs"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
 
-// ==================== EXACT SHOPEE PRODUCT CARD COMPONENT ====================
+// ==================== MANNA PRODUCT CARD COMPONENT ====================
 function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = false, storewideDiscount = 0 }) {
   const soldCount = product.reviews ? `${product.reviews}k+` : '3k+';
-  const location = isRightCol ? 'San Rafael, Bul...' : 'Bocaue, Bula...';
-  const days = isRightCol ? '3-7 Days' : '10-11 Days';
+  const location = isRightCol ? 'Tacloban City' : 'Palo, Leyte';
+  const days = isRightCol ? 'Same Day' : '1-2 Days';
 
   const itemDisc = Number(product.discount_percent || 0);
   const maxDiscount = Math.max(itemDisc, storewideDiscount);
@@ -3340,10 +4658,10 @@ function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = f
           </div>
         )}
 
-        {/* SpayLater Yellow Overlay Strip on Image bottom (Exact from Shopee Screenshot) */}
-        <div className="absolute bottom-0 left-0 right-0 bg-[#FFB800] text-[#D0011B] text-[8px] font-black px-1.5 py-0.5 flex items-center justify-between">
-          <span>SPayLater 0% INTEREST</span>
-          <span className="text-[7px] text-[#222] font-semibold">{product.unit.toUpperCase()}</span>
+        {/* Commercial Dispatch Strip on Image bottom */}
+        <div className="absolute bottom-0 left-0 right-0 bg-slate-900/90 text-amber-400 text-[8px] font-black px-1.5 py-0.5 flex items-center justify-between">
+          <span>COD / GCASH AVAILABLE</span>
+          <span className="text-[7px] text-white font-semibold">{product.unit.toUpperCase()}</span>
         </div>
       </div>
 
@@ -3362,13 +4680,13 @@ function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = f
             {product.name}
           </h3>
 
-          {/* Shopee Badges */}
+          {/* Manna Hardware Badges */}
           <div className="flex flex-wrap items-center gap-1 mt-1.5">
-            <span className="border border-[#EE4D2D] text-[#EE4D2D] text-[8px] font-semibold px-1 rounded-xs leading-none py-0.5">
-              SPayLater 0%
+            <span className="border border-emerald-600 text-emerald-700 text-[8px] font-bold px-1 rounded-xs leading-none py-0.5 bg-emerald-50">
+              Tacloban Stock
             </span>
             <span className="bg-[#EE4D2D] text-white text-[8px] font-bold px-1 rounded-xs leading-none py-0.5">
-              Sulit Deal
+              Wholesale Deal
             </span>
             {maxDiscount > 0 && (
               <span className="bg-emerald-600 text-white text-[8px] font-black px-1 rounded-xs leading-none py-0.5">

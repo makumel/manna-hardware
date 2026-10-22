@@ -2,6 +2,8 @@
   
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import initialCatalog from './catalog.json';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { 
   Search, Camera, ShoppingCart, MessageCircle, Home, ShoppingBag, 
   Tv, Bell, User, Truck, MapPin, MoreHorizontal, ShieldCheck, 
@@ -13,7 +15,7 @@ import {
   Laptop, Smartphone, HelpCircle, ExternalLink, Sparkles, Box,
   ArrowUpDown, ArrowUp, ArrowDown, Ban, XCircle, BarChart3, Copy, Printer,
   TrendingUp, TrendingDown, DollarSign, PieChart, FileText, Receipt, ArrowUpRight, Percent, Coins, AlertTriangle
-} from 'lucide-react';
+, Star, Zap, Award } from 'lucide-react';
 
 // Helper to detect 10ft+ long structural and pipe items (Angle bar, C-Purlins, GI Pipe, Rebar, etc.)
 export const isLongCargoItem = (item) => {
@@ -456,9 +458,9 @@ const renderPopups = () => (
   const [manifestSearchQuery, setManifestSearchQuery] = useState('');
   const [manifestCategoryFilter, setManifestCategoryFilter] = useState('All');
 
-  // Merchant Admin Password Gate (STRICT: asenso123)
+  // Merchant Admin Authentication Gate (Server-Verified via /api/admin/login)
   const [isMerchantAuthenticated, setIsMerchantAuthenticated] = useState(() => {
-    return sessionStorage.getItem('manna_merchant_auth') === 'true';
+    return sessionStorage.getItem('manna_merchant_auth') === 'true' && Boolean(sessionStorage.getItem('manna_admin_token'));
   });
   const [adminPasswordInput, setAdminPasswordInput] = useState('');
   const [adminPasswordError, setAdminPasswordError] = useState('');
@@ -467,7 +469,18 @@ const renderPopups = () => (
   // ==================== CATALOG & INVENTORY ====================
   const [products, setProducts] = useState(() => {
     const saved = localStorage.getItem('manna_products');
-    const rawList = saved ? JSON.parse(saved) : initialCatalog;
+    let rawList = initialCatalog;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // If saved list has older/fewer items than updated catalog (e.g. 465 vs 934), use full catalog
+        if (Array.isArray(parsed) && parsed.length >= initialCatalog.length) {
+          rawList = parsed;
+        }
+      } catch (e) {
+        rawList = initialCatalog;
+      }
+    }
     // Guarantee MNA-1103 (LUX QDE Med. Brown) always has authentic paint can image (not human hair color)
     return rawList.map(p => {
       if (p.id === 'MNA-1103' || p.name === 'LUX QDE Med. Brown') {
@@ -528,6 +541,23 @@ const renderPopups = () => (
   const [catalogSortField, setCatalogSortField] = useState('name');
   const [catalogSortOrder, setCatalogSortOrder] = useState('asc'); // 'asc' | 'desc'
   const [catalogQuantities, setCatalogQuantities] = useState({});
+
+  // Marketplace Home Feed Controls & Flash Timer
+  const [homeQuickFilter, setHomeQuickFilter] = useState('all'); // 'all' | 'bestseller' | 'new' | 'deals' | 'under100' | 'surplus'
+  const [selectedBrandFilter, setSelectedBrandFilter] = useState(null);
+  const [flashTime, setFlashTime] = useState({ hours: 1, minutes: 58, seconds: 24 });
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setFlashTime(prev => {
+        if (prev.seconds > 0) return { ...prev, seconds: prev.seconds - 1 };
+        if (prev.minutes > 0) return { ...prev, minutes: 59, seconds: 59 };
+        if (prev.hours > 0) return { hours: prev.hours - 1, minutes: 59, seconds: 59 };
+        return { hours: 2, minutes: 0, seconds: 0 };
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // ==================== CHECKOUT & ORDER TRACKING ====================
   const [customer, setCustomer] = useState({
@@ -622,7 +652,7 @@ const renderPopups = () => (
   useEffect(() => {
     if (isMerchantAuthenticated) {
       fetch('/api/admin/warehouse/locations', {
-        headers: { 'x-admin-key': 'asenso123' }
+        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('manna_admin_token') || ''}` }
       })
       .then(res => res.json())
       .then(data => {
@@ -642,7 +672,7 @@ const renderPopups = () => (
       });
 
       fetch('/api/admin/warehouse/boxes', {
-        headers: { 'x-admin-key': 'asenso123' }
+        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('manna_admin_token') || ''}` }
       })
       .then(res => res.json())
       .then(data => {
@@ -651,7 +681,7 @@ const renderPopups = () => (
       .catch(() => {});
 
       fetch('/api/admin/warehouse/summary', {
-        headers: { 'x-admin-key': 'asenso123' }
+        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('manna_admin_token') || ''}` }
       })
       .then(res => res.json())
       .then(data => {
@@ -754,6 +784,29 @@ const renderPopups = () => (
     }
   }, [currentUser, authToken]);
 
+  // Always fetch latest products from database on mount to guarantee fresh live stock counts
+  useEffect(() => {
+    fetch('/api/products')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setProducts(prev => {
+            // Merge with existing admin edits if any, but ensure full SKU coverage
+            const map = new Map(data.map(p => [p.id, p]));
+            // Also preserve capital costs if available in initialCatalog or prev
+            return data.map(item => {
+              const existing = prev.find(p => p.id === item.id) || initialCatalog.find(p => p.id === item.id);
+              return {
+                ...item,
+                capital: existing?.capital ?? item.capital ?? (Math.round((item.price * 0.78) * 100) / 100)
+              };
+            });
+          });
+        }
+      })
+      .catch(err => console.log('Products API sync fallback to catalog:', err));
+  }, []);
+
   useEffect(() => {
     localStorage.setItem('manna_products', JSON.stringify(products));
   }, [products]);
@@ -822,15 +875,35 @@ const renderPopups = () => (
 
   // Filtered products for public views (excludes cancelled / inconsistency items)
   const filteredProducts = useMemo(() => {
-    return products.filter(p => {
+    let list = products.filter(p => {
       if (p.isCancelled || p.status === 'cancelled') return false;
       const matchCat = selectedCategory === 'All' || p.category === selectedCategory;
       const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           p.id.toLowerCase().includes(searchQuery.toLowerCase());
       const matchStock = catalogFilterInStock ? p.stock > 0 : true;
-      return matchCat && matchSearch && matchStock;
+      const matchBrand = selectedBrandFilter ? p.name.toLowerCase().includes(selectedBrandFilter.toLowerCase()) : true;
+
+      let matchQuick = true;
+      if (homeQuickFilter === 'deals') {
+        const disc = Number(p.discount_percent || 0);
+        matchQuick = disc >= 15 || storewideDiscount >= 15;
+      } else if (homeQuickFilter === 'under100') {
+        matchQuick = Number(p.price || 0) <= 100;
+      } else if (homeQuickFilter === 'new') {
+        matchQuick = p.id.startsWith('MNA-NT-');
+      } else if (homeQuickFilter === 'surplus') {
+        matchQuick = (p.description && /surplus|display|as-is/i.test(p.description)) || p.stock < 10;
+      }
+
+      return matchCat && matchSearch && matchStock && matchBrand && matchQuick;
     });
-  }, [products, selectedCategory, searchQuery, catalogFilterInStock]);
+
+    if (homeQuickFilter === 'bestseller') {
+      list = [...list].sort((a, b) => (Number(b.sold || 0) - Number(a.sold || 0)));
+    }
+
+    return list;
+  }, [products, selectedCategory, searchQuery, catalogFilterInStock, selectedBrandFilter, homeQuickFilter, storewideDiscount]);
 
   // Dual column masonry for Home view
   const leftColumnItems = useMemo(() => {
@@ -1218,7 +1291,7 @@ const renderPopups = () => (
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
-        'x-admin-key': 'asenso123'
+        'Authorization': `Bearer ${sessionStorage.getItem('manna_admin_token') || ''}`
       },
       body: JSON.stringify({ capital: capVal })
     }).catch(() => {});
@@ -1436,7 +1509,7 @@ const renderPopups = () => (
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
-        'x-admin-key': 'asenso123'
+        'Authorization': `Bearer ${sessionStorage.getItem('manna_admin_token') || ''}`
       },
       body: JSON.stringify({ stock: stockVal })
     }).catch(() => {});
@@ -1457,7 +1530,7 @@ const renderPopups = () => (
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-admin-key': 'asenso123'
+        'Authorization': `Bearer ${sessionStorage.getItem('manna_admin_token') || ''}`
       },
       body: JSON.stringify({ discount_percent: discVal })
     }).catch(() => {});
@@ -1469,7 +1542,7 @@ const renderPopups = () => (
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': 'asenso123'
+          'Authorization': `Bearer ${sessionStorage.getItem('manna_admin_token') || ''}`
         },
         body: JSON.stringify({
           discounts: products.map(p => ({ id: p.id, discount_percent: Number(p.discount_percent || 0) })),
@@ -1518,7 +1591,7 @@ const renderPopups = () => (
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
-        'x-admin-key': 'asenso123'
+        'Authorization': `Bearer ${sessionStorage.getItem('manna_admin_token') || ''}`
       },
       body: JSON.stringify({ isCancelled: true, status: 'cancelled' })
     }).catch(() => {});
@@ -1572,7 +1645,101 @@ const renderPopups = () => (
     });
   };
 
-  // Download Full Inventory Manifest CSV for Contractors & Hardware Resellers
+  // Dynamic Inventory Manifest PDF Generation with live, updated quantities every download
+  const downloadManifestPDF = () => {
+    const activeProducts = products.filter(p => !p.isCancelled && p.status !== 'cancelled');
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const dateStr = new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const fileDate = new Date().toISOString().slice(0, 10);
+    const totalUnits = activeProducts.reduce((sum, p) => sum + (Math.max(0, Number(p.stock) || 0)), 0);
+    const totalValuation = activeProducts.reduce((sum, p) => sum + ((Number(p.price) || 0) * Math.max(0, Number(p.stock) || 0)), 0);
+
+    // Header styling
+    doc.setFillColor(15, 23, 42); // slate-900
+    doc.rect(0, 0, 210, 28, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('MANNA BUILDING SUPPLY', 14, 11);
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(203, 213, 225); // slate-300
+    doc.text('Commercial Warehouse Stock & Inventory Manifest', 14, 17);
+    doc.text('Tacloban City, Leyte • Hotline / Viber: 0926 199 5703', 14, 22);
+
+    // Right header badges
+    doc.setFontSize(8);
+    doc.setTextColor(251, 191, 36); // amber-400
+    doc.setFont('helvetica', 'bold');
+    doc.text(`LIVE STOCK: ${totalUnits.toLocaleString()} UNITS`, 196, 11, { align: 'right' });
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Active Catalog: ${activeProducts.length} SKUs`, 196, 16, { align: 'right' });
+    doc.text(`Generated: ${dateStr}`, 196, 21, { align: 'right' });
+
+    // Table data
+    const tableData = activeProducts.map((p, idx) => {
+      const stock = Math.max(0, Number(p.stock) || 0);
+      const price = Number(p.price) || 0;
+      const wholesale = Math.round(price * 0.60 * 100) / 100;
+      const total = price * stock;
+      return [
+        p.id || `MNA-${idx + 1000}`,
+        p.name || 'Commercial Item',
+        p.category || 'General',
+        `${stock} ${p.unit || 'pc'}`,
+        `P${price.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        `P${wholesale.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        `P${total.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      ];
+    });
+
+    autoTable(doc, {
+      startY: 32,
+      head: [['SKU', 'Item Description', 'Category', 'Live Qty', 'Retail (PHP)', 'Wholesale 40% OFF', 'Line Total']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: {
+        fillColor: [238, 77, 45], // #EE4D2D brand orange
+        textColor: [255, 255, 255],
+        fontSize: 7.5,
+        fontStyle: 'bold',
+        halign: 'left'
+      },
+      styles: {
+        fontSize: 7,
+        cellPadding: 1.8,
+        lineColor: [226, 232, 240],
+        textColor: [30, 41, 59]
+      },
+      columnStyles: {
+        0: { cellWidth: 24, fontStyle: 'bold' },
+        1: { cellWidth: 56 },
+        2: { cellWidth: 32 },
+        3: { cellWidth: 18, halign: 'center', fontStyle: 'bold' },
+        4: { cellWidth: 24, halign: 'right' },
+        5: { cellWidth: 26, halign: 'right', textColor: [22, 101, 52], fontStyle: 'bold' },
+        6: { cellWidth: 26, halign: 'right', fontStyle: 'bold' }
+      },
+      didDrawPage: (data) => {
+        // Footer on every page
+        const pageCount = doc.internal.getNumberOfPages();
+        doc.setFontSize(7);
+        doc.setTextColor(148, 163, 184);
+        doc.text(
+          `Page ${data.pageNumber} of ${pageCount} • Manna Hardware Commercial Inventory Manifest • Tacloban City, Leyte • As-Is, Where-Is Commercial Terms`,
+          14,
+          290
+        );
+      }
+    });
+
+    doc.save(`manna_hardware_inventory_manifest_${fileDate}.pdf`);
+  };
+
+  // Download Full Inventory Manifest CSV for Contractors & Hardware Resellers (Updated: No liquidation)
   const downloadFullManifestCSV = () => {
     const headers = ['SKU', 'Item Name', 'Category', 'Unit', 'Stock On Hand', 'Retail Price (PHP)', 'Tier 3 Wholesale 40% OFF (PHP)', 'Total Retail Valuation (PHP)'];
     const rows = products.map(p => {
@@ -1598,7 +1765,7 @@ const renderPopups = () => (
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `manna_hardware_liquidation_manifest_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `manna_hardware_inventory_manifest_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1622,7 +1789,7 @@ const renderPopups = () => (
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': 'asenso123'
+          'Authorization': `Bearer ${sessionStorage.getItem('manna_admin_token') || ''}`
         },
         body: JSON.stringify({ status: newStatus })
       });
@@ -1661,7 +1828,7 @@ const renderPopups = () => (
         method: source === 'merchant' ? 'PATCH' : 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(source === 'merchant' ? { 'x-admin-key': 'asenso123' } : {})
+          ...(source === 'merchant' ? { 'Authorization': `Bearer ${sessionStorage.getItem('manna_admin_token') || ''}` } : {})
         },
         body: JSON.stringify({ status: 'Cancelled' })
       });
@@ -1915,16 +2082,31 @@ const renderPopups = () => (
     setUserOrders([]);
   };
 
-  // Merchant Admin Password verification (STRICT: asenso123)
-  const handleAdminPasswordSubmit = (e) => {
+  // Merchant Admin Password verification (Server-Side Zero-Exposure Gate)
+  const handleAdminPasswordSubmit = async (e) => {
     e.preventDefault();
     setAdminPasswordError('');
-    if (adminPasswordInput.trim() === 'asenso123') {
-      setIsMerchantAuthenticated(true);
-      sessionStorage.setItem('manna_merchant_auth', 'true');
-      setAdminPasswordInput('');
-    } else {
-      setAdminPasswordError('Incorrect password. Access denied.');
+    if (!adminPasswordInput.trim()) {
+      setAdminPasswordError('Please enter the merchant security key.');
+      return;
+    }
+    try {
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: adminPasswordInput.trim() })
+      });
+      const data = await res.json();
+      if (res.ok && data.token) {
+        setIsMerchantAuthenticated(true);
+        sessionStorage.setItem('manna_merchant_auth', 'true');
+        sessionStorage.setItem('manna_admin_token', data.token);
+        setAdminPasswordInput('');
+      } else {
+        setAdminPasswordError(data.error || 'Incorrect security key. Access denied.');
+      }
+    } catch {
+      setAdminPasswordError('Authentication service unreachable. Please retry.');
     }
   };
 
@@ -2398,44 +2580,456 @@ const renderPopups = () => (
         
         {/* ==================== TAB 1: HOME FEED (RESPONSIVE 2-6 COLS) ==================== */}
         {activeTab === 'home' && (
-          <main className="w-full">
-            {/* Active Promo Voucher Banner */}
-            <div className="bg-gradient-to-r from-slate-900 via-red-950 to-orange-950 text-white p-3.5 sm:p-4 rounded-xl mb-4 border border-amber-500/30 shadow-md">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                <div className="flex items-start sm:items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center shrink-0">
-                    <Flame className="w-6 h-6 animate-pulse text-amber-400" />
-                  </div>
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="bg-amber-500 text-slate-950 text-[10px] font-black uppercase px-2 py-0.5 rounded tracking-wider">
-                        Commercial Warehouse Clearance
-                      </span>
-                      <span className="text-amber-300 text-xs font-bold">
-                        Commercial Warehouse Clearance • 20% to 40% OFF Wholesale Rates
-                      </span>
+          <main className="w-full space-y-4">
+
+            {/* 1. HORIZONTAL STORIES / ITEM CIRCLES: DISPATCH NEAR YOU (NO FACES - AUTHENTIC ITEMS ONLY) */}
+            <div className="bg-white rounded-2xl p-3 sm:p-4 border border-slate-200/90 shadow-2xs">
+              <div className="flex items-center justify-between mb-3 px-1">
+                <div className="flex items-center gap-1.5 text-xs sm:text-sm font-extrabold text-slate-900">
+                  <MapPin className="w-4 h-4 text-emerald-600" />
+                  <span>Items & Inventory Near You</span>
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full ml-1">
+                    Tacloban & Palo Hub
+                  </span>
+                </div>
+                <button 
+                  onClick={() => { setActiveTab('catalog'); setSelectedCategory('All'); setSelectedBrandFilter(null); }}
+                  className="text-xs text-slate-500 hover:text-[#EE4D2D] font-bold flex items-center gap-0.5 cursor-pointer transition-colors"
+                >
+                  <span>See all</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* Story Circles Row */}
+              <div className="flex items-start gap-3 sm:gap-4 overflow-x-auto pb-1.5 pt-0.5 scrollbar-none px-1">
+                {/* 1A. Use Location / Live Hub Beacon */}
+                <button
+                  onClick={() => { setSelectedCategory('All'); setSelectedBrandFilter(null); setHomeQuickFilter('all'); }}
+                  className="flex flex-col items-center shrink-0 group cursor-pointer focus:outline-none"
+                >
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full border-2 border-dashed border-emerald-500 p-0.5 flex items-center justify-center bg-emerald-50/50 group-hover:scale-105 transition-transform shadow-xs">
+                    <div className="w-full h-full rounded-full bg-emerald-600 text-white flex flex-col items-center justify-center">
+                      <MapPin className="w-5 h-5 animate-bounce" />
+                      <span className="text-[7px] font-black uppercase tracking-tighter">LIVE HUB</span>
                     </div>
-                    <p className="text-xs text-slate-200 mt-1">
-                      Direct liquidation for contractors, fabricators & hardware stores. Available in curated <strong>Specialty Category Lots</strong> or mix-and-match volume tiers (<span className="text-amber-300 font-semibold">₱25k = 20% OFF</span>, <span className="text-amber-300 font-semibold">₱50k = 30% OFF</span>, <span className="text-amber-300 font-semibold">₱100k = 40% OFF</span>).
-                    </p>
+                  </div>
+                  <span className="text-[10.5px] font-bold text-slate-800 mt-1.5 text-center leading-tight max-w-[64px] truncate">
+                    Tacloban
+                  </span>
+                </button>
+
+                {/* 1B. Authentic Hardware Items in Story Rings (NO FACES!) */}
+                {[
+                  { name: 'Davies Enamel', brand: 'DAVIES', img: '/images/davies_gloss_it_clean.jpg' },
+                  { name: 'Boysen Paints', brand: 'BOYSEN', img: '/images/boysen_otc_clean.jpg' },
+                  { name: 'Pylox Spray', brand: 'PYLOX', img: '/images/pylox_16_scarlet_clean.jpg' },
+                  { name: 'Rosco Faucets', brand: 'ROSCO', img: '/images/gooseneck_faucet_clean.jpg' },
+                  { name: 'Brass Valves', cat: 'Plumbing & Fixtures', img: '/images/brass_swing_valve_clean.jpg' },
+                  { name: 'Blind Rivets', brand: 'BLIND RIVET', img: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQRFZtrOeadPeOXo9jb5u54sIQVGBf5238GsLSpoKbC0g&s' },
+                  { name: 'Anam Outlets', brand: 'ANAM', img: '/images/anam_outlet_3213_clean.jpg' },
+                  { name: 'Island Paints', brand: 'ISLAND', img: '/images/island_qde_clean.png' },
+                  { name: 'Stikwel Glue', brand: 'STIKWEL', img: '/images/stikwel_clean.jpg' },
+                  { name: 'Bosny Acrylic', brand: 'BOSNY', img: '/images/bosny_flat_black_04_clean.jpg' },
+                  { name: 'Steel Purlins', cat: 'Structural & Building Materials', img: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTJzVHyZ12Skv8mdJfdA16ZpAhOWE03o76OVgrOxW1ffA&s=10' }
+                ].map((st, i) => {
+                  const isSelected = selectedBrandFilter === st.brand || (st.cat && selectedCategory === st.cat);
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        if (st.brand) {
+                          setSelectedBrandFilter(selectedBrandFilter === st.brand ? null : st.brand);
+                          setSelectedCategory('All');
+                        } else if (st.cat) {
+                          setSelectedCategory(selectedCategory === st.cat ? 'All' : st.cat);
+                          setSelectedBrandFilter(null);
+                        }
+                      }}
+                      className="flex flex-col items-center shrink-0 group cursor-pointer focus:outline-none"
+                    >
+                      <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full p-0.5 transition-all duration-200 group-hover:scale-105 shadow-2xs ${
+                        isSelected 
+                          ? 'ring-3 ring-[#EE4D2D] bg-gradient-to-tr from-[#EE4D2D] to-amber-500 scale-105' 
+                          : 'bg-gradient-to-tr from-amber-400 via-orange-400 to-[#EE4D2D]'
+                      }`}>
+                        <div className="w-full h-full rounded-full bg-white p-0.5 overflow-hidden flex items-center justify-center">
+                          <img
+                            src={st.img}
+                            alt={st.name}
+                            className="w-full h-full object-contain rounded-full group-hover:scale-105 transition-transform"
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = '/images/davies_gloss_it_clean.jpg';
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <span className={`text-[10px] mt-1.5 text-center leading-tight max-w-[64px] truncate transition-colors ${
+                        isSelected ? 'font-black text-[#EE4D2D]' : 'font-semibold text-slate-700 group-hover:text-slate-900'
+                      }`}>
+                        {st.name}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 2. PROMO BANNER WITH SHORT INTRO, PROMOS & PROCEED TO WHOLESALE CLICK */}
+            <div className="bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 text-slate-900 rounded-2xl p-4 sm:p-6 shadow-md border border-amber-300 relative overflow-hidden">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+                <div className="max-w-xl space-y-1.5">
+                  <div className="inline-flex items-center gap-1.5 bg-red-600 text-white text-[10px] sm:text-xs font-black uppercase px-2.5 py-0.5 rounded-full shadow-xs">
+                    <Flame className="w-3.5 h-3.5 animate-pulse" />
+                    <span>SURPLUS & DISPLAY SALE • AS-IS, WHERE-IS</span>
+                  </div>
+
+                  <h2 className="text-xl sm:text-3xl font-black text-slate-950 tracking-tight leading-tight">
+                    Up to 40% OFF Construction Surplus
+                  </h2>
+
+                  <p className="text-xs sm:text-sm text-slate-800 font-medium leading-snug">
+                    Affordable contractor overstock, showroom display units & building materials. 100% sound, authentic & contractor-ready at below-retail prices.
+                  </p>
+
+                  {/* Active Tier Promos */}
+                  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 pt-1 text-[11px] sm:text-xs font-extrabold text-slate-900">
+                    <span className="bg-white/90 backdrop-blur-xs px-2.5 py-0.5 rounded-lg shadow-2xs border border-amber-300">
+                      ₱25k = 20% OFF
+                    </span>
+                    <span className="bg-white/90 backdrop-blur-xs px-2.5 py-0.5 rounded-lg shadow-2xs border border-amber-300">
+                      ₱50k = 30% OFF
+                    </span>
+                    <span className="bg-white/90 backdrop-blur-xs px-2.5 py-0.5 rounded-lg shadow-2xs border border-amber-300">
+                      ₱100k = 40% OFF
+                    </span>
+                  </div>
+
+                  {/* Proceed to Wholesale Primary CTA Button */}
+                  <div className="pt-2 flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={() => setActiveTab('lots')}
+                      className="bg-[#EE4D2D] hover:bg-[#d73f20] text-white font-black text-xs sm:text-sm px-5 py-2.5 rounded-xl shadow-lg cursor-pointer transition-all flex items-center gap-2 active:scale-95 group"
+                    >
+                      <Package className="w-4 h-4 group-hover:rotate-6 transition-transform" />
+                      <span>Proceed to Wholesale</span>
+                      <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                    </button>
+                    <button
+                      onClick={() => { setActiveTab('catalog'); setSelectedCategory('All'); setSelectedBrandFilter(null); }}
+                      className="bg-slate-900/10 hover:bg-slate-900/20 text-slate-950 font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl cursor-pointer transition-all border border-slate-900/20"
+                    >
+                      Browse 934 SKUs
+                    </button>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-                  <button 
-                    onClick={() => setActiveTab('lots')} 
-                    className="bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black px-4 py-2 rounded-lg shadow-sm cursor-pointer transition-all flex items-center gap-1.5 active:scale-95"
-                  >
-                    <Package className="w-4 h-4" /> Browse Buyout Lots
-                  </button>
-                  <button 
-                    onClick={() => { setActiveTab('checkout'); setIsCartOpen(true); }} 
-                    className="bg-white/10 hover:bg-white/20 text-white text-xs font-bold px-3 py-2 rounded-lg cursor-pointer transition-all border border-white/20"
-                  >
-                    Apply Bulk Code
-                  </button>
+                {/* Right Hero Visual: Authentic Hardware Packshots */}
+                <div className="shrink-0 hidden sm:flex items-center justify-center relative">
+                  <div className="relative w-40 h-40 sm:w-48 sm:h-48 flex items-center justify-center">
+                    <img
+                      src="/images/davies_gloss_it_clean.jpg"
+                      alt="Davies Paint"
+                      className="w-32 h-32 object-contain drop-shadow-xl z-10"
+                    />
+                    <img
+                      src="/images/pylox_16_scarlet_clean.jpg"
+                      alt="Pylox Spray"
+                      className="w-24 h-24 object-contain drop-shadow-lg absolute -bottom-2 -left-3 z-20"
+                    />
+                    <div className="absolute top-1 right-1 bg-red-600 text-white font-black text-xs px-2.5 py-1 rounded-full shadow-lg z-30 animate-pulse">
+                      -40% OFF
+                    </div>
+                  </div>
                 </div>
               </div>
+
+              {/* Carousel Pagination Dots */}
+              <div className="flex items-center justify-center gap-1.5 mt-2">
+                <div className="w-5 h-1.5 bg-emerald-700 rounded-full"></div>
+                <div className="w-1.5 h-1.5 bg-slate-700/40 rounded-full"></div>
+                <div className="w-1.5 h-1.5 bg-slate-700/40 rounded-full"></div>
+              </div>
+            </div>
+
+            {/* 3. 5 QUICK NAVIGATION ACTION ICONS */}
+            <div className="grid grid-cols-5 gap-2 sm:gap-4 my-2">
+              {[
+                { id: 'bestseller', label: 'Best Seller', icon: Star, bg: 'bg-amber-50 text-amber-600 border-amber-200' },
+                { id: 'new', label: 'New Arrival', icon: Sparkles, bg: 'bg-emerald-50 text-emerald-600 border-emerald-200' },
+                { id: 'deals', label: 'Best Deals', icon: Tag, bg: 'bg-red-50 text-red-600 border-red-200' },
+                { id: 'under100', label: 'Below ₱100', icon: Coins, bg: 'bg-blue-50 text-blue-600 border-blue-200' },
+                { id: 'surplus', label: 'Surplus / Display', icon: RefreshCw, bg: 'bg-purple-50 text-purple-600 border-purple-200' },
+              ].map(btn => {
+                const Icon = btn.icon;
+                const isActive = homeQuickFilter === btn.id;
+                return (
+                  <button
+                    key={btn.id}
+                    onClick={() => {
+                      setHomeQuickFilter(isActive ? 'all' : btn.id);
+                      setSelectedBrandFilter(null);
+                    }}
+                    className="flex flex-col items-center justify-center group cursor-pointer focus:outline-none"
+                  >
+                    <div className={`w-11 h-11 sm:w-13 sm:h-13 rounded-2xl border flex items-center justify-center shadow-xs transition-all duration-200 group-hover:scale-105 active:scale-95 ${
+                      isActive ? 'ring-2 ring-[#EE4D2D] scale-105 shadow-md ' + btn.bg : btn.bg
+                    }`}>
+                      <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
+                    </div>
+                    <span className={`text-[10px] sm:text-xs mt-1.5 text-center line-clamp-1 transition-colors ${
+                      isActive ? 'font-black text-[#EE4D2D]' : 'font-semibold text-slate-700 group-hover:text-slate-900'
+                    }`}>
+                      {btn.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* 4. TWO SIDE-BY-SIDE CARDS: FLASH SALE & SHOWROOM DISPLAY HUB (NO FACES - REAL HARDWARE ITEMS) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {/* Card 4A: Flash Sale with Countdown Clock */}
+              <div className="bg-white rounded-2xl p-3 sm:p-4 border border-slate-200/90 shadow-2xs flex flex-col justify-between">
+                <div className="flex items-center justify-between mb-2.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-black text-sm sm:text-base text-slate-900 flex items-center gap-1">
+                      Flash <Flame className="w-4 h-4 text-[#EE4D2D] fill-[#EE4D2D]" /> Sale
+                    </span>
+                  </div>
+                  {/* Real Countdown Timer */}
+                  <div className="flex items-center gap-1">
+                    <span className="bg-slate-900 text-white font-mono font-black text-[11px] px-1.5 py-0.5 rounded shadow-xs">
+                      {String(flashTime.hours).padStart(2, '0')}
+                    </span>
+                    <span className="font-black text-slate-900 text-xs">:</span>
+                    <span className="bg-slate-900 text-white font-mono font-black text-[11px] px-1.5 py-0.5 rounded shadow-xs">
+                      {String(flashTime.minutes).padStart(2, '0')}
+                    </span>
+                    <span className="font-black text-slate-900 text-xs">:</span>
+                    <span className="bg-slate-900 text-white font-mono font-black text-[11px] px-1.5 py-0.5 rounded shadow-xs">
+                      {String(flashTime.seconds).padStart(2, '0')}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 2 Flash Deals Side-by-Side */}
+                <div className="grid grid-cols-2 gap-2">
+                  {/* Pylox Deal */}
+                  <div className="bg-slate-50/70 border border-slate-100 rounded-xl p-2 flex flex-col justify-between relative group hover:bg-slate-100/60 transition-colors">
+                    <div className="relative aspect-square w-full rounded-lg overflow-hidden bg-white mb-1.5 flex items-center justify-center">
+                      <img src="/images/pylox_16_scarlet_clean.jpg" alt="Pylox Scarlet" className="w-full h-full object-contain p-1 group-hover:scale-105 transition-transform" />
+                      <span className="absolute bottom-1 left-1 bg-red-600 text-white text-[9px] font-black px-1.5 py-0.2 rounded shadow-xs">
+                        -40%
+                      </span>
+                    </div>
+                    <div className="text-[11px] font-bold text-slate-800 line-clamp-1">Pylox Lazer #16 Scarlet</div>
+                    <div className="flex items-baseline gap-1 mt-0.5">
+                      <span className="text-[#EE4D2D] font-black text-xs sm:text-sm">₱140</span>
+                      <span className="text-[10px] text-slate-400 line-through">₱235</span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const p = products.find(x => x.name.toLowerCase().includes('pylox') && x.name.toLowerCase().includes('scarlet')) || products[0];
+                        addToCart(p, 1);
+                      }}
+                      className="mt-1.5 w-full bg-[#EE4D2D] hover:bg-[#d73f20] text-white text-[10px] font-bold py-1 rounded-md transition-colors cursor-pointer"
+                    >
+                      + Add Flash Deal
+                    </button>
+                  </div>
+
+                  {/* Davies Gloss-It Deal */}
+                  <div className="bg-slate-50/70 border border-slate-100 rounded-xl p-2 flex flex-col justify-between relative group hover:bg-slate-100/60 transition-colors">
+                    <div className="relative aspect-square w-full rounded-lg overflow-hidden bg-white mb-1.5 flex items-center justify-center">
+                      <img src="/images/davies_gloss_it_clean.jpg" alt="Davies Gloss-It" className="w-full h-full object-contain p-1 group-hover:scale-105 transition-transform" />
+                      <span className="absolute bottom-1 left-1 bg-red-600 text-white text-[9px] font-black px-1.5 py-0.2 rounded shadow-xs">
+                        -30%
+                      </span>
+                    </div>
+                    <div className="text-[11px] font-bold text-slate-800 line-clamp-1">Davies Gloss-It Enamel 4L</div>
+                    <div className="flex items-baseline gap-1 mt-0.5">
+                      <span className="text-[#EE4D2D] font-black text-xs sm:text-sm">₱265</span>
+                      <span className="text-[10px] text-slate-400 line-through">₱380</span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const p = products.find(x => x.name.toLowerCase().includes('davies') && x.name.toLowerCase().includes('gloss-it')) || products[1];
+                        addToCart(p, 1);
+                      }}
+                      className="mt-1.5 w-full bg-[#EE4D2D] hover:bg-[#d73f20] text-white text-[10px] font-bold py-1 rounded-md transition-colors cursor-pointer"
+                    >
+                      + Add Flash Deal
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 4B: Showroom Display Hub & Top Lots (NO FACES - HARDWARE ITEMS INSTEAD) */}
+              <div className="bg-white rounded-2xl p-3 sm:p-4 border border-slate-200/90 shadow-2xs flex flex-col justify-between">
+                <div className="flex items-center justify-between mb-2.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-black text-sm sm:text-base text-slate-900 flex items-center gap-1.5">
+                      Showroom Display Hub <span className="inline-block w-2 h-2 rounded-full bg-red-600 animate-ping" />
+                    </span>
+                  </div>
+                  <button 
+                    onClick={() => setActiveTab('lots')} 
+                    className="text-[11px] font-bold text-[#EE4D2D] hover:underline flex items-center gap-0.5 cursor-pointer"
+                  >
+                    <span>Wholesale Lots</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* 2 Featured Showroom / Display Items */}
+                <div className="grid grid-cols-2 gap-2">
+                  {/* Rosco Faucet */}
+                  <div className="bg-slate-50/70 border border-slate-100 rounded-xl p-2 flex flex-col justify-between relative group hover:bg-slate-100/60 transition-colors">
+                    <div className="relative aspect-square w-full rounded-lg overflow-hidden bg-white mb-1.5 flex items-center justify-center">
+                      <img src="/images/gooseneck_faucet_clean.jpg" alt="Rosco Faucet" className="w-full h-full object-contain p-1 group-hover:scale-105 transition-transform" />
+                      <span className="absolute bottom-1 left-1 bg-amber-500 text-slate-950 text-[9px] font-black px-1.5 py-0.2 rounded shadow-xs">
+                        SURPLUS
+                      </span>
+                    </div>
+                    <div className="text-[11px] font-bold text-slate-800 line-clamp-1">Rosco Gooseneck Basin Faucet</div>
+                    <div className="flex items-baseline gap-1 mt-0.5">
+                      <span className="text-[#EE4D2D] font-black text-xs sm:text-sm">₱390</span>
+                      <span className="text-[10px] text-slate-400 line-through">₱600</span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const p = products.find(x => x.name.toLowerCase().includes('rosco') && x.name.toLowerCase().includes('gooseneck')) || products[2];
+                        addToCart(p, 1);
+                      }}
+                      className="mt-1.5 w-full bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-bold py-1 rounded-md transition-colors cursor-pointer"
+                    >
+                      Claim As-Is
+                    </button>
+                  </div>
+
+                  {/* Blind Rivets Box */}
+                  <div className="bg-slate-50/70 border border-slate-100 rounded-xl p-2 flex flex-col justify-between relative group hover:bg-slate-100/60 transition-colors">
+                    <div className="relative aspect-square w-full rounded-lg overflow-hidden bg-white mb-1.5 flex items-center justify-center">
+                      <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQRFZtrOeadPeOXo9jb5u54sIQVGBf5238GsLSpoKbC0g&s" alt="Blind Rivets" className="w-full h-full object-contain p-1 group-hover:scale-105 transition-transform" />
+                      <span className="absolute bottom-1 left-1 bg-amber-500 text-slate-950 text-[9px] font-black px-1.5 py-0.2 rounded shadow-xs">
+                        DISPLAY
+                      </span>
+                    </div>
+                    <div className="text-[11px] font-bold text-slate-800 line-clamp-1">Blind Rivets 1/8x1/2 (1000s)</div>
+                    <div className="flex items-baseline gap-1 mt-0.5">
+                      <span className="text-[#EE4D2D] font-black text-xs sm:text-sm">₱180</span>
+                      <span className="text-[10px] text-slate-400 line-through">₱300</span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const p = products.find(x => x.name.toLowerCase().includes('blind rivet')) || products[3];
+                        addToCart(p, 1);
+                      }}
+                      className="mt-1.5 w-full bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-bold py-1 rounded-md transition-colors cursor-pointer"
+                    >
+                      Claim As-Is
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 5. CATEGORY & BRAND PILL BAR */}
+            <div className="bg-white rounded-2xl p-3 border border-slate-200/90 shadow-2xs space-y-2.5">
+              {/* Category Pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
+                <button
+                  onClick={() => { setSelectedCategory('All'); setSelectedBrandFilter(null); setHomeQuickFilter('all'); }}
+                  className={`px-3 py-1.5 rounded-full font-bold whitespace-nowrap transition-colors cursor-pointer ${
+                    selectedCategory === 'All' && !selectedBrandFilter
+                      ? 'bg-[#EE4D2D] text-white shadow-xs'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  All Items
+                </button>
+                {['Plumbing & Fixtures', 'Electrical & Lighting', 'Paints & Coatings', 'Hardware & Fasteners', 'Structural & Building Materials'].map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => { setSelectedCategory(cat); setSelectedBrandFilter(null); }}
+                    className={`px-3 py-1.5 rounded-full font-bold whitespace-nowrap transition-colors cursor-pointer ${
+                      selectedCategory === cat
+                        ? 'bg-[#EE4D2D] text-white shadow-xs'
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+
+              {/* Brand Logo / Tag Chips */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none pt-1 border-t border-slate-100">
+                {[
+                  { name: 'BOYSEN', color: 'border-red-400 text-red-600' },
+                  { name: 'DAVIES', color: 'border-blue-500 text-blue-600' },
+                  { name: 'ISLAND', color: 'border-emerald-500 text-emerald-600' },
+                  { name: 'PYLOX', color: 'border-orange-500 text-orange-600' },
+                  { name: 'BOSNY', color: 'border-amber-500 text-amber-600' },
+                  { name: 'MAKITA', color: 'border-cyan-600 text-cyan-700' },
+                  { name: 'ROYU', color: 'border-orange-600 text-orange-700' },
+                  { name: 'PIONEER', color: 'border-indigo-500 text-indigo-600' },
+                  { name: 'ROSCO', color: 'border-slate-500 text-slate-700' },
+                  { name: 'ANAM', color: 'border-purple-500 text-purple-700' }
+                ].map(b => (
+                  <button
+                    key={b.name}
+                    onClick={() => setSelectedBrandFilter(selectedBrandFilter === b.name ? null : b.name)}
+                    className={`px-3 py-1 rounded-lg border text-xs font-black tracking-wider whitespace-nowrap cursor-pointer transition-all ${
+                      selectedBrandFilter === b.name
+                        ? 'bg-slate-900 text-white border-slate-900 shadow-xs scale-105'
+                        : `bg-slate-50 hover:bg-slate-100 ${b.color}`
+                    }`}
+                  >
+                    {b.name}
+                  </button>
+                ))}
+                {selectedBrandFilter && (
+                  <button
+                    onClick={() => setSelectedBrandFilter(null)}
+                    className="px-2 py-1 text-xs text-red-600 font-bold hover:underline whitespace-nowrap cursor-pointer"
+                  >
+                    ✕ Clear Brand
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* 6. DEDICATED PROCEED TO WHOLESALE CALLOUT BANNER */}
+            <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-red-950 text-white p-3.5 sm:p-4 rounded-2xl border border-amber-500/40 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center shrink-0">
+                  <Package className="w-5 h-5 text-amber-400" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="bg-amber-500 text-slate-950 text-[10px] font-black uppercase px-2 py-0.5 rounded tracking-wider">
+                      B2B Liquidation Portal
+                    </span>
+                    <span className="text-amber-300 text-xs font-bold">
+                      Wholesale Buyout Lots & Up to 40% OFF
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-200 mt-0.5">
+                    Contractors, hardware stores & bulk buyers: Access 465 SKUs in pre-packaged lots or ₱15,000+ volume clearance.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setActiveTab('lots')}
+                className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs sm:text-sm px-5 py-2.5 rounded-xl shadow-md cursor-pointer transition-all flex items-center gap-2 active:scale-95 shrink-0 group"
+              >
+                <span>Proceed to Wholesale</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </button>
             </div>
 
             {/* Responsive Products Grid: 2 cols mobile, 3-4 tablet, 5-6 desktop */}
@@ -2620,12 +3214,12 @@ const renderPopups = () => (
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-5 border-t border-white/10">
                   <div className="bg-white/5 backdrop-blur-xs p-3 rounded-xl border border-white/10">
                     <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Active Inventory</p>
-                    <p className="text-lg sm:text-xl font-black text-amber-400 mt-0.5">465 SKUs</p>
-                    <p className="text-[10px] text-slate-400">Full Commercial Catalog</p>
+                    <p className="text-lg sm:text-xl font-black text-amber-400 mt-0.5">{products.length} SKUs</p>
+                    <p className="text-[10px] text-slate-400">Tacloban & Nula Tula Depots</p>
                   </div>
                   <div className="bg-white/5 backdrop-blur-xs p-3 rounded-xl border border-white/10">
                     <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Physical Units</p>
-                    <p className="text-lg sm:text-xl font-black text-white mt-0.5">10,269 pcs</p>
+                    <p className="text-lg sm:text-xl font-black text-white mt-0.5">{financialMetrics.totalStockCount.toLocaleString()} pcs</p>
                     <p className="text-[10px] text-slate-400">On-floor ready to haul</p>
                   </div>
                   <div className="bg-white/5 backdrop-blur-xs p-3 rounded-xl border border-white/10">
@@ -2644,10 +3238,18 @@ const renderPopups = () => (
 
                 <div className="flex flex-wrap items-center gap-3 mt-5">
                   <button
-                    onClick={downloadFullManifestCSV}
+                    onClick={downloadManifestPDF}
                     className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-black px-4 py-2 rounded-lg text-xs flex items-center gap-2 cursor-pointer shadow-sm transition-all active:scale-95"
+                    title="Generate and download complete manifest as PDF with live updated quantities"
                   >
-                    <Download className="w-4 h-4" /> Download Complete Manifest (CSV)
+                    <FileText className="w-4 h-4 text-slate-950" /> Download Complete Manifest (PDF)
+                  </button>
+                  <button
+                    onClick={downloadFullManifestCSV}
+                    className="bg-slate-800 hover:bg-slate-700 text-white font-bold px-3 py-2 rounded-lg text-xs flex items-center gap-1.5 cursor-pointer shadow-sm border border-slate-700 transition-all active:scale-95"
+                    title="Download raw spreadsheet data as CSV"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Export CSV
                   </button>
                   <a
                     href="https://wa.me/639261995703?text=Good%20day.%20I%20am%20a%20contractor%20/%20hardware%20buyer%20interested%20in%20inspecting%20your%20commercial%20liquidation%20lots.%20Please%20send%20schedule%20and%20terms."
@@ -2816,7 +3418,7 @@ const renderPopups = () => (
                   Tiered Volume Discounts for Walk-in Contractors & Hardware Resellers
                 </h3>
                 <p className="text-xs text-slate-500 mt-1">
-                  Need specific SKUs instead of an entire category lot? Mix and match any items from our 465-item catalog and automatically trigger wholesale volume tier discounts.
+                  Need specific SKUs instead of an entire category lot? Mix and match any items from our {products.length}-item catalog and automatically trigger wholesale volume tier discounts.
                 </p>
               </div>
 
@@ -2865,7 +3467,7 @@ const renderPopups = () => (
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100">
                 <div>
                   <h3 className="font-black text-slate-900 text-base flex items-center gap-2">
-                    <FileSpreadsheet className="w-5 h-5 text-[#EE4D2D]" /> Complete 465-SKU Warehouse Liquidation Manifest
+                    <FileSpreadsheet className="w-5 h-5 text-[#EE4D2D]" /> Complete {products.length}-SKU Warehouse Commercial Manifest
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
                     Search on-floor physical counts, retail benchmark prices, and 40% Tier 3 wholesale rates across all active inventory.
@@ -2874,10 +3476,18 @@ const renderPopups = () => (
 
                 <div className="flex items-center gap-2">
                   <button
+                    onClick={downloadManifestPDF}
+                    className="bg-[#EE4D2D] hover:bg-[#d73f20] text-white text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer flex items-center gap-1.5 shadow-2xs transition-colors shrink-0"
+                    title="Download updated manifest as PDF"
+                  >
+                    <FileText className="w-3.5 h-3.5" /> Download Manifest (PDF)
+                  </button>
+                  <button
                     onClick={downloadFullManifestCSV}
                     className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer flex items-center gap-1.5 shadow-2xs transition-colors shrink-0"
+                    title="Export as CSV"
                   >
-                    <Download className="w-3.5 h-3.5" /> Export Manifest (CSV)
+                    <Download className="w-3.5 h-3.5" /> Export CSV
                   </button>
                 </div>
               </div>
@@ -2888,7 +3498,7 @@ const renderPopups = () => (
                   <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
-                    placeholder="Search 465 manifest items (e.g. C-Purlins, PPR, GI Pipe, Rivets)..."
+                    placeholder={`Search ${products.length} manifest items across Cabalwan & Nula Tula (e.g. C-Purlins, Bosny, PPR, GI Pipe)...`}
                     value={manifestSearchQuery}
                     onChange={(e) => setManifestSearchQuery(e.target.value)}
                     className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-amber-400 focus:bg-white transition-colors"
@@ -3621,7 +4231,7 @@ const renderPopups = () => (
           </main>
         )}
 
-        {/* ==================== TAB 7: MERCHANT SELLER COMMAND CENTRE (PASSWORD: asenso123) ==================== */}
+        {/* ==================== TAB 7: MERCHANT SELLER COMMAND CENTRE ==================== */}
         {activeTab === 'me' && (
           <main className="w-full">
             {!isMerchantAuthenticated ? (
@@ -4562,7 +5172,7 @@ const renderPopups = () => (
                             <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900">
                               {financialMetrics.totalStockCount.toLocaleString()} units
                             </td>
-                            <td className="py-2.5 px-4 text-right font-mono text-slate-400">465 SKUs</td>
+                            <td className="py-2.5 px-4 text-right font-mono text-slate-400">{products.length} SKUs</td>
                           </tr>
                           <tr>
                             <td className="py-2.5 px-4 pl-6 text-slate-700">
@@ -6202,7 +6812,7 @@ const renderPopups = () => (
                               method: 'POST',
                               headers: {
                                 'Content-Type': 'application/json',
-                                'x-admin-key': 'asenso123'
+                                'Authorization': `Bearer ${sessionStorage.getItem('manna_admin_token') || ''}`
                               },
                               body: JSON.stringify({
                                 warehouse: intakeWarehouse,
@@ -8416,12 +9026,14 @@ function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = f
     <div className="bg-white rounded-sm overflow-hidden border border-[#EAEAEA] flex flex-col group relative shadow-2xs hover:shadow-md transition-shadow">
       
       {/* Product Image Box */}
-      <div className="relative aspect-square bg-[#F7F7F7] overflow-hidden">
+      <div className="relative aspect-square bg-[#F7F7F7] overflow-hidden select-none" onContextMenu={(e) => e.preventDefault()}>
         <img
           src={product.image}
           alt={product.name}
           loading="lazy"
-          className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
+          draggable={false}
+          onContextMenu={(e) => e.preventDefault()}
+          className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300 select-none pointer-events-auto"
           onError={(e) => {
             e.target.onerror = null;
             e.target.src = "https://images.pexels.com/photos/175039/pexels-photo-175039.jpeg?auto=compress&cs=tinysrgb&h=650&w=940";
@@ -8500,7 +9112,7 @@ function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = f
         {/* Price & Sold Section */}
         <div className="mt-2">
           <div className="flex items-baseline justify-between">
-            <span className="text-[#EE4D2D] font-extrabold text-sm sm:text-base leading-none tracking-tight">
+            <span className="text-[#EE4D2D] font-extrabold text-sm sm:text-base leading-none tracking-tight select-none">
               ₱{Math.floor(isRetailMode ? effectivePrice : packTotalPrice).toLocaleString()}
             </span>
             <span className="text-[10px] text-[#757575] font-normal">

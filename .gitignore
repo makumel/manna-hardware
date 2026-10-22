@@ -6,3 +6,10 @@ build/
 .env.local
 .env
 .vercel/
+
+*.pdf
+*.xlsx
+*.sqlite*
+proof_*.png
+live_*.png
+*.py

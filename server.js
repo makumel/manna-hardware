@@ -95,7 +95,7 @@ const honeypotGuard = (req, res, next) => {
 
 // Admin Password Gate Middleware
 const adminAuth = (req, res, next) => {
-  const password = req.headers['x-admin-password'] || req.query.password || req.body?.admin_password;
+  const password = req.headers['x-admin-password'] || req.headers['x-admin-key'] || req.query.password || req.body?.admin_password;
   if (password !== ADMIN_PASSWORD) {
     return res.status(401).json({
       error: 'Unauthorized: Access restricted to store merchant only. Valid password required.'
@@ -164,10 +164,11 @@ app.get('/api/admin/stats', adminAuth, (req, res) => {
   });
 });
 
-// ==================== PRODUCTS CATALOG API (PUBLIC) ====================
+// ==================== PRODUCTS CATALOG API (PUBLIC - ZERO WAREHOUSE/BOX TRACE) ====================
 app.get('/api/products', (req, res) => {
   const { category, search, stock_only } = req.query;
-  let query = "SELECT * FROM products WHERE 1=1";
+  // Customer-facing query strictly excludes capital, cost, box_no, quote_no, and internal bin codes
+  let query = "SELECT id, name, category, unit, price, stock, discount_percent, rating, reviews, featured, image, description FROM products WHERE 1=1";
   const params = [];
 
   if (category && category !== 'All') {
@@ -197,11 +198,18 @@ app.get('/api/products/categories', (req, res) => {
 });
 
 app.get('/api/products/:id', (req, res) => {
-  const product = db.prepare("SELECT * FROM products WHERE id = ?").get(req.params.id);
+  // Public single product fetch - zero trace of internal warehouse/box metadata
+  const product = db.prepare("SELECT id, name, category, unit, price, stock, discount_percent, rating, reviews, featured, image, description FROM products WHERE id = ?").get(req.params.id);
   if (!product) {
     return res.status(404).json({ error: 'Product not found' });
   }
   res.json(product);
+});
+
+// Admin-only complete products list with capital & warehouse summary
+app.get('/api/admin/products', adminAuth, (req, res) => {
+  const rows = db.prepare("SELECT * FROM products ORDER BY featured DESC, name ASC").all();
+  res.json(rows);
 });
 
 // Admin product update (stock, price, capital, per-item discount)
@@ -426,6 +434,206 @@ app.post('/api/admin/products/:id/discount', adminAuth, (req, res) => {
   res.json({ success: true, id: req.params.id, discount_percent: discountVal });
 });
 
+// ==================== INTERNAL WAREHOUSE & BOX PICK LOCATION API (ADMIN ONLY) ====================
+
+// 1. Get warehouse item locations (Search by item name, SKU, box_no, quote_no, warehouse)
+app.get('/api/admin/warehouse/locations', adminAuth, (req, res) => {
+  const { search, box_no, quote_no, warehouse, product_id, limit = 500 } = req.query;
+  let query = "SELECT * FROM item_locations WHERE 1=1";
+  const params = [];
+
+  if (search && search.trim()) {
+    query += " AND (item_name LIKE ? OR product_id LIKE ?)";
+    const term = `%${search.trim()}%`;
+    params.push(term, term);
+  }
+
+  if (box_no && box_no.trim()) {
+    query += " AND box_no = ?";
+    params.push(box_no.trim());
+  }
+
+  if (quote_no && quote_no.trim()) {
+    query += " AND (quote_no LIKE ? OR quote_no = ?)";
+    const qTerm = `%${quote_no.trim()}%`;
+    params.push(qTerm, quote_no.trim());
+  }
+
+  if (warehouse && warehouse.trim() && warehouse !== 'All') {
+    query += " AND warehouse = ?";
+    params.push(warehouse.trim());
+  }
+
+  if (product_id && product_id.trim()) {
+    query += " AND product_id = ?";
+    params.push(product_id.trim());
+  }
+
+  query += " ORDER BY CAST(box_no AS INTEGER) ASC, item_name ASC LIMIT ?";
+  params.push(Number(limit));
+
+  const rows = db.prepare(query).all(...params);
+  res.json(rows);
+});
+
+// 2. Get summary list of all boxes (Item count, total units, quote #, warehouse)
+app.get('/api/admin/warehouse/boxes', adminAuth, (req, res) => {
+  const query = `
+    SELECT 
+      box_no, 
+      quote_no, 
+      warehouse, 
+      source_file,
+      COUNT(*) as total_items, 
+      SUM(qty) as total_units
+    FROM item_locations 
+    GROUP BY box_no, quote_no, warehouse 
+    ORDER BY CAST(box_no AS INTEGER) ASC, box_no ASC
+  `;
+  const rows = db.prepare(query).all();
+  res.json(rows);
+});
+
+// 3. Get all items inside a specific box number
+app.get('/api/admin/warehouse/boxes/:box_no', adminAuth, (req, res) => {
+  const rows = db.prepare(`
+    SELECT * FROM item_locations 
+    WHERE box_no = ? 
+    ORDER BY item_name ASC
+  `).all(req.params.box_no);
+  res.json(rows);
+});
+
+// 4. Get distinct warehouses
+app.get('/api/admin/warehouse/warehouses', adminAuth, (req, res) => {
+  const rows = db.prepare("SELECT DISTINCT warehouse FROM item_locations ORDER BY warehouse ASC").all();
+  res.json(rows.map(r => r.warehouse));
+});
+
+// 5. Ingest new inventory items from another warehouse / incoming quote file
+app.post('/api/admin/warehouse/ingest', adminAuth, (req, res) => {
+  const { warehouse, quote_no, box_no, source_file, items } = req.body;
+  
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: 'No items provided for warehouse intake.' });
+  }
+
+  const warehouseName = (warehouse && warehouse.trim()) || 'Warehouse 2 (New Inflow)';
+  const boxNum = String(box_no || '1').trim();
+  const quoteNum = String(quote_no || `Quote #${boxNum}`).trim();
+  const fileName = source_file || `incoming_wh_${Date.now()}.csv`;
+
+  const insertLocation = db.prepare(`
+    INSERT INTO item_locations (product_id, item_name, box_no, quote_no, warehouse, qty, unit, price, source_file)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const findProduct = db.prepare("SELECT * FROM products WHERE LOWER(name) = LOWER(?) OR id = ?");
+  const updateProductStock = db.prepare("UPDATE products SET stock = stock + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+  const insertNewProduct = db.prepare(`
+    INSERT INTO products (id, name, category, unit, price, capital, stock, discount_percent, rating, reviews, featured, image, description)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 0, 4.8, 15, 0, ?, ?)
+  `);
+
+  let addedLocations = 0;
+  let updatedProducts = 0;
+  let createdProducts = 0;
+
+  const runIngest = db.transaction(() => {
+    let skuCounter = Date.now().toString().slice(-4);
+    for (const itm of items) {
+      const name = (itm.name || itm.item_name || '').trim();
+      if (!name) continue;
+
+      const qty = Math.max(1, parseInt(itm.qty || itm.stock || 1, 10));
+      const price = parseFloat(itm.price || 0) || 0;
+      const unit = itm.unit || itm.um || 'pc';
+      const capital = parseFloat(itm.capital || itm.cost || 0) || Math.round(price * 0.78);
+      const category = itm.category || 'General Hardware';
+
+      // Check if product exists in catalog
+      const existing = findProduct.get(name, itm.product_id || itm.id || '');
+      let finalPid = '';
+
+      if (existing) {
+        finalPid = existing.id;
+        updateProductStock.run(qty, existing.id);
+        updatedProducts++;
+      } else {
+        finalPid = `MNA-WH2-${skuCounter++}`;
+        const defaultImg = itm.image || 'https://images.pexels.com/photos/175039/pexels-photo-175039.jpeg?auto=compress&cs=tinysrgb&h=650&w=940';
+        const desc = itm.description || `Commercial hardware item sourced directly for Manna Hardware.`;
+        insertNewProduct.run(finalPid, name, category, unit, price, capital, qty, defaultImg, desc);
+        createdProducts++;
+      }
+
+      insertLocation.run(finalPid, name, boxNum, quoteNum, warehouseName, qty, unit, price, fileName);
+      addedLocations++;
+    }
+  });
+
+  runIngest();
+
+  res.json({
+    success: true,
+    message: `Successfully registered ${addedLocations} items in ${warehouseName} under Box #${boxNum} (${quoteNum})`,
+    warehouse: warehouseName,
+    box_no: boxNum,
+    quote_no: quoteNum,
+    added_locations: addedLocations,
+    updated_products: updatedProducts,
+    created_products: createdProducts
+  });
+});
+
+// 6. Generate order pick list with box locations
+app.get('/api/admin/orders/:id/pick-list', adminAuth, (req, res) => {
+  const order = db.prepare("SELECT * FROM orders WHERE id = ?").get(req.params.id);
+  if (!order) {
+    return res.status(404).json({ error: 'Order not found' });
+  }
+
+  const items = db.prepare("SELECT * FROM order_items WHERE order_id = ?").all(req.params.id);
+  const findLocs = db.prepare(`
+    SELECT box_no, quote_no, warehouse, qty, unit, source_file 
+    FROM item_locations 
+    WHERE product_id = ? OR LOWER(item_name) = LOWER(?)
+    ORDER BY warehouse ASC, CAST(box_no AS INTEGER) ASC
+  `);
+
+  const pickItems = items.map(itm => {
+    const locs = findLocs.all(itm.product_id, itm.product_name);
+    return {
+      product_id: itm.product_id,
+      product_name: itm.product_name,
+      quantity_ordered: itm.quantity,
+      unit_price: itm.unit_price,
+      total_price: itm.total_price,
+      locations: locs.length > 0 ? locs : [
+        {
+          box_no: 'General Rack',
+          quote_no: 'Standard Shelf',
+          warehouse: 'Warehouse 1 (Tacloban Hub)',
+          qty: itm.quantity,
+          unit: 'pc',
+          source_file: 'Standard'
+        }
+      ]
+    };
+  });
+
+  res.json({
+    order_id: order.id,
+    customer_name: order.customer_name,
+    customer_phone: order.customer_phone,
+    delivery_address: order.delivery_address,
+    status: order.status,
+    total: order.total,
+    created_at: order.created_at,
+    pick_items: pickItems
+  });
+});
+
 // ==================== DISCOUNTS & PROMOTIONS API ====================
 app.get('/api/discounts', (req, res) => {
   const rows = db.prepare("SELECT * FROM discounts WHERE active = 1 ORDER BY value DESC").all();
@@ -629,36 +837,92 @@ function isLongCargoItem(item) {
   );
 }
 
-// Public Shipping & Long Cargo Calculator API
-app.post('/api/shipping/calculate', (req, res) => {
-  const { items, distanceKm, subtotal } = req.body || {};
-  const distance = Math.max(1, Number(distanceKm || 10));
+// Delivery Calculation Rule:
+// Free delivery for ₱5,000+ orders within Tacloban City (<= 10km); beyond Tacloban City (> 10km): ₱50/km
+function calculateShipping({ items, subtotal, distanceKm, isWithinTacloban }) {
+  const dist = Math.max(1, Number(distanceKm || 8));
+  const numSubtotal = Number(subtotal || 0);
+
+  // Check if order contains 10ft+ long materials
   let hasLongCargo = false;
   const longItems = [];
-
   if (Array.isArray(items)) {
     for (const item of items) {
-      if (isLongCargoItem(item)) {
+      if (item && isLongCargoItem(item)) {
         hasLongCargo = true;
         longItems.push(item.name || item.id);
       }
     }
   }
 
-  const numSubtotal = Number(subtotal || 0);
-  const baseShippingFee = numSubtotal >= 3000 ? 0 : 150;
-  const longCargoFee = hasLongCargo ? (distance * 50) : 0;
-  const totalShippingFee = baseShippingFee + longCargoFee;
+  // Within Tacloban City if dist <= 10 km or explicitly marked
+  const withinTacloban = isWithinTacloban !== undefined 
+    ? Boolean(isWithinTacloban) 
+    : (dist <= 10);
 
-  res.json({
+  const qualifiesForFreeTacloban = numSubtotal >= 5000;
+
+  let baseShippingFee = 0;
+  let longCargoFee = 0;
+  let totalShippingFee = 0;
+  let freeDeliveryApplied = false;
+  let excessKm = 0;
+
+  if (withinTacloban) {
+    if (qualifiesForFreeTacloban) {
+      // Free delivery for ₱5,000+ orders within Tacloban City
+      freeDeliveryApplied = true;
+      baseShippingFee = 0;
+      longCargoFee = 0;
+      totalShippingFee = 0;
+    } else {
+      // Under ₱5,000 within Tacloban City
+      baseShippingFee = numSubtotal >= 3000 ? 0 : 150;
+      longCargoFee = hasLongCargo ? (dist * 50) : 0;
+      totalShippingFee = baseShippingFee + longCargoFee;
+    }
+  } else {
+    // Outside / more than Tacloban City (> 10 km)
+    // "more than that 50/km"
+    excessKm = Math.max(0, dist - 10);
+    if (qualifiesForFreeTacloban) {
+      // Tacloban portion is covered free; customer only pays ₱50/km for distance beyond Tacloban
+      baseShippingFee = 0;
+      longCargoFee = excessKm * 50;
+      totalShippingFee = longCargoFee;
+    } else {
+      // Under ₱5k outside Tacloban: full distance @ ₱50/km if long cargo, or base + excess
+      baseShippingFee = numSubtotal >= 3000 ? 0 : 150;
+      longCargoFee = hasLongCargo ? (dist * 50) : (excessKm * 50);
+      totalShippingFee = Math.max(baseShippingFee, longCargoFee);
+    }
+  }
+
+  return {
     hasLongCargo,
     longItems,
-    distanceKm: distance,
+    distanceKm: dist,
+    withinTacloban,
+    qualifiesForFreeTacloban,
+    freeDeliveryApplied,
+    excessKm,
     ratePerKm: 50,
-    longCargoFee,
     baseShippingFee,
+    longCargoFee,
     totalShippingFee
+  };
+}
+
+// Public Shipping & Long Cargo Calculator API
+app.post('/api/shipping/calculate', (req, res) => {
+  const { items, distanceKm, subtotal, isWithinTacloban } = req.body || {};
+  const result = calculateShipping({
+    items,
+    distanceKm,
+    subtotal,
+    isWithinTacloban
   });
+  res.json(result);
 });
 
 // ==================== CHECKOUT & ORDERS API (ACCOUNT REQUIRED) ====================
@@ -737,21 +1001,23 @@ app.post('/api/checkout', checkoutRateLimiter, honeypotGuard, requireAuth, (req,
 
     const totalDiscountAmount = Math.min(promoDiscountAmount, subtotal);
 
-    // ==================== 10FT+ LONG CARGO (50/KM) SHIPPING CALCULATION ====================
-    // Check if order contains 10ft+ long materials (anglebar, c-purlins, gi pipe, etc.)
-    const longItemsInOrder = validatedItems.filter(i => i.isLongCargo);
-    const hasLongCargo = longItemsInOrder.length > 0;
+    // ==================== TACLOBAN CITY ₱5,000+ FREE DELIVERY & ₱50/KM SHIPPING ====================
+    const distanceKm = Math.max(1, Number(customer.distanceKm || customer.distance_km || 8));
+    const isWithinTacloban = customer.isWithinTacloban !== undefined
+      ? Boolean(customer.isWithinTacloban)
+      : (customer.deliveryZone ? (!customer.deliveryZone.toLowerCase().includes('leyte') && !customer.deliveryZone.toLowerCase().includes('samar') && distanceKm <= 10) : distanceKm <= 10);
 
-    // Delivery distance in km (default: 10 km if unspecified)
-    const distanceKm = Math.max(1, Number(customer.distanceKm || customer.distance_km || 10));
+    const shippingResult = calculateShipping({
+      items: validatedItems,
+      subtotal,
+      distanceKm,
+      isWithinTacloban
+    });
 
-    // Long cargo delivery fee: ₱50 per km
-    const longCargoRatePerKm = 50;
-    const longCargoFee = hasLongCargo ? (distanceKm * longCargoRatePerKm) : 0;
-
-    // Base standard shipping fee (Free if subtotal >= ₱3,000)
-    const baseShippingFee = subtotal >= 3000 ? 0 : 150;
-    const totalShippingFee = baseShippingFee + longCargoFee;
+    const baseShippingFee = shippingResult.baseShippingFee;
+    const longCargoFee = shippingResult.longCargoFee;
+    const totalShippingFee = shippingResult.totalShippingFee;
+    const hasLongCargo = shippingResult.hasLongCargo;
 
     const finalTotal = Math.max(0, subtotal - totalDiscountAmount + totalShippingFee);
 
@@ -803,16 +1069,21 @@ app.post('/api/checkout', checkoutRateLimiter, honeypotGuard, requireAuth, (req,
         ...customer,
         fullName: customer.fullName || req.user.fullName,
         email: customer.email || req.user.email,
-        distanceKm
+        distanceKm,
+        isWithinTacloban: shippingResult.withinTacloban
       },
       items: validatedItems,
       subtotal,
       discountAmount: totalDiscountAmount,
       baseShippingFee,
       hasLongCargo,
-      longCargoItems: longItemsInOrder.map(i => ({ id: i.id, name: i.name })),
+      longCargoItems: shippingResult.longItems,
       distanceKm,
-      ratePerKm: longCargoRatePerKm,
+      withinTacloban: shippingResult.withinTacloban,
+      qualifiesForFreeTacloban: shippingResult.qualifiesForFreeTacloban,
+      freeDeliveryApplied: shippingResult.freeDeliveryApplied,
+      excessKm: shippingResult.excessKm,
+      ratePerKm: shippingResult.ratePerKm,
       longCargoFee,
       shippingFee: totalShippingFee,
       finalTotal,

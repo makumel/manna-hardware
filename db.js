@@ -90,6 +90,27 @@ db.exec(`
     canary_token TEXT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
+
+  -- Internal Warehouse Box & Quote Location Tracking (Hidden from Front-End)
+  CREATE TABLE IF NOT EXISTS item_locations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id TEXT,
+    item_name TEXT NOT NULL,
+    box_no TEXT NOT NULL,
+    quote_no TEXT NOT NULL,
+    warehouse TEXT NOT NULL DEFAULT 'Warehouse 1 (Tacloban Hub)',
+    qty INTEGER NOT NULL DEFAULT 1,
+    unit TEXT DEFAULT 'pc',
+    price REAL DEFAULT 0,
+    source_file TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_item_loc_name ON item_locations(item_name);
+  CREATE INDEX IF NOT EXISTS idx_item_loc_box ON item_locations(box_no);
+  CREATE INDEX IF NOT EXISTS idx_item_loc_quote ON item_locations(quote_no);
+  CREATE INDEX IF NOT EXISTS idx_item_loc_pid ON item_locations(product_id);
+  CREATE INDEX IF NOT EXISTS idx_item_loc_wh ON item_locations(warehouse);
 `);
 
 // Safe column migration for discount_percent and user_id if table existed previously
@@ -214,7 +235,44 @@ function seedProductsFromCatalog() {
 
 seedProductsFromCatalog();
 
+// Function to seed initial warehouse box & quote locations
+function seedWarehouseLocations() {
+  const locPath = path.join(__dirname, 'warehouse_locations.json');
+  if (!fs.existsSync(locPath)) return;
+  
+  const count = db.prepare("SELECT COUNT(*) as count FROM item_locations").get().count;
+  if (count > 0) return;
+
+  const locs = JSON.parse(fs.readFileSync(locPath, 'utf-8'));
+  const insert = db.prepare(`
+    INSERT INTO item_locations (product_id, item_name, box_no, quote_no, warehouse, qty, unit, price, source_file)
+    VALUES (@product_id, @item_name, @box_no, @quote_no, @warehouse, @qty, @unit, @price, @source_file)
+  `);
+
+  const runBatch = db.transaction((items) => {
+    for (const item of items) {
+      insert.run({
+        product_id: item.product_id || null,
+        item_name: item.item_name,
+        box_no: String(item.box_no),
+        quote_no: String(item.quote_no),
+        warehouse: item.warehouse || 'Warehouse 1 (Tacloban Hub)',
+        qty: Number(item.qty || 1),
+        unit: item.unit || 'pc',
+        price: Number(item.price || 0),
+        source_file: item.source_file || null
+      });
+    }
+  });
+
+  runBatch(locs);
+  console.log(`Seeded ${locs.length} warehouse item box location records.`);
+}
+
+seedWarehouseLocations();
+
 module.exports = {
   db,
-  seedProductsFromCatalog
+  seedProductsFromCatalog,
+  seedWarehouseLocations
 };

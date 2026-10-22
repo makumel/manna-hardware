@@ -27,6 +27,7 @@ function cleanAndFixCatalog() {
   const TWO_WAY_FAUCET_CLEAN = '/images/two_way_faucet_clean.jpg';
   const GOOSENECK_FAUCET_CLEAN = '/images/gooseneck_faucet_clean.jpg';
   const ROSCO_WATER_JUG_FAUCET_CLEAN = '/images/rosco_water_jug_faucet_clean.jpg';
+  const ROLLER_BRUSH_REFILL_CLEAN = '/images/roller_brush_refill_clean.jpg';
 
   const CLEAN_BLIND_RIVETS = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQRFZtrOeadPeOXo9jb5u54sIQVGBf5238GsLSpoKbC0g&s';
   const PYLOX_SPRAY_CAN = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQDc4k6L47QodySi2Ekrc2ln8FLe_3pQz58B9wj5MHCKA&s=10';
@@ -220,6 +221,13 @@ function cleanAndFixCatalog() {
     // 26. FSL LED
     if (name.includes('fsl led')) {
       item.image = FSL_LED_BULB;
+      fixedCount++;
+      continue;
+    }
+
+    // 27. Roller Brush Refill
+    if (name.includes('roller brush') && name.includes('refill')) {
+      item.image = ROLLER_BRUSH_REFILL_CLEAN;
       fixedCount++;
       continue;
     }

@@ -6657,26 +6657,57 @@ export default function App() {
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-3xl w-full my-auto overflow-hidden flex flex-col max-h-[95vh]">
             
             {/* Top Modal Controls (No-Print) */}
-            <div className="no-print bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between border-b border-slate-800 shrink-0">
-              <div className="flex items-center gap-2">
+            <div className="no-print bg-slate-900 text-white px-5 py-3 flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 shrink-0">
+              <div className="flex items-center gap-2.5">
                 <Receipt className="w-5 h-5 text-orange-400" />
                 <div>
                   <h3 className="text-sm font-black tracking-wide text-white flex items-center gap-2">
-                    Official Commercial Sales Invoice
-                    <span className="text-[10px] font-mono bg-orange-500/30 text-orange-300 px-2 py-0.5 rounded border border-orange-400/30">
-                      BIR Non-VAT
+                    {invoicePrintMode === 'internal_pick' ? 'Internal Warehouse Dispatch Pick Slip' : 'Official Commercial Sales Invoice'}
+                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                      invoicePrintMode === 'internal_pick'
+                        ? 'bg-amber-400/20 text-amber-300 border-amber-400/30 font-bold'
+                        : 'bg-orange-500/30 text-orange-300 border-orange-400/30'
+                    }`}>
+                      {invoicePrintMode === 'internal_pick' ? 'STAFF PICK ONLY' : 'BIR Non-VAT'}
                     </span>
                   </h3>
                   <p className="text-[11px] text-slate-400">Order Ref: <span className="font-mono font-bold text-slate-200">{invoiceModalOrder.orderId}</span></p>
                 </div>
               </div>
 
+              {/* View Mode Switcher Toggle */}
+              <div className="flex items-center gap-1 bg-slate-800 p-1 rounded-lg border border-slate-700">
+                <button
+                  type="button"
+                  onClick={() => setInvoicePrintMode('commercial')}
+                  className={`px-3 py-1.5 rounded text-xs font-bold transition-all cursor-pointer ${
+                    invoicePrintMode === 'commercial'
+                      ? 'bg-[#EE4D2D] text-white shadow-xs'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  📄 Customer Invoice (BIR)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInvoicePrintMode('internal_pick')}
+                  className={`px-3 py-1.5 rounded text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                    invoicePrintMode === 'internal_pick'
+                      ? 'bg-amber-400 text-slate-950 shadow-xs'
+                      : 'text-slate-400 hover:text-amber-300'
+                  }`}
+                >
+                  <Box className="w-3.5 h-3.5 text-amber-950" />
+                  📦 Warehouse Pick Slip (Shows Box #)
+                </button>
+              </div>
+
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => window.print()}
-                  className="bg-[#EE4D2D] hover:bg-[#d73f20] text-white text-xs font-bold px-3.5 py-2 rounded-lg flex items-center gap-1.5 cursor-pointer shadow-sm transition-all printable-btn"
-                  title="Print official invoice or save as PDF"
+                  className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs px-3.5 py-2 rounded-lg flex items-center gap-1.5 cursor-pointer shadow-sm transition-all printable-btn"
+                  title="Print document or save as PDF"
                 >
                   <Printer className="w-4 h-4" /> Print / Save PDF
                 </button>
@@ -6720,18 +6751,28 @@ export default function App() {
 
                   {/* Document Badge */}
                   <div className="sm:text-right shrink-0 bg-slate-50 sm:bg-transparent p-3 sm:p-0 rounded-lg border sm:border-0 border-slate-200">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-[#EE4D2D] bg-orange-50 px-2 py-0.5 rounded border border-orange-200 block mb-1">
-                      Commercial Sales Invoice
+                    <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded border block mb-1 ${
+                      invoicePrintMode === 'internal_pick'
+                        ? 'bg-amber-100 text-amber-950 border-amber-300'
+                        : 'text-[#EE4D2D] bg-orange-50 border-orange-200'
+                    }`}>
+                      {invoicePrintMode === 'internal_pick' ? 'WAREHOUSE RETRIEVAL SLIP' : 'Commercial Sales Invoice'}
                     </span>
                     <p className="font-mono font-black text-lg text-slate-900">
-                      INV-{invoiceModalOrder.orderId}
+                      {invoicePrintMode === 'internal_pick' ? `PICK-${invoiceModalOrder.orderId}` : `INV-${invoiceModalOrder.orderId}`}
                     </p>
                     <p className="text-xs text-slate-500 mt-0.5">
                       Date: <strong className="text-slate-800">{invoiceModalOrder.date}</strong>
                     </p>
-                    <p className="text-[10px] text-slate-400 mt-0.5 font-mono">
-                      BIR Reg No: BIR-TX-08-6500-2026-MNA
-                    </p>
+                    {invoicePrintMode === 'internal_pick' ? (
+                      <p className="text-[10px] text-amber-800 font-bold mt-0.5 font-mono">
+                        Target: Numbered Storage Boxes
+                      </p>
+                    ) : (
+                      <p className="text-[10px] text-slate-400 mt-0.5 font-mono">
+                        BIR Reg No: BIR-TX-08-6500-2026-MNA
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -6794,15 +6835,40 @@ export default function App() {
                 </div>
               </div>
 
+              {/* Staff Picking Directive Banner */}
+              {invoicePrintMode === 'internal_pick' && (
+                <div className="bg-amber-50 border-2 border-dashed border-amber-300 p-3.5 rounded-xl text-xs text-amber-950 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-amber-400 text-slate-950 flex items-center justify-center font-black shrink-0">
+                    <Box className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h5 className="font-black text-xs uppercase tracking-wide text-amber-950">
+                      WAREHOUSE PICKING DIRECTIVE (DO NOT UNPACK SHELVES)
+                    </h5>
+                    <p className="text-[11px] text-amber-900 mt-0.5">
+                      Employees: Retrieve small items directly from their assigned <strong>BOX NUMBER</strong> below. Once pulled, tick the checkbox.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* 3. Itemized Table Breakdown */}
               <div className="border border-slate-200 rounded-lg overflow-hidden">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead className="bg-slate-900 text-white font-bold uppercase text-[10px] tracking-wider">
                     <tr>
+                      {invoicePrintMode === 'internal_pick' && (
+                        <th className="py-2.5 px-2 text-center w-8 bg-amber-500 text-slate-950 font-black">Pick</th>
+                      )}
                       <th className="py-2.5 px-3 text-center w-10">#</th>
                       <th className="py-2.5 px-3">Item Description &amp; Specification</th>
+                      {invoicePrintMode === 'internal_pick' && (
+                        <th className="py-2.5 px-3 bg-amber-400 text-slate-950 font-black">
+                          📦 Physical Box Location &amp; Quote #
+                        </th>
+                      )}
                       <th className="py-2.5 px-3 text-center">Unit</th>
-                      <th className="py-2.5 px-3 text-center">Qty</th>
+                      <th className="py-2.5 px-3 text-center font-black">Qty</th>
                       <th className="py-2.5 px-3 text-right">Unit Price (₱)</th>
                       <th className="py-2.5 px-3 text-right">Amount (₱)</th>
                     </tr>
@@ -6813,13 +6879,49 @@ export default function App() {
                       const itemTotal = itemPrice * Number(it.quantity || 1);
                       return (
                         <tr key={idx} className="hover:bg-slate-50/50">
+                          {invoicePrintMode === 'internal_pick' && (
+                            <td className="py-2.5 px-2 text-center bg-amber-50/40">
+                              <input type="checkbox" className="w-4 h-4 rounded cursor-pointer" />
+                            </td>
+                          )}
                           <td className="py-2.5 px-3 text-center font-mono text-slate-400 font-bold">{idx + 1}</td>
                           <td className="py-2.5 px-3">
                             <p className="font-bold text-slate-900">{it.name || it.product_id}</p>
                             <p className="text-[10px] font-mono text-slate-400">SKU: {it.id || it.product_id || 'MNA-SKU'}</p>
                           </td>
+                          {invoicePrintMode === 'internal_pick' && (
+                            <td className="py-2.5 px-3 bg-amber-50/70 border-l border-r border-amber-200">
+                              {(() => {
+                                const locs = getItemLocations(it.name, it.id || it.product_id);
+                                if (locs.length === 0) {
+                                  return (
+                                    <span className="inline-block bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded text-[11px]">
+                                      Box #01 / Standard Bin
+                                    </span>
+                                  );
+                                }
+                                return (
+                                  <div className="space-y-1">
+                                    {locs.map((loc, lIdx) => (
+                                      <div key={lIdx} className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="bg-amber-300 text-amber-950 font-black px-2 py-0.5 rounded text-xs border border-amber-400 shadow-2xs font-mono inline-block">
+                                          📦 BOX #{loc.box_no}
+                                        </span>
+                                        <span className="text-[11px] font-bold text-slate-800 font-mono">
+                                          {loc.quote_no}
+                                        </span>
+                                        <span className="text-[10px] text-slate-500 font-mono">
+                                          ({loc.warehouse} • Stock in box: {loc.qty} {loc.unit})
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                );
+                              })()}
+                            </td>
+                          )}
                           <td className="py-2.5 px-3 text-center font-mono text-slate-600 uppercase text-[11px]">{it.unit || 'pc'}</td>
-                          <td className="py-2.5 px-3 text-center font-mono font-black text-slate-900">{it.quantity}</td>
+                          <td className="py-2.5 px-3 text-center font-mono font-black text-slate-900 text-sm">{it.quantity}</td>
                           <td className="py-2.5 px-3 text-right font-mono text-slate-700">₱{itemPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                           <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">₱{itemTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                         </tr>

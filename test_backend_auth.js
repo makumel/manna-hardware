@@ -167,40 +167,82 @@ const server = app.listen(0, async () => {
       throw new Error('Missing X-Content-Type-Options security header');
     }
 
-    console.log('\n--- Test 13: Shipping & 10ft+ Long Cargo Rate Calculator (/api/shipping/calculate) ---');
-    // Test A: Standard items (Paint / Screws) - No long cargo surcharge
-    const calcStandard = await request('/api/shipping/calculate', {
-      method: 'POST',
-      body: JSON.stringify({
-        items: [{ id: 'MNA-1010', name: 'Boysen Permacoat White', quantity: 2 }],
-        distanceKm: 15,
-        subtotal: 1800
-      })
-    });
-    console.log('Standard calc:', calcStandard.data);
-    if (calcStandard.data.hasLongCargo !== false || calcStandard.data.longCargoFee !== 0 || calcStandard.data.baseShippingFee !== 150) {
-      throw new Error('Standard items should not incur long cargo fee');
-    }
-
-    // Test B: 10ft+ Long Structural items (C-Purlins, Angle Bar, GI Pipe) - ₱50/km surcharge
-    const calcLong = await request('/api/shipping/calculate', {
+    console.log('\n--- Test 13: Shipping & Long Cargo Calculator (/api/shipping/calculate) ---');
+    // Test A: ₱5,000+ within Tacloban City (8 km, C-Purlins & Angle Bars) -> 100% FREE DELIVERY (₱0)
+    const calcFreeTacloban = await request('/api/shipping/calculate', {
       method: 'POST',
       body: JSON.stringify({
         items: [
-          { id: 'MNA-1001', name: 'C-Purlins 2x4 1.2mm', quantity: 10 },
-          { id: 'MNA-1007', name: 'Angle Bar 1/4 x 2', quantity: 5 }
+          { id: 'MNA-1001', name: 'C-Purlins 2x4 1.2mm', quantity: 8 },
+          { id: 'MNA-1007', name: 'Angle Bar 1/4 x 2', quantity: 4 }
         ],
-        distanceKm: 15, // Palo, Leyte (15 km)
-        subtotal: 12000 // Subtotal >= 3000 -> Free base shipping
+        distanceKm: 8, // Downtown Tacloban (within Tacloban City <= 10 km)
+        subtotal: 8200 // >= ₱5,000
       })
     });
-    console.log('Long cargo calc (15 km @ 50/km = 750):', calcLong.data);
-    if (!calcLong.data.hasLongCargo || calcLong.data.longCargoFee !== 750 || calcLong.data.baseShippingFee !== 0 || calcLong.data.totalShippingFee !== 750) {
-      throw new Error(`Long cargo fee calculation mismatch: expected 750, got ${calcLong.data.longCargoFee}`);
+    console.log('Tacloban ₱5k+ Free Delivery:', calcFreeTacloban.data);
+    if (!calcFreeTacloban.data.withinTacloban || !calcFreeTacloban.data.freeDeliveryApplied || calcFreeTacloban.data.totalShippingFee !== 0) {
+      throw new Error(`Expected FREE delivery within Tacloban City for ₱5k+, got totalShippingFee: ${calcFreeTacloban.data.totalShippingFee}`);
     }
 
-    console.log('\n--- Test 14: Authenticated Checkout with 10ft+ Long Cargo items and distance ---');
-    const longCargoCheckout = await request('/api/checkout', {
+    // Test B: Under ₱5,000 within Tacloban City with 10ft items -> ₱50/km
+    const calcUnder5k = await request('/api/shipping/calculate', {
+      method: 'POST',
+      body: JSON.stringify({
+        items: [{ id: 'MNA-1001', name: 'C-Purlins 2x4 1.2mm', quantity: 2 }],
+        distanceKm: 8,
+        subtotal: 1550 // < ₱5,000
+      })
+    });
+    console.log('Tacloban Under ₱5k with Long Cargo (8 km @ 50/km = 400 + 150 base):', calcUnder5k.data);
+    if (calcUnder5k.data.freeDeliveryApplied !== false || calcUnder5k.data.longCargoFee !== 400) {
+      throw new Error(`Expected 400 long cargo fee for 8km, got ${calcUnder5k.data.longCargoFee}`);
+    }
+
+    // Test C: ₱5,000+ Outside Tacloban City (Palo, Leyte - 15 km) -> Tacloban portion is Free, excess 5 km @ ₱50/km = ₱250
+    const calcOutsideTacloban = await request('/api/shipping/calculate', {
+      method: 'POST',
+      body: JSON.stringify({
+        items: [
+          { id: 'MNA-1001', name: 'C-Purlins 2x4 1.2mm', quantity: 10 }
+        ],
+        distanceKm: 15, // Palo, Leyte (15 km)
+        subtotal: 7750  // >= ₱5,000
+      })
+    });
+    console.log('Beyond Tacloban ₱5k+ (15 km, 5 km excess @ 50/km = 250):', calcOutsideTacloban.data);
+    if (calcOutsideTacloban.data.withinTacloban !== false || calcOutsideTacloban.data.excessKm !== 5 || calcOutsideTacloban.data.totalShippingFee !== 250) {
+      throw new Error(`Expected 250 shipping fee for 15km (5km excess @ 50/km), got ${calcOutsideTacloban.data.totalShippingFee}`);
+    }
+
+    console.log('\n--- Test 14: Authenticated Checkout with Tacloban City ₱5,000+ Free Delivery ---');
+    // Test 14A: ₱5k+ within Tacloban City
+    const freeTaclobanCheckout = await request('/api/checkout', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${newCustomerToken}` },
+      body: JSON.stringify({
+        customer: {
+          fullName: 'Engr. Maria Santos',
+          phone: '09189998877',
+          address: 'Downtown, Tacloban City',
+          distanceKm: 8,
+          paymentMethod: 'cod'
+        },
+        items: [
+          { id: 'MNA-1001', quantity: 8 } // 8 * 775 = 6200 (>= ₱5,000)
+        ]
+      })
+    });
+    console.log('Tacloban ₱5k+ Checkout status:', freeTaclobanCheckout.status, 'Order:', freeTaclobanCheckout.data.order?.orderId);
+    if (freeTaclobanCheckout.status !== 201) throw new Error('Tacloban checkout failed');
+    const orderA = freeTaclobanCheckout.data.order;
+    console.log('Order A - Shipping fee (expect 0):', orderA.shippingFee, 'Free delivery applied:', orderA.freeDeliveryApplied);
+    if (orderA.shippingFee !== 0 || !orderA.freeDeliveryApplied) {
+      throw new Error(`Order within Tacloban City >= ₱5k should have FREE delivery (0), got ${orderA.shippingFee}`);
+    }
+
+    // Test 14B: ₱5k+ outside Tacloban City (Palo, 15 km -> 250 shipping)
+    const outsideTaclobanCheckout = await request('/api/checkout', {
       method: 'POST',
       headers: { Authorization: `Bearer ${newCustomerToken}` },
       body: JSON.stringify({
@@ -212,17 +254,16 @@ const server = app.listen(0, async () => {
           paymentMethod: 'cod'
         },
         items: [
-          { id: 'MNA-1001', quantity: 5 }, // C-Purlins 2x4 1.2mm (10ft+ long cargo)
-          { id: 'MNA-1002', quantity: 2 }  // GI Pipe S-40 (10ft+ long cargo)
+          { id: 'MNA-1001', quantity: 8 } // 8 * 775 = 6200 (>= ₱5,000)
         ]
       })
     });
-    console.log('Long cargo checkout status:', longCargoCheckout.status, 'Order:', longCargoCheckout.data.order?.orderId);
-    if (longCargoCheckout.status !== 201) throw new Error('Long cargo checkout failed');
-    const orderData = longCargoCheckout.data.order;
-    console.log('Order long cargo fee:', orderData.longCargoFee, 'Distance:', orderData.distanceKm, 'Total shipping:', orderData.shippingFee);
-    if (!orderData.hasLongCargo || orderData.longCargoFee !== 750 || orderData.distanceKm !== 15) {
-      throw new Error(`Order long cargo fee mismatch: expected 750 for 15km, got ${orderData.longCargoFee}`);
+    console.log('Outside Tacloban Checkout status:', outsideTaclobanCheckout.status, 'Order:', outsideTaclobanCheckout.data.order?.orderId);
+    if (outsideTaclobanCheckout.status !== 201) throw new Error('Outside Tacloban checkout failed');
+    const orderB = outsideTaclobanCheckout.data.order;
+    console.log('Order B - Shipping fee (expect 250):', orderB.shippingFee, 'Excess km:', orderB.excessKm);
+    if (orderB.shippingFee !== 250 || orderB.excessKm !== 5) {
+      throw new Error(`Order outside Tacloban should be charged 250 for 15km, got ${orderB.shippingFee}`);
     }
 
     console.log('\nALL 14 BACKEND SECURITY, LOGISTICS & MULTI-TENANT TESTS PASSED SUCCESSFULLY!');

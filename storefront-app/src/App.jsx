@@ -215,10 +215,9 @@ export function getProductWholesalePack(product, isRetail) {
   if (price >= 1500) {
     return { minQty: 1, step: 1, packLabel: 'Commercial Unit (1 pc)' };
   }
-  // Nails & Bulk Wire: Minimum 1 sack (25kg)
-  if (name.includes('nail') || unit.includes('kg') || unit.includes('sack')) {
-    const min = Math.min(25, Math.max(1, product?.stock || 25));
-    return { minQty: min, step: min, packLabel: `Sack (${min}kg)` };
+  // Nails & Kilo Materials: Sold per kilo (1 kg) - user confirmed no 25kg sacks in stock
+  if (name.includes('nail') || unit === 'kg' || unit.includes('kilo')) {
+    return { minQty: 1, step: 1, packLabel: '1 kg (Per Kilo)' };
   }
   // Blind Rivets: Minimum box of 10 packs (1,000 pcs)
   if (name.includes('rivet') || name.includes('blind rivet')) {
@@ -9122,7 +9121,7 @@ function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = f
       <div className="p-2 sm:p-2.5 flex-1 flex flex-col justify-between">
         <div>
           {/* LIVE Red Pill */}
-          {product.featured && (
+          {Boolean(product.featured) && (
             <span className="bg-[#EE4D2D] text-white text-[8px] font-black px-1 py-0.2 rounded-xs mr-1 uppercase">
               LIVE
             </span>

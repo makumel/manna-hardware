@@ -28,6 +28,32 @@ function cleanAndFixCatalog() {
   const GOOSENECK_FAUCET_CLEAN = '/images/gooseneck_faucet_clean.jpg';
   const ROSCO_WATER_JUG_FAUCET_CLEAN = '/images/rosco_water_jug_faucet_clean.jpg';
   const ROLLER_BRUSH_REFILL_CLEAN = '/images/roller_brush_refill_clean.jpg';
+  const ANAM_OUTLET_CLEAN = '/images/anam_outlet_3213_clean.jpg';
+
+  // Spray Paint Mappings (100% color-accurate studio packshots, no watermarks)
+  const SPRAY_MAPPING = {
+    'MNA-1219': '/images/pylox_01_clear_clean.jpg',
+    'MNA-NT-01-0011': '/images/pylox_02_white_clean.jpg',
+    'MNA-1217': '/images/pylox_601_orange_clean.jpg',
+    'MNA-1214': '/images/pylox_605_green_clean.jpg',
+    'MNA-1215': '/images/pylox_705_gold_clean.jpg',
+    'MNA-1216': '/images/pylox_706_flash_gold_clean.jpg',
+    'MNA-1218': '/images/pylox_710_solid_gold_clean.jpg',
+    'MNA-NT-01-0009': '/images/bosny_flat_black_04_clean.jpg',
+    'MNA-NT-01-0006': '/images/bosny_blue_21_clean.jpg',
+    'MNA-NT-01-0003': '/images/bosny_rose_pink_30_clean.jpg',
+    'MNA-NT-01-0008': '/images/bosny_silver_36_clean.jpg',
+    'MNA-NT-01-0007': '/images/bosny_grass_green_37_clean.jpg',
+    'MNA-NT-01-0004': '/images/bosny_primer_grey_68_clean.jpg',
+    'MNA-NT-01-0001': '/images/bosny_gold_351_clean.jpg',
+    'MNA-NT-01-0005': '/images/bosny_fluor_orange_1006_clean.jpg',
+    'MNA-NT-01-0002': '/images/bosny_undercoat_b104_clean.jpg',
+    'MNA-1221': '/images/bosny_undercoat_b104_clean.jpg',
+    'MNA-NT-03-0078': '/images/bosny_polyurethane_1900_clean.jpg',
+    'MNA-1220': '/images/bosny_polyurethane_1900_clean.jpg',
+    'MNA-NT-03-0077': '/images/bosny_tire_shine_b118_clean.jpg',
+    'MNA-NT-03-0075': '/images/bosny_plastic_primer_b117_clean.jpg',
+  };
 
   const CLEAN_BLIND_RIVETS = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQRFZtrOeadPeOXo9jb5u54sIQVGBf5238GsLSpoKbC0g&s';
   const PYLOX_SPRAY_CAN = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQDc4k6L47QodySi2Ekrc2ln8FLe_3pQz58B9wj5MHCKA&s=10';
@@ -169,16 +195,9 @@ function cleanAndFixCatalog() {
       continue;
     }
 
-    // 19. Pylox Lazer Clear & all Pylox items -> clean Pylox spray can
-    if (name.includes('pylox')) {
-      item.image = PYLOX_SPRAY_CAN;
-      fixedCount++;
-      continue;
-    }
-
-    // 20. Bosny Polyurethane & Bosny items -> clean Bosny spray can
-    if (name.includes('bosny')) {
-      item.image = BOSNY_SPRAY_CAN;
+    // 19 & 20. Pylox & Bosny Spray Cans -> Color-accurate studio packshot
+    if (SPRAY_MAPPING[item.id]) {
+      item.image = SPRAY_MAPPING[item.id];
       fixedCount++;
       continue;
     }
@@ -231,14 +250,29 @@ function cleanAndFixCatalog() {
       fixedCount++;
       continue;
     }
+
+    // 28. ANAM / Legrand Outlet 3G 3213
+    if (name.includes('anam') && name.includes('3213')) {
+      item.image = ANAM_OUTLET_CLEAN;
+      fixedCount++;
+      continue;
+    }
   }
 
-  console.log(`Successfully updated ${fixedCount} items to clean isolated brand images (no competitor store names).`);
-
-  // Write catalog.json and storefront catalog.json
+  console.log(`Successfully updated ${fixedCount} items in root catalog.`);
   fs.writeFileSync(catalogPath, JSON.stringify(catalog, null, 2), 'utf8');
-  fs.writeFileSync(storefrontCatalogPath, JSON.stringify(catalog, null, 2), 'utf8');
-  console.log('Saved catalog.json and storefront-app/src/catalog.json');
+
+  // Process storefront catalog (934 items) separately so Nulatula items are never lost
+  const storefrontCatalog = JSON.parse(fs.readFileSync(storefrontCatalogPath, 'utf8'));
+  let storefrontFixed = 0;
+  for (const item of storefrontCatalog) {
+    if (SPRAY_MAPPING[item.id]) {
+      item.image = SPRAY_MAPPING[item.id];
+      storefrontFixed++;
+    }
+  }
+  fs.writeFileSync(storefrontCatalogPath, JSON.stringify(storefrontCatalog, null, 2), 'utf8');
+  console.log(`Saved catalog.json (${catalog.length} items) and storefront-app/src/catalog.json (${storefrontCatalog.length} items, ${storefrontFixed} spray items updated).`);
 
   // Update SQLite
   const updateStmt = db.prepare('UPDATE products SET image = ? WHERE id = ?');
@@ -247,7 +281,7 @@ function cleanAndFixCatalog() {
       updateStmt.run(item.image, item.id);
     }
   });
-  updateTx(catalog);
+  updateTx(storefrontCatalog);
   console.log('Updated database.sqlite products table!');
 }
 

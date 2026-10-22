@@ -598,6 +598,7 @@ const renderPopups = () => (
   const [valuationCategory, setValuationCategory] = useState('All');
   const [valuationSortField, setValuationSortField] = useState('originalIndex');
   const [valuationSortOrder, setValuationSortOrder] = useState('asc');
+  const [valuationPricingMode, setValuationPricingMode] = useState('discounted'); // 'discounted' | 'regular'
 
   // CSV/PDF Upload state
   const [uploadModal, setUploadModal] = useState(false);
@@ -1236,8 +1237,16 @@ const renderPopups = () => (
       const qty = Math.max(0, Number(p.stock || 0));
       const unitCapital = Number(p.capital || 0);
       const totalCapital = qty * unitCapital;
-      const unitPrice = Number(p.price || 0);
-      const totalSellingPrice = qty * unitPrice;
+      const regularPrice = Number(p.price || 0);
+      
+      // Calculate effective discounted price based on active per-item discount and sitewide discount
+      const itemDisc = Number(p.discount_percent || 0);
+      const activeDisc = Math.max(itemDisc, storewideDiscount);
+      const effectiveUnitPrice = (valuationPricingMode === 'discounted' && activeDisc > 0)
+        ? Number((regularPrice * (1 - activeDisc / 100)).toFixed(2))
+        : regularPrice;
+
+      const totalSellingPrice = qty * effectiveUnitPrice;
       const potentialProfit = totalSellingPrice - totalCapital;
       const marginPct = totalSellingPrice > 0 ? ((potentialProfit / totalSellingPrice) * 100).toFixed(1) : '0';
 
@@ -1247,7 +1256,9 @@ const renderPopups = () => (
         qty,
         unitCapital,
         totalCapital,
-        unitPrice,
+        regularPrice,
+        unitPrice: effectiveUnitPrice,
+        appliedDiscount: activeDisc,
         totalSellingPrice,
         potentialProfit,
         marginPct
@@ -1270,7 +1281,7 @@ const renderPopups = () => (
       if (valA > valB) return valuationSortOrder === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [products, valuationCategory, valuationSearch, valuationSortField, valuationSortOrder]);
+  }, [products, valuationCategory, valuationSearch, valuationSortField, valuationSortOrder, valuationPricingMode, storewideDiscount]);
 
   const valuationTotals = useMemo(() => {
     let totalQty = 0;
@@ -3103,7 +3114,7 @@ const renderPopups = () => (
                     <Layers className="w-5 h-5 text-[#EE4D2D]" /> FULL MASTER CATALOG
                   </h1>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Browse all {products.length} commercial hardware supplies with live inventory, bulk packaging, and contract pricing.
+                    Browse all {products.length} Heavy-Duty (HD) & Premium hardware supplies with live inventory, bulk packaging, and contract pricing.
                   </p>
                 </div>
 
@@ -3147,6 +3158,15 @@ const renderPopups = () => (
                     In Stock Only ({products.filter(p => p.stock > 0).length})
                   </label>
                 </div>
+
+              {/* Clearance & Liquidation Notice (As-Is, Where-Is) */}
+              <div className="mt-3.5 p-3 bg-amber-50/90 border border-amber-200 rounded-xl flex items-start gap-2.5 text-slate-700 w-full">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div className="text-xs leading-relaxed">
+                  <span className="font-bold text-amber-950">Clearance & Liquidation Notice (As-Is, Where-Is):</span>{' '}
+                  All items are offered at deeply discounted, below-retail clearance prices because stock consists of genuine surplus, warehouse overstock, and showroom display units sold strictly <strong>As-Is, Where-Is</strong>. Every item is verified 100% authentic, structurally sound, fully functional, and ready for contractor and residential projects.
+                </div>
+              </div>
 
                 <div className="flex items-center gap-2 text-xs">
                   <span className="text-slate-500 font-medium">Category:</span>
@@ -4658,6 +4678,99 @@ const renderPopups = () => (
                       </div>
                     )}
 
+                    {/* Live Sitewide Discount & Pricing Mode Controller Banner */}
+                    <div className="bg-gradient-to-r from-red-950 via-slate-900 to-amber-950 text-white p-4 sm:p-5 rounded-2xl border-2 border-red-500/50 shadow-xl space-y-4">
+                      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="bg-[#EE4D2D] text-white text-[10px] font-black uppercase px-2 py-0.5 rounded tracking-wider flex items-center gap-1">
+                              <Flame className="w-3.5 h-3.5 animate-pulse" /> Active Sitewide Discount &amp; Margin Simulator
+                            </span>
+                            <span className="text-amber-400 text-xs font-bold font-mono">
+                              Current Rate: {storewideDiscount}% Sitewide OFF
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-300 max-w-xl leading-relaxed">
+                            Adjust the sitewide slider or toggle modes below. Potential selling prices, net profit markups, and profit margins automatically recalculate across all <strong>{valuationRows.length} SKUs</strong>.
+                          </p>
+                        </div>
+
+                        {/* Interactive Pricing Mode Switcher */}
+                        <div className="flex items-center gap-2 bg-slate-950/80 p-1.5 rounded-xl border border-white/10 shrink-0 self-start lg:self-auto">
+                          <button
+                            type="button"
+                            onClick={() => setValuationPricingMode('discounted')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                              valuationPricingMode === 'discounted'
+                                ? 'bg-red-600 text-white shadow-md ring-2 ring-red-400'
+                                : 'text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            <Flame className="w-3.5 h-3.5" /> Discounted Selling Prices
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setValuationPricingMode('regular')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                              valuationPricingMode === 'regular'
+                                ? 'bg-blue-600 text-white shadow-md ring-2 ring-blue-400'
+                                : 'text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            <DollarSign className="w-3.5 h-3.5" /> Regular Benchmark SRP
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Slider & Quick Percentage Jump Buttons */}
+                      <div className="bg-white/5 p-3.5 rounded-xl border border-white/10 space-y-2">
+                        <div className="flex items-center justify-between text-xs font-bold">
+                          <span className="text-slate-300 flex items-center gap-1.5">
+                            Sitewide Flash Discount Slider: <strong className="text-amber-400 text-sm font-mono">{storewideDiscount}% OFF</strong>
+                          </span>
+                          <span className="text-slate-400 text-[11px]">
+                            {valuationPricingMode === 'discounted' ? 'Applied live to potential margins below' : 'Paused (Viewing regular retail SRP)'}
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="50"
+                          step="5"
+                          value={storewideDiscount}
+                          onChange={e => setStorewideDiscount(Number(e.target.value))}
+                          className="w-full accent-[#EE4D2D] cursor-pointer h-2 bg-slate-700 rounded-lg"
+                        />
+                        <div className="flex flex-wrap items-center justify-between gap-1 pt-1">
+                          <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
+                            <span>Preset jumps:</span>
+                            {[0, 5, 10, 15, 20, 25, 30, 40].map(pct => (
+                              <button
+                                key={pct}
+                                type="button"
+                                onClick={() => setStorewideDiscount(pct)}
+                                className={`px-2 py-0.5 rounded font-mono font-bold cursor-pointer transition-colors ${
+                                  storewideDiscount === pct 
+                                    ? 'bg-[#EE4D2D] text-white' 
+                                    : 'bg-white/10 hover:bg-white/20 text-slate-300'
+                                }`}
+                              >
+                                {pct}%
+                              </button>
+                            ))}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={handleSaveDiscounts}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-black px-3 py-1 rounded-lg shadow-sm flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                          >
+                            <Check className="w-3 h-3" /> Save to Catalog
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* 4 Grand Summary Metric Cards (Primary User Goal) */}
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                       {/* Total Inventory Cost / Capital */}
@@ -4859,9 +4972,20 @@ const renderPopups = () => (
                                   {r.totalCapital.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </td>
 
-                                {/* Unit Price */}
+                                {/* Unit Price (Shows Discounted Price + Strikethrough if discounted) */}
                                 <td className="py-2 px-3 text-right font-mono text-slate-800 border-r border-slate-200">
-                                  {r.unitPrice.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  {r.appliedDiscount > 0 && valuationPricingMode === 'discounted' ? (
+                                    <div className="flex flex-col items-end">
+                                      <span className="font-bold text-red-600">
+                                        ₱{r.unitPrice.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      </span>
+                                      <span className="text-[10px] text-slate-400 line-through">
+                                        ₱{r.regularPrice.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <span>₱{r.unitPrice.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                  )}
                                 </td>
 
                                 {/* Total Selling Price */}
@@ -6508,7 +6632,13 @@ const renderPopups = () => (
                     </div>
                   )}
 
-                  <button
+                  <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-lg text-[11px] text-amber-950 leading-relaxed mb-3 flex items-start gap-2">
+                        <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                        <div>
+                          <strong>Clearance Terms (As-Is, Where-Is):</strong> Items are liquidated surplus, warehouse overstock, and showroom display inventory sold at deep below-retail clearance rates. All items are verified genuine, fully functional, and ready for immediate project installation.
+                        </div>
+                      </div>
+                    <button
                     type="submit"
                     disabled={isSubmittingCheckout || !isWholesaleMinMet}
                     className="w-full bg-[#EE4D2D] hover:bg-[#d73f20] disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg text-sm shadow-md cursor-pointer mt-4 flex items-center justify-center gap-2"
@@ -6835,6 +6965,13 @@ const renderPopups = () => (
                   </div>
                 )}
 
+                {/* Clearance Notice (As-Is, Where-Is) */}
+                <div className="p-2.5 bg-amber-50/90 border border-amber-200/90 rounded-lg text-[10px] text-amber-950 leading-relaxed mb-2.5 flex items-start gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <strong>Clearance Notice (As-Is, Where-Is):</strong> Items are liquidation surplus, warehouse overstock, and showroom display units sold as-is at below-retail rates. Fully inspected, authentic, and 100% functional.
+                  </div>
+                </div>
                 <button
                   onClick={() => {
                     if (!isWholesaleMinMet) return;

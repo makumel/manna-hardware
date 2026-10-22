@@ -6707,6 +6707,77 @@ const renderPopups = () => (
 
       </div>
 
+      {/* ==================== COMMERCIAL HARDWARE FOOTER ==================== */}
+      <footer className="bg-slate-950 text-slate-400 text-xs border-t border-slate-800 mt-auto no-print">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-12">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+            
+            {/* Col 1: Brand & Clearance Summary */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 bg-[#EE4D2D] text-white rounded-md flex items-center justify-center font-black text-sm shadow-xs">
+                  M
+                </div>
+                <span className="text-white font-black text-sm tracking-tight">MANNA BUILDING SUPPLY</span>
+              </div>
+              <p className="text-slate-400 text-[11px] leading-relaxed">
+                Commercial warehouse liquidation and specialty inventory clearance. 100% authentic, sound, contractor-ready heavy hardware and construction supplies sold strictly on an As-Is, Where-Is basis.
+              </p>
+              <div className="text-[11px] text-slate-500 space-y-1 pt-1">
+                <p>📍 Tacloban City, Leyte • Dispatch by Schedule</p>
+                <p>📞 Hotline: <span className="text-white font-mono font-bold">0926 199 5703</span></p>
+              </div>
+            </div>
+
+            {/* Col 2: Quick Links */}
+            <div>
+              <h4 className="text-white font-bold text-xs uppercase tracking-wider mb-3">Inventory Quick Links</h4>
+              <ul className="space-y-2 text-[11px]">
+                <li><button onClick={() => { setActiveTab('lots'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-white transition-colors cursor-pointer">Wholesale Clearance Lots</button></li>
+                <li><button onClick={() => { setActiveTab('catalog'); setSelectedCategory('All'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-white transition-colors cursor-pointer">Browse Full Catalog (934 SKUs)</button></li>
+                <li><button onClick={() => { setActiveTab('track-order'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-white transition-colors cursor-pointer">Track Commercial Delivery</button></li>
+                <li><button onClick={() => { setAuthPromptMessage('Customer Portal Access'); setAuthModal('login'); }} className="hover:text-white transition-colors cursor-pointer">Customer Portal Login</button></li>
+              </ul>
+            </div>
+
+            {/* Col 3: Liquidation Policies */}
+            <div>
+              <h4 className="text-white font-bold text-xs uppercase tracking-wider mb-3">Commercial Policies</h4>
+              <ul className="space-y-2 text-[11px] text-slate-400">
+                <li>• As-Is, Where-Is Liquidation Terms</li>
+                <li>• Cash Before Load (CBL) / Bank Wire</li>
+                <li>• Commercial Delivery Receipt (DR) issued</li>
+                <li>• Physical Pickup & Leyte Truck Dispatch</li>
+              </ul>
+            </div>
+
+            {/* Col 4: Warehouse Verification */}
+            <div>
+              <h4 className="text-white font-bold text-xs uppercase tracking-wider mb-3">Dispatch Hours</h4>
+              <p className="text-[11px] leading-relaxed text-slate-400 mb-2">
+                Monday – Saturday: 7:30 AM – 5:30 PM<br />
+                Sunday: 8:00 AM – 12:00 PM (Emergency Dispatch)
+              </p>
+              <div className="bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-[10px] text-slate-400">
+                🔒 Physical stock verified across Tacloban Hub (Cabalwan), NulaTula Depot, and Annex.
+              </div>
+            </div>
+
+          </div>
+
+          {/* Bottom Bar with subtle powered by mikabuilds */}
+          <div className="pt-6 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px]">
+            <p className="text-slate-500 text-center sm:text-left">
+              &copy; {new Date().getFullYear()} Manna Building Supply. All rights reserved. Commercial liquidation inventory.
+            </p>
+            <div className="flex items-center gap-1.5 text-slate-500 hover:text-slate-400 transition-colors">
+              <span className="text-[10px] tracking-wide uppercase font-medium">Powered by</span>
+              <span className="font-bold text-slate-300 hover:text-white transition-colors tracking-tight">mikabuilds</span>
+            </div>
+          </div>
+        </div>
+      </footer>
+
       {/* ==================== STICKY BOTTOM NAVIGATION BAR (MOBILE ONLY: md:hidden) ==================== */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-[#E5E5E5] py-1 px-2 shadow-lg max-w-lg mx-auto">
         <div className="grid grid-cols-5 text-center">

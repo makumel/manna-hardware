@@ -3632,7 +3632,7 @@
     "reviews": 28,
     "featured": false,
     "description": "Authentic commercial-grade Pylox Lazer #605 F-Green sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQDc4k6L47QodySi2Ekrc2ln8FLe_3pQz58B9wj5MHCKA&s=10",
+    "image": "/images/pylox_605_green_clean.jpg",
     "archetype": "spray_paint",
     "discount_percent": 0,
     "sold": 2617
@@ -3649,7 +3649,7 @@
     "reviews": 17,
     "featured": false,
     "description": "Authentic commercial-grade Pylox Lazer #705 Gold sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQDc4k6L47QodySi2Ekrc2ln8FLe_3pQz58B9wj5MHCKA&s=10",
+    "image": "/images/pylox_705_gold_clean.jpg",
     "archetype": "spray_paint",
     "discount_percent": 0,
     "sold": 1740
@@ -3666,7 +3666,7 @@
     "reviews": 27,
     "featured": false,
     "description": "Authentic commercial-grade Pylox Lazer #706 Flash Gold sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQDc4k6L47QodySi2Ekrc2ln8FLe_3pQz58B9wj5MHCKA&s=10",
+    "image": "/images/pylox_706_flash_gold_clean.jpg",
     "archetype": "spray_paint",
     "discount_percent": 0,
     "sold": 2152
@@ -3683,7 +3683,7 @@
     "reviews": 33,
     "featured": false,
     "description": "Authentic commercial-grade Pylox Lazer #601 F-Orange sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQDc4k6L47QodySi2Ekrc2ln8FLe_3pQz58B9wj5MHCKA&s=10",
+    "image": "/images/pylox_601_orange_clean.jpg",
     "archetype": "spray_paint",
     "discount_percent": 0,
     "sold": 1275
@@ -3700,7 +3700,7 @@
     "reviews": 31,
     "featured": false,
     "description": "Authentic commercial-grade Pylox Lazer #710 Solid Gold sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQDc4k6L47QodySi2Ekrc2ln8FLe_3pQz58B9wj5MHCKA&s=10",
+    "image": "/images/pylox_710_solid_gold_clean.jpg",
     "archetype": "spray_paint",
     "discount_percent": 0,
     "sold": 582
@@ -3717,7 +3717,7 @@
     "reviews": 32,
     "featured": false,
     "description": "Authentic commercial-grade Pylox Lazer #01 Clear sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQDc4k6L47QodySi2Ekrc2ln8FLe_3pQz58B9wj5MHCKA&s=10",
+    "image": "/images/pylox_01_clear_clean.jpg",
     "archetype": "spray_paint",
     "discount_percent": 0,
     "sold": 2656
@@ -3734,7 +3734,7 @@
     "reviews": 44,
     "featured": false,
     "description": "Authentic commercial-grade Bosny Polyurethane #1900 sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSRmwmyMWqfWATvZdkgY7rE5DwW8oAy2vcnMZGw_7ArfQ&s=10",
+    "image": "/images/bosny_polyurethane_1900_clean.jpg",
     "archetype": "spray_paint",
     "discount_percent": 0,
     "sold": 730
@@ -3751,7 +3751,7 @@
     "reviews": 25,
     "featured": false,
     "description": "Authentic commercial-grade Bosny Undercoat Rubberized B104 sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSRmwmyMWqfWATvZdkgY7rE5DwW8oAy2vcnMZGw_7ArfQ&s=10",
+    "image": "/images/bosny_undercoat_b104_clean.jpg",
     "archetype": "spray_paint",
     "discount_percent": 0,
     "sold": 1607
@@ -4244,7 +4244,7 @@
     "reviews": 32,
     "featured": false,
     "description": "Authentic commercial-grade ANAM/Legrand OUTLET 3G 3213 sourced directly by Manna Hardware & Building Supply.",
-    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRe1V8WHbM1En2tIJe7MZu_kBEB96vZY1oGHl4pQPGX2w&s=10",
+    "image": "/images/anam_outlet_3213_clean.jpg",
     "archetype": "electrical_switch_socket",
     "discount_percent": 0,
     "sold": 2411

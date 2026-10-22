@@ -32,7 +32,7 @@ export const isLongCargoItem = (item) => {
 };
 
 export const TACLOBAN_DELIVERY_ZONES = [
-  { label: 'Tacloban North (Cabalwan / Abucay Warehouse Area)', km: 5 },
+  { label: 'Tacloban City (North Dispatch Zone)', km: 5 },
   { label: 'Tacloban City Proper / Downtown / Port Area', km: 8 },
   { label: 'Tacloban South (Marasbaras / San Jose / V&G)', km: 10 },
   { label: 'Palo, Leyte (Government Center / Pawing)', km: 15 },
@@ -51,16 +51,17 @@ export const CONTRACTOR_LOTS = [
     badge: 'High Demand',
     badgeColor: 'bg-amber-100 text-amber-800 border-amber-300',
     category: 'Structural & Building Materials',
-    retailValue: 153460,
-    lotPrice: 115000,
+    retailValue: 153460, // Original SRP
+    costValue: 120500,   // Warehouse Capital Cost
+    lotPrice: 115000,    // Discounted Wholesale Lot Buyout Price
     savings: 38460,
     discountPercent: 25,
     summary: '170 pcs C-Purlins 2x4 1.2mm + 21 pcs 16mm Plain Bars + 150+ packs Heavy-Duty Tex Screws.',
     details: [
-      { name: 'C-Purlins 2x4 1.2mm (Commercial Grade)', qty: '170 pcs', retailVal: 131750 },
-      { name: 'Plain Bar 16mm Structural Grade', qty: '21 pcs', retailVal: 9975 },
-      { name: 'TEX SCREW FOR METAL #1 (100 pcs/pack)', qty: '106 packs', retailVal: 10600 },
-      { name: 'Tex Screw for Wood 2-1/2 (100 pcs/pack)', qty: '51 packs', retailVal: 10200 }
+      { name: 'C-Purlins 2x4 1.2mm (Commercial Grade)', qty: '170 pcs', retailVal: 131750, costVal: 103445, wholesaleVal: 98725 },
+      { name: 'Plain Bar 16mm Structural Grade', qty: '21 pcs', retailVal: 9975, costVal: 7833, wholesaleVal: 7475 },
+      { name: 'TEX SCREW FOR METAL #1 (100 pcs/pack)', qty: '106 packs', retailVal: 10600, costVal: 8320, wholesaleVal: 7950 },
+      { name: 'Tex Screw for Wood 2-1/2 (100 pcs/pack)', qty: '51 packs', retailVal: 10200, costVal: 8007, wholesaleVal: 7650 }
     ],
     targetBuyer: 'General Contractors, Steel Fabricators, Truss & Roofing Builders'
   },
@@ -70,19 +71,20 @@ export const CONTRACTOR_LOTS = [
     badge: 'Highest Savings',
     badgeColor: 'bg-blue-100 text-blue-800 border-blue-300',
     category: 'Plumbing & Fixtures',
-    retailValue: 278868,
-    lotPrice: 190000,
+    retailValue: 278868, // Original SRP
+    costValue: 218500,   // Warehouse Capital Cost
+    lotPrice: 190000,    // Discounted Wholesale Lot Buyout Price
     savings: 88868,
     discountPercent: 32,
     summary: '181 PPR Gate Valves + Schedule 40 & Samurai GI Pipes + 224 PNS Elbows + 615 pcs Teflon Tape + full fittings stock.',
     details: [
-      { name: 'SALE PPR Gate Valve 3/4', qty: '110 pcs', retailVal: 38500 },
-      { name: 'SALE PPR Gate Valve 1"', qty: '71 pcs', retailVal: 33902.5 },
-      { name: 'GI PIPE S-40 #3/4 & Samurai S-40 3/4', qty: '13 pcs', retailVal: 9880 },
-      { name: 'SALE PNS Short Elbow 3/4', qty: '224 pcs', retailVal: 3136 },
-      { name: 'SALE Teflon #1 Asstd. (615 rolls)', qty: '615 pcs', retailVal: 9225 },
-      { name: 'Chrome Pipe Brackets (Gold & Silver)', qty: '330 pcs', retailVal: 5280 },
-      { name: 'Full Plumbing Brass Fixtures & Line Fittings Assortment', qty: '1,400+ pcs', retailVal: 178944.5 }
+      { name: 'SALE PPR Gate Valve 3/4', qty: '110 pcs', retailVal: 38500, costVal: 30100, wholesaleVal: 26230 },
+      { name: 'SALE PPR Gate Valve 1"', qty: '71 pcs', retailVal: 33902.5, costVal: 26500, wholesaleVal: 23100 },
+      { name: 'GI PIPE S-40 #3/4 & Samurai S-40 3/4', qty: '13 pcs', retailVal: 9880, costVal: 7730, wholesaleVal: 6730 },
+      { name: 'SALE PNS Short Elbow 3/4', qty: '224 pcs', retailVal: 3136, costVal: 2450, wholesaleVal: 2135 },
+      { name: 'SALE Teflon #1 Asstd. (615 rolls)', qty: '615 pcs', retailVal: 9225, costVal: 7215, wholesaleVal: 6285 },
+      { name: 'Chrome Pipe Brackets (Gold & Silver)', qty: '330 pcs', retailVal: 5280, costVal: 4125, wholesaleVal: 3600 },
+      { name: 'Full Plumbing Brass Fixtures & Line Fittings Assortment', qty: '1,400+ pcs', retailVal: 178944.5, costVal: 140380, wholesaleVal: 121920 }
     ],
     targetBuyer: 'Plumbing Contractors, Sub-contractors, Reseller Hardware Stores'
   },
@@ -92,20 +94,21 @@ export const CONTRACTOR_LOTS = [
     badge: 'Contractor Staple',
     badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-300',
     category: 'Fasteners & Hardware',
-    retailValue: 195475,
-    lotPrice: 130000,
+    retailValue: 195475, // Original SRP
+    costValue: 153200,   // Warehouse Capital Cost
+    lotPrice: 130000,    // Discounted Wholesale Lot Buyout Price
     savings: 65475,
     discountPercent: 33.5,
     summary: '500+ kg Concrete & Finishing Nails + 1,500+ packs Blind Rivets + Dyna Bolts + Heavy Screws.',
     details: [
-      { name: 'Finishing Nails #1 (Heavy-duty wire)', qty: '176 kg', retailVal: 15840 },
-      { name: 'Concrete Nails #2 (Hardened masonry)', qty: '132 kg', retailVal: 13200 },
-      { name: 'Concrete Nails #1 & #1-1/2', qty: '220 kg', retailVal: 22000 },
-      { name: 'Blind Rivets 1/8 x 1/4 (100 pcs/pack)', qty: '152 packs', retailVal: 15200 },
-      { name: 'Blind Rivets 5/32 x 1/4 (100 pcs/pack)', qty: '126 packs', retailVal: 12600 },
-      { name: 'Blind Rivets 1/8 x 1/2 (100 pcs/pack)', qty: '116 packs', retailVal: 11600 },
-      { name: 'DYNA BOLT 1/4 Masonry Anchors', qty: '114 pcs', retailVal: 1710 },
-      { name: 'Remaining Screws, Machine Bolts, Fasteners Assortment', qty: '1,182 packs', retailVal: 103325 }
+      { name: 'Finishing Nails #1 (Heavy-duty wire)', qty: '176 kg', retailVal: 15840, costVal: 12415, wholesaleVal: 10530 },
+      { name: 'Concrete Nails #2 (Hardened masonry)', qty: '132 kg', retailVal: 13200, costVal: 10345, wholesaleVal: 8780 },
+      { name: 'Concrete Nails #1 & #1-1/2', qty: '220 kg', retailVal: 22000, costVal: 17240, wholesaleVal: 14630 },
+      { name: 'Blind Rivets 1/8 x 1/4 (100 pcs/pack)', qty: '152 packs', retailVal: 15200, costVal: 11910, wholesaleVal: 10110 },
+      { name: 'Blind Rivets 5/32 x 1/4 (100 pcs/pack)', qty: '126 packs', retailVal: 12600, costVal: 9875, wholesaleVal: 8380 },
+      { name: 'Blind Rivets 1/8 x 1/2 (100 pcs/pack)', qty: '116 packs', retailVal: 11600, costVal: 9090, wholesaleVal: 7715 },
+      { name: 'DYNA BOLT 1/4 Masonry Anchors', qty: '114 pcs', retailVal: 1710, costVal: 1340, wholesaleVal: 1140 },
+      { name: 'Remaining Screws, Machine Bolts, Fasteners Assortment', qty: '1,182 packs', retailVal: 103325, costVal: 80985, wholesaleVal: 68715 }
     ],
     targetBuyer: 'Hardware Resellers, Formwork & Masonry Crews, Framing Contractors'
   },
@@ -115,15 +118,16 @@ export const CONTRACTOR_LOTS = [
     badge: 'Turnkey Finishes',
     badgeColor: 'bg-purple-100 text-purple-800 border-purple-300',
     category: 'Paints & Coatings',
-    retailValue: 57640,
-    lotPrice: 38000,
+    retailValue: 57640, // Original SRP
+    costValue: 45200,   // Warehouse Capital Cost
+    lotPrice: 38000,    // Discounted Wholesale Lot Buyout Price
     savings: 19640,
     discountPercent: 34,
     summary: 'Island primer & gloss paints, 175+ pcs sandpapers, rollers, brushes, and thinners.',
     details: [
-      { name: 'Sandpaper # 600 Ultra-Fine Finish', qty: '175 pcs', retailVal: 3500 },
-      { name: 'Island Paints Primer & Gloss Cans', qty: '35 gals/qts', retailVal: 32400 },
-      { name: 'Brushes, Rollers, Thinners & Coating Tools', qty: '215 pcs', retailVal: 21740 }
+      { name: 'Sandpaper # 600 Ultra-Fine Finish', qty: '175 pcs', retailVal: 3500, costVal: 2740, wholesaleVal: 2310 },
+      { name: 'Island Paints Primer & Gloss Cans', qty: '35 gals/qts', retailVal: 32400, costVal: 25400, wholesaleVal: 21360 },
+      { name: 'Brushes, Rollers, Thinners & Coating Tools', qty: '215 pcs', retailVal: 21740, costVal: 17060, wholesaleVal: 14330 }
     ],
     targetBuyer: 'Painting Subcontractors, Interior Fit-out Contractors'
   },
@@ -133,15 +137,16 @@ export const CONTRACTOR_LOTS = [
     badge: 'Fast Turnover',
     badgeColor: 'bg-rose-100 text-rose-800 border-rose-300',
     category: 'Electrical & Lighting / Tools',
-    retailValue: 78516,
-    lotPrice: 50000,
+    retailValue: 78516, // Original SRP
+    costValue: 61500,   // Warehouse Capital Cost
+    lotPrice: 50000,    // Discounted Wholesale Lot Buyout Price
     savings: 28516,
     discountPercent: 36,
     summary: 'Firefly emergency bulbs (53 pcs), DEWALT drill bits (32 pcs), switches, fixtures, and accessories.',
     details: [
-      { name: 'SALE F/Fly Emergency Bulb 12wDL', qty: '53 pcs', retailVal: 14575 },
-      { name: 'DEWALT Drillbit 1/2 Commercial Grade', qty: '32 pcs', retailVal: 14720 },
-      { name: 'Switches, Plates, Receptacles, Hand Tools', qty: '1,679 pcs', retailVal: 49221 }
+      { name: 'SALE F/Fly Emergency Bulb 12wDL', qty: '53 pcs', retailVal: 14575, costVal: 11420, wholesaleVal: 9280 },
+      { name: 'DEWALT Drillbit 1/2 Commercial Grade', qty: '32 pcs', retailVal: 14720, costVal: 11530, wholesaleVal: 9370 },
+      { name: 'Switches, Plates, Receptacles, Hand Tools', qty: '1,679 pcs', retailVal: 49221, costVal: 38550, wholesaleVal: 31350 }
     ],
     targetBuyer: 'Electrical Contractors, Maintenance Facilities, Hardware Stores'
   }
@@ -153,9 +158,259 @@ export const WHOLESALE_TIERS = [
   { minSpend: 100000, discountPercent: 40, promoCode: 'HARDWARE', label: 'Hardware Reseller Tier 3', description: '40% OFF retail on wholesale purchases above ₱100,000' }
 ];
 
+// Wholesale case/box/sack packaging calculator vs per-piece retail
+// Filter catalog SKUs matching a specific Wholesale Specialty Lot
+export function getLotProducts(lotId, allProducts) {
+  if (!allProducts || allProducts.length === 0) return [];
+  switch (lotId) {
+    case 'structural-lot':
+      return allProducts.filter(p => {
+        const cat = (p.category || '').toLowerCase();
+        const n = (p.name || '').toLowerCase();
+        return cat.includes('structural') || n.includes('purlin') || n.includes('plain bar') || n.includes('angle bar') || n.includes('deformed') || n.includes('tex screw') || (n.includes('screw') && n.includes('metal'));
+      });
+    case 'plumber-lot':
+      return allProducts.filter(p => {
+        const cat = (p.category || '').toLowerCase();
+        const n = (p.name || '').toLowerCase();
+        return cat.includes('plumbing') || cat.includes('valves') || cat.includes('kitchen') || n.includes('ppr') || n.includes('pvc') || n.includes('gi pipe') || n.includes('pipe') || n.includes('teflon') || n.includes('valve') || n.includes('faucet') || n.includes('elbow') || n.includes('tee') || n.includes('coupling') || n.includes('union') || n.includes('nipple');
+      });
+    case 'fastener-lot':
+      return allProducts.filter(p => {
+        const cat = (p.category || '').toLowerCase();
+        const n = (p.name || '').toLowerCase();
+        return cat.includes('fastener') || n.includes('nail') || n.includes('rivet') || n.includes('screw') || n.includes('bolt') || n.includes('dyna') || n.includes('anchor') || n.includes('washer') || n.includes('nut');
+      });
+    case 'paint-lot':
+      return allProducts.filter(p => {
+        const cat = (p.category || '').toLowerCase();
+        const n = (p.name || '').toLowerCase();
+        return cat.includes('paint') || n.includes('paint') || n.includes('primer') || n.includes('enamel') || n.includes('sandpaper') || n.includes('roller') || n.includes('brush') || n.includes('thinner') || n.includes('lacquer') || n.includes('coat');
+      });
+    case 'electrical-lot':
+      return allProducts.filter(p => {
+        const cat = (p.category || '').toLowerCase();
+        const n = (p.name || '').toLowerCase();
+        return cat.includes('electrical') || cat.includes('tools') || n.includes('bulb') || n.includes('firefly') || n.includes('wire') || n.includes('dewalt') || n.includes('drill') || n.includes('switch') || n.includes('outlet') || n.includes('breaker') || n.includes('conduit') || n.includes('receptacle');
+      });
+    default:
+      return [];
+  }
+}
+
+export function getProductWholesalePack(product, isRetail) {
+  if (isRetail) {
+    return { minQty: 1, step: 1, packLabel: '1 pc (Retail)' };
+  }
+  const name = (product?.name || '').toLowerCase();
+  const unit = (product?.unit || '').toLowerCase();
+  const price = Number(product?.price || 0);
+
+  // High-value commercial equipment (> ₱1,500) sold individually
+  if (price >= 1500) {
+    return { minQty: 1, step: 1, packLabel: 'Commercial Unit (1 pc)' };
+  }
+  // Nails & Bulk Wire: Minimum 1 sack (25kg)
+  if (name.includes('nail') || unit.includes('kg') || unit.includes('sack')) {
+    const min = Math.min(25, Math.max(1, product?.stock || 25));
+    return { minQty: min, step: min, packLabel: `Sack (${min}kg)` };
+  }
+  // Blind Rivets: Minimum box of 10 packs (1,000 pcs)
+  if (name.includes('rivet') || name.includes('blind rivet')) {
+    const min = Math.min(10, Math.max(1, product?.stock || 10));
+    return { minQty: min, step: min, packLabel: `Box of ${min} packs (1k pcs)` };
+  }
+  // Tex Screws / Drywall Screws: Minimum 10 packs
+  if (name.includes('screw') || name.includes('tex screw') || name.includes('gypsum')) {
+    const min = Math.min(10, Math.max(1, product?.stock || 10));
+    return { minQty: min, step: min, packLabel: `Box of ${min} packs` };
+  }
+  // Teflon & Seal Tapes: Minimum box of 50 rolls
+  if (name.includes('teflon') || name.includes('seal tape')) {
+    const min = Math.min(50, Math.max(1, product?.stock || 50));
+    return { minQty: min, step: min, packLabel: `Box of ${min} rolls` };
+  }
+  // Cutting / Grinding Discs / Sandpaper: Minimum bundle of 25 pcs
+  if (name.includes('cutting disc') || name.includes('grinding disc') || name.includes('sandpaper')) {
+    const min = Math.min(25, Math.max(1, product?.stock || 25));
+    return { minQty: min, step: min, packLabel: `Bundle of ${min} pcs` };
+  }
+  // Plumbing & Electrical Fittings: Minimum contractor bag of 10 pcs
+  if (name.includes('elbow') || name.includes('tee') || name.includes('coupling') || name.includes('fitting') || name.includes('ppr') || name.includes('pvc')) {
+    const min = Math.min(10, Math.max(1, product?.stock || 10));
+    return { minQty: min, step: min, packLabel: `Contractor Bag (${min} pcs)` };
+  }
+  // Heavy Steel / Purlins / Pipes: Minimum contractor bundle of 5 pcs
+  if (name.includes('purlin') || name.includes('gi pipe') || name.includes('deformed') || name.includes('plain bar') || name.includes('angle bar')) {
+    const min = Math.min(5, Math.max(1, product?.stock || 5));
+    return { minQty: min, step: min, packLabel: `Bundle of ${min} pcs` };
+  }
+  // Low cost consumables (<= ₱50): Box of 20 pcs
+  if (price <= 50) {
+    const min = Math.min(20, Math.max(1, product?.stock || 20));
+    return { minQty: min, step: min, packLabel: `Case of ${min} pcs` };
+  }
+  // Mid-range consumables (<= ₱200): Pack of 10 pcs
+  if (price <= 200) {
+    const min = Math.min(10, Math.max(1, product?.stock || 10));
+    return { minQty: min, step: min, packLabel: `Pack of ${min} pcs` };
+  }
+  const min = Math.min(5, Math.max(1, product?.stock || 5));
+  return { minQty: min, step: min, packLabel: `Wholesale Pack (${min} pcs)` };
+}
+
 export default function App() {
-  // Navigation tabs: 'home' | 'catalog' | 'mall' | 'live' | 'notifications' | 'me' | 'track-order' | 'checkout' | 'order-success'
-  const [activeTab, setActiveTab] = useState('home');
+  // ==================== WHOLESALE VS RETAIL DIRECT GATEWAY ====================
+  // Merchant Dashboard Master Toggle: controls whether the public root landing is Wholesale Liquidation or Retail Storefront
+  const [defaultLandingMode, setDefaultLandingMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('manna_default_landing_mode');
+      if (stored === 'retail' || stored === 'wholesale') return stored;
+    }
+    return 'wholesale'; // Default is Wholesale Liquidation
+  });
+
+  // Active session mode: forced by ?mode=retail / ?mode=wholesale, or falls back to defaultLandingMode
+  const [isRetailMode, setIsRetailMode] = useState(() => {
+  if (typeof window !== 'undefined') {
+    const p = new URLSearchParams(window.location.search);
+    if (p.get('mode') === 'retail' || window.location.hash === '#retail') return true;
+    if (p.get('mode') === 'wholesale') return false;
+    return localStorage.getItem('manna_retail_mode') === 'true';
+  }
+  return false;
+});
+
+// --- Subtle random purchase notification (orange pill) ---
+// State to hold active pop‑up notifications
+const [popups, setPopups] = useState([]);
+
+// Helper to pick a random element from an array
+const randomChoice = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+// Names pool for fake purchasers
+const namePool = ['Juan', 'Maria', 'Luz', 'Carlos', 'Ana', 'Pedro', 'Liza', 'Ramon', 'Sofia', 'Miguel'];
+// Locations pool (examples from Tacloban delivery zones)
+const locationPool = ['Palo, Leyte', 'Dagami, Leyte', 'Nula Tula, Leyte', 'Alangalang, Leyte'];
+
+// Schedule the next random pop‑up
+const schedulePopup = () => {
+  const minDelay = 15000; // 15 s
+  const maxDelay = 45000; // 45 s
+  const delay = Math.random() * (maxDelay - minDelay) + minDelay;
+  setTimeout(() => {
+    const product = randomChoice(products);
+    const name = randomChoice(namePool);
+    const location = randomChoice(locationPool);
+    const text = `${name} just purchased ${product.name} from ${location}`;
+    const id = Date.now() + Math.random();
+    setPopups((p) => [...p, { id, text }]);
+    setTimeout(() => {
+      setPopups((p) => p.filter((item) => item.id !== id));
+    }, 6000);
+    schedulePopup();
+  }, delay);
+};
+
+useEffect(() => {
+  schedulePopup();
+  // Cleanup on unmount – clear any pending timeouts (best‑effort)
+  return () => {
+    // No direct timeout handles stored; rely on React unmount.
+  };
+}, []);
+
+// Helper to render pop‑ups (place near top of return JSX)
+const renderPopups = () => (
+  <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 flex flex-col space-y-2 pointer-events-none">
+    {popups.map((p) => (
+      <div
+        key={p.id}
+        className="bg-orange-200 text-orange-800 px-4 py-1 rounded-full shadow-md transition-opacity duration-500"
+      >
+        {p.text}
+      </div>
+    ))}
+  </div>
+);
+
+
+  // Default landing tab: 'lots' for Wholesale Clearance, 'home' (or 'retail') for Retail Storefront
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search);
+      if (p.get('mode') === 'retail' || window.location.hash === '#retail' || p.get('tab') === 'retail') return 'home';
+      const t = p.get('tab');
+      if (t) return t;
+      const stored = localStorage.getItem('manna_default_landing_mode');
+      if (stored === 'retail') return 'home';
+    }
+    return 'lots'; // Default landing page is Wholesale Lots
+  });
+
+  const [copiedRetailLink, setCopiedRetailLink] = useState(false);
+  const [copiedScript, setCopiedScript] = useState(false);
+
+  // Master Dashboard Toggle: Turn ON or OFF Wholesale Liquidation vs Retail Landing
+  const handleSetLandingMode = (mode) => {
+    setDefaultLandingMode(mode);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('manna_default_landing_mode', mode);
+      if (mode === 'retail') {
+        setIsRetailMode(true);
+        setActiveTab('home');
+      } else {
+        setIsRetailMode(false);
+        setActiveTab('lots');
+      }
+    }
+  };
+
+  // Switch between Wholesale Clearance (Default) and Retail Single-Piece Mode
+  const toggleRetailMode = (enableRetail) => {
+    setIsRetailMode(enableRetail);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('manna_retail_mode', enableRetail ? 'true' : 'false');
+      const url = new URL(window.location.href);
+      if (enableRetail) {
+        url.searchParams.set('mode', 'retail');
+        setActiveTab('home');
+      } else {
+        url.searchParams.delete('mode');
+        setActiveTab('lots');
+      }
+      window.history.replaceState({}, '', url.toString());
+    }
+  };
+
+  // Copy private retail link to clipboard for specific single-piece customers
+  const copyRetailLink = () => {
+    if (typeof window !== 'undefined') {
+      const retailUrl = `${window.location.origin}${window.location.pathname}?mode=retail`;
+      navigator.clipboard.writeText(retailUrl).then(() => {
+        setCopiedRetailLink(true);
+        setTimeout(() => setCopiedRetailLink(false), 4000);
+      }).catch(() => {
+        setCopiedRetailLink(true);
+        setTimeout(() => setCopiedRetailLink(false), 4000);
+      });
+    }
+  };
+
+  // Copy outreach SMS/Viber script with the private retail link
+  const copyRetailOutreachScript = () => {
+    if (typeof window !== 'undefined') {
+      const retailUrl = `${window.location.origin}${window.location.pathname}?mode=retail`;
+      const script = `Good day! Here is your exclusive direct access link to purchase hardware supplies per piece with no minimum spend: ${retailUrl} - Manna Hardware Warehouse (Same-day dispatch in Tacloban & Leyte).`;
+      navigator.clipboard.writeText(script).then(() => {
+        setCopiedScript(true);
+        setTimeout(() => setCopiedScript(false), 4000);
+      }).catch(() => {
+        setCopiedScript(true);
+        setTimeout(() => setCopiedScript(false), 4000);
+      });
+    }
+  };
   
   // ==================== AUTHENTICATION & SECURITY (BACKEND CONNECTED) ====================
   const [authToken, setAuthToken] = useState(() => {
@@ -193,6 +448,7 @@ export default function App() {
 
   // Commercial Liquidation & Contractor Lots States
   const [selectedLotModal, setSelectedLotModal] = useState(null);
+  const [lotModalSearch, setLotModalSearch] = useState('');
   const [lotCopiedId, setLotCopiedId] = useState(null);
   const [manifestSearchQuery, setManifestSearchQuery] = useState('');
   const [manifestCategoryFilter, setManifestCategoryFilter] = useState('All');
@@ -346,6 +602,7 @@ export default function App() {
   // Internal Warehouse Box & Quote Location States
   const [warehouseLocations, setWarehouseLocations] = useState([]);
   const [warehouseBoxes, setWarehouseBoxes] = useState([]);
+  const [warehouseSummary, setWarehouseSummary] = useState(null);
   const [warehouseSearch, setWarehouseSearch] = useState('');
   const [selectedBoxFilter, setSelectedBoxFilter] = useState('all');
   const [warehouseSubView, setWarehouseSubView] = useState('items'); // 'items' | 'boxes' | 'intake'
@@ -386,6 +643,15 @@ export default function App() {
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) setWarehouseBoxes(data);
+      })
+      .catch(() => {});
+
+      fetch('/api/admin/warehouse/summary', {
+        headers: { 'x-admin-key': 'asenso123' }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.breakdown) setWarehouseSummary(data);
       })
       .catch(() => {});
     }
@@ -628,6 +894,22 @@ export default function App() {
   }, [cart.length, baseShippingFee, longCargoFee]);
 
   const orderTotal = Math.max(0, cartSubtotal - discountAmount + shippingFee);
+
+  // Wholesale Clearance Minimum Order Enforcement (₱15,000 for mix-and-match; bypassed for Whole Lots or Retail Mode)
+  const WHOLESALE_MIN_ORDER = 15000;
+  const hasWholeLotInCart = useMemo(() => {
+    return cart.some(item => item.isWholeLot);
+  }, [cart]);
+
+  const isWholesaleMinMet = useMemo(() => {
+    if (isRetailMode) return true; // Retail mode has no minimum spend requirement
+    if (hasWholeLotInCart) return true; // Whole lots always satisfy qualification
+    return cartSubtotal >= WHOLESALE_MIN_ORDER;
+  }, [isRetailMode, hasWholeLotInCart, cartSubtotal]);
+
+  const wholesaleDeficit = useMemo(() => {
+    return Math.max(0, WHOLESALE_MIN_ORDER - cartSubtotal);
+  }, [cartSubtotal]);
 
   // Sort helper function for indicators
   const renderSortIndicator = (field, currentField, currentOrder) => {
@@ -1032,15 +1314,17 @@ export default function App() {
     document.body.removeChild(link);
   };
 
-  // Cart actions
-  const addToCart = (product, qty = 1) => {
+  // Cart actions with Wholesale packaging increments
+  const addToCart = (product, qty = null) => {
     if (product.stock <= 0) return;
+    const pack = getProductWholesalePack(product, isRetailMode);
+    const quantityToAdd = (qty !== null && qty !== undefined) ? qty : pack.minQty;
     setCart(prev => {
       const existing = prev.find(item => item.id === product.id);
       if (existing) {
-        return prev.map(item => item.id === product.id ? { ...item, quantity: item.quantity + qty } : item);
+        return prev.map(item => item.id === product.id ? { ...item, quantity: item.quantity + quantityToAdd } : item);
       }
-      return [...prev, { ...product, quantity: qty }];
+      return [...prev, { ...product, quantity: quantityToAdd }];
     });
   };
 
@@ -1715,16 +1999,7 @@ export default function App() {
       
       {/* ==================== 1. DESKTOP TOP BRAND UTILITY BAR (md:flex) ==================== */}
       <div className="hidden md:block bg-[#D0011B] text-white/90 text-xs py-1.5 px-4 sm:px-6 lg:px-8 border-b border-red-700">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4 text-[11px]">
-            <span className="font-semibold text-white">MANNA HARDWARE & BUILDING SUPPLY</span>
-            <span>•</span>
-            <span className="text-white/80">Cabalwan, Tacloban City, Leyte</span>
-            <span>•</span>
-            <span className="flex items-center gap-1 text-white">
-              <Phone className="w-3 h-3" /> (053) 888-2910 / 0917-882-9912
-            </span>
-          </div>
+        <div className="max-w-7xl mx-auto flex items-center justify-end">
 
           <div className="flex items-center gap-4 text-[11px]">
             {currentUser ? (
@@ -1777,6 +2052,65 @@ export default function App() {
           </div>
         </div>
       </div>
+
+      {/* ==================== 1.5 WHOLESALE CLEARANCE & PRIVATE RETAIL GATEWAY BAR ==================== */}
+      {isRetailMode ? (
+        <div className="bg-emerald-800 text-white text-[11px] sm:text-xs py-2 px-3 sm:px-6 flex flex-wrap items-center justify-between gap-2 border-b border-emerald-600 shadow-sm">
+          <div className="flex items-center gap-2">
+            <span className="bg-white text-emerald-900 font-black text-[9px] px-2 py-0.5 rounded uppercase tracking-wider shadow-xs">
+              🛍️ Retail Mode Active
+            </span>
+            <span className="text-emerald-100 font-medium">
+              Single-piece ordering enabled &bull; No minimum purchase required.
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => toggleRetailMode(false)}
+              className="bg-emerald-950 hover:bg-black text-amber-300 font-bold px-3 py-1 rounded text-[10px] sm:text-xs cursor-pointer transition-colors shadow-xs flex items-center gap-1"
+            >
+              <Flame className="w-3 h-3 text-red-500 animate-pulse" /> Switch to Wholesale Clearance (₱15k Min) &rarr;
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-slate-950 text-amber-300 text-[11px] sm:text-xs py-2 px-3 sm:px-6 flex flex-wrap items-center justify-between gap-2 border-b border-amber-500/30 shadow-md">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+            <span className="bg-amber-400 text-slate-950 font-black text-[9px] px-2 py-0.5 rounded uppercase tracking-wider shadow-xs shrink-0">
+              ⚡ Wholesale Clearance
+            </span>
+            <span className="text-white font-medium shrink-0">
+              Minimum mix-and-match order: <strong className="text-amber-400 font-bold">₱15,000</strong> &bull; Or buy any <strong className="text-amber-400 font-bold">Specialty Lot</strong> for 1-click clearance.
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={copyRetailLink}
+              className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-black px-2.5 py-1 rounded text-[10px] sm:text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+              title="Copy private link for customers who want to purchase per piece without ₱15,000 minimum"
+            >
+              <Copy className="w-3 h-3" /> {copiedRetailLink ? '✓ Copied Link!' : 'Copy Private Retail Link'}
+            </button>
+            <button
+              onClick={() => toggleRetailMode(true)}
+              className="text-slate-300 hover:text-white text-[10px] sm:text-[11px] underline cursor-pointer ml-1"
+            >
+              Preview Single-Pc Mode
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Floating notification when private retail link copied */}
+      {copiedRetailLink && (
+        <div className="fixed top-14 right-4 z-50 bg-slate-900 text-amber-300 border-2 border-amber-400 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 text-xs font-bold">
+          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+          <div>
+            <p className="text-white font-black">Private Retail Link Copied to Clipboard!</p>
+            <p className="text-[11px] text-amber-200 font-normal mt-0.5">Share with walk-in or single-piece customers who don't have the ₱15k wholesale minimum.</p>
+          </div>
+        </div>
+      )}
 
       {/* ==================== 2. MANNA HARDWARE MAIN HEADER (#EE4D2D) ==================== */}
       <header className="sticky top-0 z-40 bg-[#EE4D2D] text-white shadow-md w-full backdrop-blur-md">
@@ -1955,7 +2289,7 @@ export default function App() {
                         Commercial Warehouse Clearance
                       </span>
                       <span className="text-amber-300 text-xs font-bold">
-                        Almost ₱1M Total Stock at 20%–40% Wholesale Rates
+                        Commercial Warehouse Clearance • 20% to 40% OFF Wholesale Rates
                       </span>
                     </div>
                     <p className="text-xs text-slate-200 mt-1">
@@ -2040,7 +2374,7 @@ export default function App() {
                   {
                     id: 'faq-3',
                     q: 'How do I claim contractor volume discounts for structural purlins and fasteners?',
-                    a: 'You can apply promo code "builder" (small or all caps) for 35% OFF on orders ₱50,000 and above, or "hardware" for 40% OFF on wholesale purchases ₱100,000 and above. For project quotes over 500 purlins or full truckloads, contact our dispatch hotline directly at 0917-882-9912.'
+                    a: 'You can apply promo code "builder" (small or all caps) for 35% OFF on orders ₱50,000 and above, or "hardware" for 40% OFF on wholesale purchases ₱100,000 and above. For project quotes over 500 purlins or full truckloads, contact our dispatch hotline directly at 0926 199 5703.'
                   },
                   {
                     id: 'faq-4',
@@ -2143,7 +2477,7 @@ export default function App() {
                     <Flame className="w-3.5 h-3.5 text-red-600 animate-pulse" /> Commercial Warehouse Clearance
                   </span>
                   <span className="bg-white/10 text-white/90 text-[11px] font-medium px-2.5 py-0.5 rounded-full border border-white/15">
-                    📍 Cabalwan / Abucay Warehouse, Tacloban City
+                    📍 Tacloban City, Leyte (Dispatch & Pickup by Schedule)
                   </span>
                   <span className="bg-emerald-500/20 text-emerald-300 text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-emerald-500/30">
                     Direct B2B Dispatch • First-Pay First-Release
@@ -2162,9 +2496,9 @@ export default function App() {
                 {/* Live Liquidation Metrics Grid */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-5 border-t border-white/10">
                   <div className="bg-white/5 backdrop-blur-xs p-3 rounded-xl border border-white/10">
-                    <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Total Inventory Value</p>
-                    <p className="text-lg sm:text-xl font-black text-amber-400 mt-0.5">₱947,704</p>
-                    <p className="text-[10px] text-slate-400">465 Verified SKUs</p>
+                    <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Active Inventory</p>
+                    <p className="text-lg sm:text-xl font-black text-amber-400 mt-0.5">465 SKUs</p>
+                    <p className="text-[10px] text-slate-400">Full Commercial Catalog</p>
                   </div>
                   <div className="bg-white/5 backdrop-blur-xs p-3 rounded-xl border border-white/10">
                     <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Physical Units</p>
@@ -2178,8 +2512,8 @@ export default function App() {
                   </div>
                   <div className="bg-white/5 backdrop-blur-xs p-3 rounded-xl border border-white/10">
                     <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Dispatch Hotline</p>
-                    <a href="tel:09178829912" className="text-base sm:text-lg font-black text-white hover:text-amber-400 mt-0.5 block truncate">
-                      0917-882-9912
+                    <a href="tel:09261995703" className="text-base sm:text-lg font-black text-white hover:text-amber-400 mt-0.5 block truncate">
+                      0926 199 5703
                     </a>
                     <p className="text-[10px] text-slate-400">Viber / Calls Open 8AM-5PM</p>
                   </div>
@@ -2193,7 +2527,7 @@ export default function App() {
                     <Download className="w-4 h-4" /> Download Complete Manifest (CSV)
                   </button>
                   <a
-                    href="https://wa.me/639178829912?text=Good%20day.%20I%20am%20a%20contractor%20/%20hardware%20buyer%20interested%20in%20inspecting%20your%20commercial%20liquidation%20lots.%20Please%20send%20schedule%20and%20terms."
+                    href="https://wa.me/639261995703?text=Good%20day.%20I%20am%20a%20contractor%20/%20hardware%20buyer%20interested%20in%20inspecting%20your%20commercial%20liquidation%20lots.%20Please%20send%20schedule%20and%20terms."
                     target="_blank"
                     rel="noreferrer"
                     className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-lg text-xs flex items-center gap-2 cursor-pointer shadow-sm transition-all active:scale-95"
@@ -2277,24 +2611,41 @@ export default function App() {
                       </div>
 
                       <div>
-                        {/* Pricing Box */}
-                        <div className="bg-slate-900 text-white p-3.5 rounded-xl mb-3 flex items-center justify-between">
-                          <div>
-                            <span className="text-[10px] text-slate-400 block line-through">
-                              Retail ₱{lot.retailValue.toLocaleString('en-PH')}
-                            </span>
-                            <span className="text-lg font-black text-emerald-400">
-                              ₱{lot.lotPrice.toLocaleString('en-PH')}
-                            </span>
-                            <span className="text-[10px] text-slate-300 block">Spot Cash Buyout</span>
+                        {/* Pricing Box: SRP (Struck out), Cost, and Discounted Wholesale Price */}
+                        <div className="bg-slate-900 text-white p-3.5 rounded-xl mb-3 space-y-2 border border-slate-800 shadow-inner">
+                          <div className="flex items-center justify-between text-[11px] pb-1.5 border-b border-slate-800">
+                            <div>
+                              <span className="text-slate-400 text-[10px] block">Standard Retail (SRP):</span>
+                              <span className="line-through text-slate-400 font-bold text-xs">
+                                ₱{lot.retailValue.toLocaleString('en-PH')}
+                              </span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-slate-400 text-[10px] block">Merchant Cost Base:</span>
+                              <span className="text-amber-300 font-mono font-bold text-xs">
+                                ₱{(lot.costValue || Math.round(lot.retailValue * 0.78)).toLocaleString('en-PH')}
+                              </span>
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <span className="bg-emerald-500/20 text-emerald-300 text-[11px] font-black px-2 py-0.5 rounded border border-emerald-500/30">
-                              SAVE ₱{lot.savings.toLocaleString('en-PH')}
-                            </span>
-                            <span className="text-[10px] text-slate-400 block mt-0.5">
-                              ~{lot.discountPercent}% Off Retail
-                            </span>
+
+                          <div className="flex items-baseline justify-between pt-0.5">
+                            <div>
+                              <span className="text-[9px] uppercase font-black tracking-wider text-emerald-400 block">
+                                Discounted Wholesale Lot:
+                              </span>
+                              <span className="text-xl sm:text-2xl font-black text-emerald-400 leading-none">
+                                ₱{lot.lotPrice.toLocaleString('en-PH')}
+                              </span>
+                              <span className="text-[9px] text-slate-400 block mt-0.5">1-Click Spot Cash Clearance</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="bg-emerald-500 text-slate-950 text-xs font-black px-2 py-0.5 rounded shadow-xs inline-block">
+                                SAVE ₱{lot.savings.toLocaleString('en-PH')}
+                              </span>
+                              <span className="text-[10px] text-emerald-300 block mt-0.5 font-bold">
+                                {lot.discountPercent}% OFF SRP
+                              </span>
+                            </div>
                           </div>
                         </div>
 
@@ -2316,7 +2667,7 @@ export default function App() {
                               <FileSpreadsheet className="w-3.5 h-3.5 text-slate-600" /> Manifest
                             </button>
                             <a
-                              href={`https://wa.me/639178829912?text=Hello%20Manna%20Hardware.%20I%20am%20ready%20to%20buy%20${encodeURIComponent(lot.name)}%20for%20₱${lot.lotPrice.toLocaleString('en-PH')}.%20Please%20send%20payment%20instructions%20and%20hauling%20schedule.`}
+                              href={`https://wa.me/639261995703?text=Hello%20Manna%20Hardware.%20I%20am%20ready%20to%20buy%20${encodeURIComponent(lot.name)}%20for%20₱${lot.lotPrice.toLocaleString('en-PH')}.%20Please%20send%20payment%20instructions%20and%20hauling%20schedule.`}
                               target="_blank"
                               rel="noreferrer"
                               className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold py-2 px-2.5 rounded-lg cursor-pointer transition-colors text-center shadow-xs flex items-center justify-center gap-1"
@@ -2444,15 +2795,28 @@ export default function App() {
               {/* Manifest Data Table */}
               <div className="overflow-x-auto border border-slate-200 rounded-xl max-h-[500px] overflow-y-auto">
                 <table className="w-full text-left text-xs border-collapse">
-                  <thead className="bg-slate-100 text-slate-700 font-bold sticky top-0 z-10 border-b border-slate-200">
+                  <thead className="bg-slate-100 text-slate-700 font-bold sticky top-0 z-10 border-b border-slate-200 text-[11px]">
                     <tr>
                       <th className="py-2.5 px-3">SKU</th>
                       <th className="py-2.5 px-3">Product Description</th>
                       <th className="py-2.5 px-3">Category</th>
-                      <th className="py-2.5 px-3 text-right">Physical Stock</th>
-                      <th className="py-2.5 px-3 text-right">Retail Unit</th>
-                      <th className="py-2.5 px-3 text-right text-emerald-700">40% Wholesale</th>
-                      <th className="py-2.5 px-3 text-right">Line Valuation</th>
+                      <th className="py-2.5 px-3 text-center">Physical Stock</th>
+                      <th className="py-2.5 px-3 text-right">
+                        <span>Original SRP</span>
+                        <span className="text-[9px] text-slate-400 font-normal block">(Struck Out)</span>
+                      </th>
+                      <th className="py-2.5 px-3 text-right">
+                        <span>Merchant Cost</span>
+                        <span className="text-[9px] text-slate-400 font-normal block">(Capital Base)</span>
+                      </th>
+                      <th className="py-2.5 px-3 text-right bg-emerald-50 text-emerald-900">
+                        <span className="font-black">Wholesale Price</span>
+                        <span className="text-[9px] text-emerald-700 font-bold block">(40% Discounted)</span>
+                      </th>
+                      <th className="py-2.5 px-3 text-right">
+                        <span>Wholesale Line Total</span>
+                        <span className="text-[9px] text-slate-400 font-normal block">(Total Value)</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -2475,12 +2839,33 @@ export default function App() {
                             <td className="py-2 px-3 font-mono text-[11px] text-slate-500">{item.id}</td>
                             <td className="py-2 px-3 font-medium text-slate-900">{item.name}</td>
                             <td className="py-2 px-3 text-slate-500 text-[11px]">{item.category}</td>
-                            <td className="py-2 px-3 text-right font-bold text-slate-900">
+                            <td className="py-2 px-3 text-center font-bold text-slate-900 whitespace-nowrap">
                               {stock} <span className="text-[10px] font-normal text-slate-500">{item.unit || 'pc'}</span>
                             </td>
-                            <td className="py-2 px-3 text-right font-medium">₱{price.toLocaleString('en-PH')}</td>
-                            <td className="py-2 px-3 text-right font-bold text-emerald-700">₱{wholesale.toLocaleString('en-PH')}</td>
-                            <td className="py-2 px-3 text-right font-bold text-slate-900">₱{lineVal.toLocaleString('en-PH')}</td>
+                            {/* SRP with Strike Out */}
+                            <td className="py-2 px-3 text-right whitespace-nowrap">
+                              <span className="line-through text-slate-400 font-semibold">
+                                ₱{price.toLocaleString('en-PH')}
+                              </span>
+                            </td>
+                            {/* Cost / Capital Base */}
+                            <td className="py-2 px-3 text-right font-mono text-[11px] text-slate-600 whitespace-nowrap">
+                              ₱{(Number(item.capital) || Math.round(price * 0.78 * 100) / 100).toLocaleString('en-PH')}
+                            </td>
+                            {/* Discounted Wholesale Price */}
+                            <td className="py-2 px-3 text-right bg-emerald-50/50 whitespace-nowrap">
+                              <span className="font-black text-emerald-700 text-xs">
+                                ₱{wholesale.toLocaleString('en-PH')}
+                              </span>
+                              <span className="block text-[8.5px] text-emerald-600 font-bold">-40%</span>
+                            </td>
+                            {/* Wholesale Line Total */}
+                            <td className="py-2 px-3 text-right font-black text-slate-900 whitespace-nowrap">
+                              ₱{(Math.round(wholesale * stock * 100) / 100).toLocaleString('en-PH')}
+                              <span className="block text-[9px] text-slate-400 line-through font-normal">
+                                ₱{lineVal.toLocaleString('en-PH')} SRP
+                              </span>
+                            </td>
                           </tr>
                         );
                       })}
@@ -2506,7 +2891,7 @@ export default function App() {
                 <div className="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700">
                   <span className="w-5 h-5 rounded-full bg-amber-400 text-slate-950 font-black inline-flex items-center justify-center text-[10px] mb-2">2</span>
                   <p className="font-bold text-white mb-1">Warehouse Inspection</p>
-                  <p className="text-[11px] text-slate-400">Visit our Cabalwan facility (8AM-5PM) to verify steel gauges, valves, and physical packaging.</p>
+                  <p className="text-[11px] text-slate-400">Coordinate scheduled inspection with our dispatch team (8AM-5PM) to verify steel gauges, valves, and packaging.</p>
                 </div>
                 <div className="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700">
                   <span className="w-5 h-5 rounded-full bg-amber-400 text-slate-950 font-black inline-flex items-center justify-center text-[10px] mb-2">3</span>
@@ -2627,7 +3012,8 @@ export default function App() {
                         const maxDiscount = Math.max(itemDisc, storewideDiscount);
                         const effectivePrice = maxDiscount > 0 ? item.price * (1 - maxDiscount / 100) : item.price;
                         const isBulkPack = item.unit.includes('100');
-                        const qtyToBuy = catalogQuantities[item.id] || 1;
+                        const pack = getProductWholesalePack(item, isRetailMode);
+                        const qtyToBuy = catalogQuantities[item.id] || pack.minQty;
 
                         return (
                           <tr key={item.id} className="hover:bg-orange-50/40 transition-colors">
@@ -2719,8 +3105,9 @@ export default function App() {
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const cur = catalogQuantities[item.id] || 1;
-                                    if (cur > 1) setCatalogQuantities(prev => ({ ...prev, [item.id]: cur - 1 }));
+                                    const step = pack.step;
+                                    const cur = catalogQuantities[item.id] || pack.minQty;
+                                    if (cur > step) setCatalogQuantities(prev => ({ ...prev, [item.id]: cur - step }));
                                   }}
                                   className="px-2 py-1 text-slate-600 hover:bg-slate-100 font-bold select-none cursor-pointer"
                                 >
@@ -2728,26 +3115,33 @@ export default function App() {
                                 </button>
                                 <input
                                   type="number"
-                                  min="1"
+                                  min={pack.minQty}
+                                  step={pack.step}
                                   max={item.stock || 9999}
                                   value={qtyToBuy}
                                   onChange={(e) => {
-                                    const val = Math.max(1, parseInt(e.target.value, 10) || 1);
+                                    const val = Math.max(pack.minQty, parseInt(e.target.value, 10) || pack.minQty);
                                     setCatalogQuantities(prev => ({ ...prev, [item.id]: val }));
                                   }}
-                                  className="w-12 text-center text-xs font-black border-x border-slate-200 py-1 focus:outline-none focus:bg-orange-50 text-slate-900"
+                                  className="w-14 text-center text-xs font-black border-x border-slate-200 py-1 focus:outline-none focus:bg-orange-50 text-slate-900"
                                 />
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const cur = catalogQuantities[item.id] || 1;
-                                    setCatalogQuantities(prev => ({ ...prev, [item.id]: cur + 1 }));
+                                    const step = pack.step;
+                                    const cur = catalogQuantities[item.id] || pack.minQty;
+                                    setCatalogQuantities(prev => ({ ...prev, [item.id]: cur + step }));
                                   }}
                                   className="px-2 py-1 text-slate-600 hover:bg-slate-100 font-bold select-none cursor-pointer"
                                 >
                                   +
                                 </button>
                               </div>
+                              {!isRetailMode && (
+                                <span className="block text-[8px] text-amber-700 font-bold mt-0.5">
+                                  {pack.packLabel}
+                                </span>
+                              )}
                             </td>
 
                             {/* Action Add to Cart */}
@@ -2969,7 +3363,7 @@ export default function App() {
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3">
               {filteredProducts.slice(0, 18).map((item, idx) => (
-                <ProductCard key={item.id} product={item} onAddToCart={addToCart} storewideDiscount={storewideDiscount} isRightCol={idx % 2 === 1} />
+                <ProductCard key={item.id} product={item} onAddToCart={addToCart} storewideDiscount={storewideDiscount} isRetailMode={isRetailMode} isRightCol={idx % 2 === 1} />
               ))}
             </div>
           </main>
@@ -2992,7 +3386,7 @@ export default function App() {
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3">
               {filteredProducts.slice(10, 28).map((item, idx) => (
-                <ProductCard key={item.id} product={item} onAddToCart={addToCart} isVideoCard storewideDiscount={storewideDiscount} isRightCol={idx % 2 === 1} />
+                <ProductCard key={item.id} product={item} onAddToCart={addToCart} isVideoCard storewideDiscount={storewideDiscount} isRetailMode={isRetailMode} isRightCol={idx % 2 === 1} />
               ))}
             </div>
           </main>
@@ -3259,6 +3653,123 @@ export default function App() {
                     >
                       Lock Session
                     </button>
+                  </div>
+                </div>
+
+                {/* ==================== MERCHANT DASHBOARD MASTER TOGGLE: WHOLESALE VS RETAIL ==================== */}
+                <div className="bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 text-white p-5 rounded-2xl border-2 border-amber-400/80 shadow-xl space-y-4">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+                    <div>
+                      <div className="flex items-center gap-2.5">
+                        <span className="bg-amber-400 text-slate-950 text-xs font-black px-2.5 py-0.5 rounded uppercase tracking-wider shadow-sm flex items-center gap-1">
+                          <Flame className="w-3.5 h-3.5 text-red-600" /> Storefront Mode Control
+                        </span>
+                        <h3 className="text-base sm:text-lg font-black text-white">Public Landing Page &amp; Retail Gateway</h3>
+                      </div>
+                      <p className="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
+                        Control how public visitors experience your website. Toggle between <strong>Wholesale Liquidation</strong> (focuses 100% on fast warehouse liquidation with ₱15k minimum spend) or <strong>Retail Storefront</strong> (allows single-piece per-unit orders).
+                      </p>
+                    </div>
+
+                    {/* Master Dashboard Switch */}
+                    <div className="flex items-center gap-2 bg-slate-800/90 p-1.5 rounded-xl border border-slate-700 shrink-0 self-start md:self-auto">
+                      <button
+                        type="button"
+                        onClick={() => handleSetLandingMode('wholesale')}
+                        className={`px-3.5 py-2 rounded-lg text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                          defaultLandingMode === 'wholesale'
+                            ? 'bg-amber-400 text-slate-950 shadow-md ring-2 ring-white/20'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <Flame className="w-3.5 h-3.5 text-red-600 animate-pulse" /> Wholesale Liquidation (₱15k Min)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSetLandingMode('retail')}
+                        className={`px-3.5 py-2 rounded-lg text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                          defaultLandingMode === 'retail'
+                            ? 'bg-emerald-500 text-white shadow-md ring-2 ring-white/20'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <ShoppingBag className="w-3.5 h-3.5" /> Retail Per-Piece (No Min)
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Mode Status & Private Retail Gateway Links */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-1">
+                    {/* Status Box */}
+                    <div className="bg-slate-800/60 p-3.5 rounded-xl border border-slate-700 text-xs space-y-1.5">
+                      <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">Current Public Behavior</span>
+                      {defaultLandingMode === 'wholesale' ? (
+                        <div>
+                          <p className="text-amber-300 font-bold flex items-center gap-1.5">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Wholesale Liquidation Landing is ACTIVE
+                          </p>
+                          <p className="text-slate-300 text-[11px] mt-1 leading-relaxed">
+                            Public visitors landing on the homepage immediately see the <strong>Wholesale Lots tab</strong> (₱115k Structural, ₱190k Plumber, ₱130k Fasteners), ₱15k minimum order policy, and sack/box/case bulk packaging increments.
+                          </p>
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="text-emerald-300 font-bold flex items-center gap-1.5">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Retail Storefront Landing is ACTIVE
+                          </p>
+                          <p className="text-slate-300 text-[11px] mt-1 leading-relaxed">
+                            Public visitors land on the retail catalog with single-piece ordering and zero minimum spend.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Private Retail Sharer Hub */}
+                    <div className="bg-slate-800/60 p-3.5 rounded-xl border border-slate-700 text-xs space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] uppercase font-black tracking-wider text-amber-300">Private Retail Direct Link</span>
+                        <span className="text-[9px] bg-emerald-950 text-emerald-300 border border-emerald-500/40 px-2 py-0.2 rounded font-mono font-bold">
+                          Always Active
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-300 leading-tight">
+                        Send this link to specific customers who only want to buy single pieces per item:
+                      </p>
+                      
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          readOnly
+                          value={typeof window !== 'undefined' ? `${window.location.origin}/?mode=retail` : '/?mode=retail'}
+                          className="flex-1 bg-slate-900 border border-slate-700 text-amber-200 px-3 py-1.5 rounded-lg text-xs font-mono select-all focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={copyRetailLink}
+                          className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-black px-3 py-1.5 rounded-lg text-xs cursor-pointer shadow-xs transition-colors flex items-center gap-1 shrink-0"
+                        >
+                          <Copy className="w-3.5 h-3.5" /> {copiedRetailLink ? 'Copied!' : 'Copy Link'}
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={copyRetailOutreachScript}
+                          className="text-[11px] bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold px-2.5 py-1 rounded cursor-pointer transition-colors flex items-center gap-1"
+                        >
+                          <FileText className="w-3 h-3 text-amber-400" /> {copiedScript ? '✓ Script Copied!' : 'Copy SMS / Viber Outreach Message'}
+                        </button>
+                        <a
+                          href="/?mode=retail"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[11px] text-slate-400 hover:text-white underline inline-flex items-center gap-1 ml-auto"
+                        >
+                          Open Retail View <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -3887,6 +4398,50 @@ export default function App() {
                         </button>
                       </div>
                     </div>
+
+                    {/* Warehouse Breakdown Bar (Tacloban Hub Cabalwan & NulaTula) */}
+                    {warehouseSummary && warehouseSummary.breakdown && (
+                      <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white p-4 rounded-xl border border-blue-500/30 shadow-md space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="bg-amber-500 text-slate-950 text-[10px] font-black uppercase px-2 py-0.5 rounded">
+                              Combined Multi-Warehouse Total
+                            </span>
+                            <span className="text-xs font-bold text-slate-200">
+                              Overall Physical Capital: <strong className="text-amber-400 font-mono">₱{Number(warehouseSummary.overall?.total_capital || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                            </span>
+                          </div>
+                          <div className="text-xs text-emerald-400 font-bold font-mono">
+                            Potential Retail Selling: ₱{Number(warehouseSummary.overall?.total_selling_price || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          {warehouseSummary.breakdown.map((wh, idx) => (
+                            <div key={idx} className="bg-white/5 border border-white/10 rounded-lg p-3 space-y-1">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-xs text-amber-300">
+                                  {wh.warehouse.includes('Tacloban') ? '📍 ' + wh.warehouse + ' (Cabalwan)' : '📦 ' + wh.warehouse}
+                                </span>
+                                <span className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded text-slate-300 font-mono">
+                                  {wh.total_boxes} Boxes
+                                </span>
+                              </div>
+                              <div className="flex items-baseline justify-between pt-1">
+                                <span className="text-[11px] text-slate-400">Total Capital Cost:</span>
+                                <span className="text-xs font-bold font-mono text-white">
+                                  ₱{Number(wh.total_cost || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                              </div>
+                              <div className="flex items-baseline justify-between text-[11px] text-slate-400">
+                                <span>Physical Count:</span>
+                                <span className="font-mono text-slate-300">{Number(wh.total_qty || 0).toLocaleString()} units</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {/* 4 Grand Summary Metric Cards (Primary User Goal) */}
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -5463,7 +6018,7 @@ export default function App() {
                     <input
                       type="tel"
                       required
-                      placeholder="0917 123 4567"
+                      placeholder="0926 199 5703"
                       value={customer.phone}
                       onChange={e => setCustomer({ ...customer, phone: e.target.value })}
                       className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:border-[#EE4D2D] focus:outline-none"
@@ -5529,11 +6084,11 @@ export default function App() {
                           onChange={(e) => setCustomer({ ...customer, distanceKm: Math.max(1, Number(e.target.value) || 1) })}
                           className="w-20 px-2 py-1 text-xs border border-slate-300 rounded focus:outline-none focus:border-[#EE4D2D] font-bold text-slate-900 bg-white"
                         />
-                        <span className="text-xs text-slate-500 font-bold">km from Cabalwan warehouse</span>
+                        <span className="text-xs text-slate-500 font-bold">km from Tacloban Dispatch Hub</span>
                       </div>
                     ) : (
                       <div className="flex items-center justify-between text-[11px] text-slate-500 pt-0.5">
-                        <span>Origin: Cabalwan Warehouse, Tacloban</span>
+                        <span>Origin: Tacloban City, Leyte</span>
                         <span className="font-bold text-slate-700 bg-slate-200/70 px-2 py-0.5 rounded">{deliveryDistanceKm} km distance</span>
                       </div>
                     )}
@@ -5646,12 +6201,43 @@ export default function App() {
                     </div>
                   </div>
 
+                  {/* Wholesale Minimum Order Warning in Checkout */}
+                  {!isWholesaleMinMet && (
+                    <div className="bg-amber-50 border-2 border-amber-400 p-3.5 rounded-xl text-amber-950 my-3 space-y-2">
+                      <div className="flex items-center gap-2 font-black text-xs text-amber-900 uppercase">
+                        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span>Wholesale Minimum Spend Not Met (₱15,000 Required)</span>
+                      </div>
+                      <p className="text-xs text-amber-900 leading-relaxed">
+                        Mix-and-match contractor orders require a minimum spend of <strong>₱15,000</strong> (Current: ₱{cartSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}). Add <strong>₱{wholesaleDeficit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong> more to qualify.
+                      </p>
+                      <div className="flex items-center gap-3 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('lots')}
+                          className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs px-3 py-1.5 rounded-lg cursor-pointer"
+                        >
+                          Browse Wholesale Lots &rarr;
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => toggleRetailMode(true)}
+                          className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs px-3 py-1.5 rounded-lg cursor-pointer"
+                        >
+                          Enable Retail Mode (No Minimum)
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <button
                     type="submit"
-                    disabled={isSubmittingCheckout}
-                    className="w-full bg-[#EE4D2D] hover:bg-[#d73f20] disabled:opacity-60 text-white font-bold py-3 rounded-lg text-sm shadow-md cursor-pointer mt-4 flex items-center justify-center gap-2"
+                    disabled={isSubmittingCheckout || !isWholesaleMinMet}
+                    className="w-full bg-[#EE4D2D] hover:bg-[#d73f20] disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg text-sm shadow-md cursor-pointer mt-4 flex items-center justify-center gap-2"
                   >
-                    {isSubmittingCheckout ? (
+                    {!isWholesaleMinMet ? (
+                      `Wholesale Min Spend (₱15k) Not Met - Need ₱${wholesaleDeficit.toLocaleString()} More`
+                    ) : isSubmittingCheckout ? (
                       <>
                         <RefreshCw className="w-4 h-4 animate-spin" /> Verifying & Placing Order...
                       </>
@@ -5905,7 +6491,7 @@ export default function App() {
                       <span>10ft+ Long Cargo Delivery (@ ₱50/km)</span>
                     </div>
                     <p className="text-[11px] text-amber-800 leading-snug">
-                      Your cart includes long materials (e.g., {longCargoItemsInCart.map(i => i.name).slice(0, 2).join(', ')}{longCargoItemsInCart.length > 2 ? ` +${longCargoItemsInCart.length - 2} more` : ''}). Surcharge calculated at ₱50 per km from our Cabalwan warehouse.
+                      Your cart includes long materials (e.g., {longCargoItemsInCart.map(i => i.name).slice(0, 2).join(', ')}{longCargoItemsInCart.length > 2 ? ` +${longCargoItemsInCart.length - 2} more` : ''}). Surcharge calculated at ₱50 per km from Tacloban dispatch hub.
                     </p>
                   </div>
                 )}
@@ -5937,8 +6523,43 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* Wholesale Minimum Order Warning Notice */}
+                {!isWholesaleMinMet && (
+                  <div className="bg-amber-50 border-2 border-amber-400 p-3 rounded-xl text-amber-950 space-y-2 shadow-xs">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 font-black text-xs text-amber-900 uppercase tracking-wide">
+                        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span>Wholesale Minimum: ₱15,000</span>
+                      </div>
+                      <span className="text-[9px] bg-amber-200 text-amber-950 font-black px-1.5 py-0.5 rounded">
+                        REQUIRED
+                      </span>
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-amber-900">
+                      Mix-and-match contractor clearance requires a minimum order of <strong>₱15,000</strong>.
+                      Current: <strong>₱{cartSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>.
+                      Add <strong>₱{wholesaleDeficit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong> more to qualify, or buy any Whole Specialty Lot for instant checkout.
+                    </p>
+                    <div className="pt-1 flex items-center gap-2">
+                      <button
+                        onClick={() => { setIsCartOpen(false); setActiveTab('lots'); }}
+                        className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-[10px] px-2.5 py-1 rounded shadow-xs cursor-pointer flex items-center gap-1"
+                      >
+                        <Flame className="w-3 h-3 text-red-600 animate-pulse" /> View Whole Lots &rarr;
+                      </button>
+                      <button
+                        onClick={() => { toggleRetailMode(true); }}
+                        className="text-[10px] text-amber-800 underline hover:text-amber-950 cursor-pointer"
+                      >
+                        Switch to Retail Mode
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <button
                   onClick={() => {
+                    if (!isWholesaleMinMet) return;
                     if (!currentUser) {
                       setAuthPromptMessage('Account Required: Please log in or create an account to proceed to checkout.');
                       setAuthModal('login');
@@ -5947,9 +6568,16 @@ export default function App() {
                     setIsCartOpen(false);
                     setActiveTab('checkout');
                   }}
-                  className="w-full bg-[#EE4D2D] hover:bg-[#d73f20] text-white py-3 rounded-lg font-bold text-xs sm:text-sm shadow-md cursor-pointer transition-colors flex items-center justify-center gap-1.5"
+                  disabled={!isWholesaleMinMet}
+                  className={`w-full py-3 rounded-lg font-bold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-1.5 ${
+                    !isWholesaleMinMet
+                      ? 'bg-slate-300 text-slate-600 cursor-not-allowed border border-slate-300'
+                      : 'bg-[#EE4D2D] hover:bg-[#d73f20] text-white cursor-pointer'
+                  }`}
                 >
-                  Proceed to Checkout {!currentUser && '(Log In Required)'}
+                  {!isWholesaleMinMet
+                    ? `Add ₱${wholesaleDeficit.toLocaleString(undefined, { minimumFractionDigits: 0 })} more for Wholesale Min (₱15k)`
+                    : `Proceed to Checkout ${!currentUser ? '(Log In Required)' : ''}`}
                 </button>
               </div>
             )}
@@ -6276,7 +6904,7 @@ export default function App() {
                 <input
                   type={authModal === 'login' ? 'text' : 'email'}
                   required
-                  placeholder={authModal === 'login' ? 'builder@example.com or 0917...' : 'customer@example.com'}
+                  placeholder={authModal === 'login' ? 'builder@example.com or 0926 199 5703' : 'customer@example.com'}
                   value={authForm.email}
                   onChange={e => setAuthForm({ ...authForm, email: e.target.value })}
                   className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:border-[#EE4D2D] focus:outline-none"
@@ -6288,7 +6916,7 @@ export default function App() {
                   <label className="block text-[11px] font-bold text-slate-700 mb-1">Mobile Phone (for delivery SMS)</label>
                   <input
                     type="tel"
-                    placeholder="0917 123 4567"
+                    placeholder="0926 199 5703"
                     value={authForm.phone}
                     onChange={e => setAuthForm({ ...authForm, phone: e.target.value })}
                     className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:border-[#EE4D2D] focus:outline-none"
@@ -6442,14 +7070,14 @@ export default function App() {
             <div className="py-4 space-y-3 text-xs">
               <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-1">
                 <p className="font-bold text-slate-800">Direct Contractor Hotline:</p>
-                <p className="text-base font-black text-[#EE4D2D] font-mono">0917-882-9912 / (053) 888-2910</p>
+                <p className="text-base font-black text-[#EE4D2D] font-mono">0926 199 5703 / (053) 888-2910</p>
                 <p className="text-[10px] text-slate-400">Viber, SMS & WhatsApp connected</p>
               </div>
 
               <div className="space-y-1 text-slate-600">
                 <p className="flex items-center gap-1.5 font-medium">
                   <MapPin className="w-3.5 h-3.5 text-[#EE4D2D] shrink-0" />
-                  <span>Brgy. Cabalwan, Tacloban City, Leyte</span>
+                  <span>Tacloban City, Leyte (Dispatch & Pickup by Schedule)</span>
                 </p>
                 <p className="flex items-center gap-1.5 font-medium">
                   <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
@@ -6460,7 +7088,7 @@ export default function App() {
 
             <div className="pt-2 border-t border-slate-100 flex gap-2">
               <a
-                href="tel:09178829912"
+                href="tel:09261995703"
                 className="flex-1 bg-[#EE4D2D] hover:bg-[#d73f20] text-white py-2 rounded-lg text-xs font-bold text-center cursor-pointer transition-colors"
               >
                 Call Hotline
@@ -6509,147 +7137,242 @@ export default function App() {
       )}
 
       {/* ==================== CONTRACTOR LOT INSPECTION & RESERVATION MODAL ==================== */}
-      {selectedLotModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-auto">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-red-950 text-white p-5 flex items-start justify-between">
-              <div>
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded border ${selectedLotModal.badgeColor}`}>
-                    {selectedLotModal.badge}
-                  </span>
-                  <span className="text-xs text-amber-300 font-bold">
-                    Specialty Category Lot
-                  </span>
-                </div>
-                <h3 className="text-lg sm:text-xl font-black text-white">
-                  {selectedLotModal.name}
-                </h3>
-                <p className="text-xs text-slate-300 mt-1">
-                  {selectedLotModal.summary}
-                </p>
-              </div>
-              <button
-                onClick={() => setSelectedLotModal(null)}
-                className="text-white/70 hover:text-white p-1 rounded-lg hover:bg-white/10 cursor-pointer transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      {selectedLotModal && (() => {
+        // Resolve all catalog items matching this specialty lot
+        const lotItems = getLotProducts(selectedLotModal.id, products);
+        const filteredLotItems = lotItems.filter(p => {
+          if (!lotModalSearch) return true;
+          const q = lotModalSearch.toLowerCase();
+          return (p.name || '').toLowerCase().includes(q) || (p.id || '').toLowerCase().includes(q) || (p.category || '').toLowerCase().includes(q);
+        });
 
-            {/* Body */}
-            <div className="p-5 max-h-[60vh] overflow-y-auto space-y-4">
-              {/* Valuation vs Lot Price Summary */}
-              <div className="bg-amber-50 rounded-xl p-4 border border-amber-200 flex flex-wrap items-center justify-between gap-3">
+        const totalLotUnits = filteredLotItems.reduce((sum, p) => sum + (Number(p.stock) || 0), 0);
+
+        return (
+          <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+            <div className="w-full max-w-5xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-auto flex flex-col max-h-[92vh]">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-red-950 text-white p-4 sm:p-5 flex items-start justify-between shrink-0 border-b border-amber-500/20">
                 <div>
-                  <span className="text-[11px] text-slate-500 line-through block">
-                    Total Retail Valuation: ₱{selectedLotModal.retailValue.toLocaleString('en-PH')}
-                  </span>
-                  <span className="text-2xl font-black text-slate-900">
-                    ₱{selectedLotModal.lotPrice.toLocaleString('en-PH')}
-                  </span>
-                  <span className="text-[11px] text-emerald-700 font-bold block">
-                    Spot Cash / Direct Buyout Price
-                  </span>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded border ${selectedLotModal.badgeColor}`}>
+                      {selectedLotModal.badge}
+                    </span>
+                    <span className="text-xs text-amber-300 font-bold">
+                      Specialty Category Lot Manifest
+                    </span>
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-black text-white">
+                    {selectedLotModal.name}
+                  </h3>
+                  <p className="text-xs text-slate-300 mt-0.5">
+                    {selectedLotModal.summary}
+                  </p>
                 </div>
-                <div className="text-right">
-                  <span className="bg-emerald-600 text-white text-xs font-black px-2.5 py-1 rounded-md shadow-2xs">
-                    SAVE ₱{selectedLotModal.savings.toLocaleString('en-PH')}
-                  </span>
-                  <span className="text-xs text-slate-600 block mt-1 font-semibold">
-                    ~{selectedLotModal.discountPercent}% OFF Retail
+                <button
+                  onClick={() => { setSelectedLotModal(null); setLotModalSearch(''); }}
+                  className="text-white/70 hover:text-white p-1 rounded-lg hover:bg-white/10 cursor-pointer transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Price Banner: Spot Cash Lot Buyout & Savings (No Total Warehouse Stock Value shown) */}
+              <div className="p-4 sm:p-5 pb-0 shrink-0 space-y-3">
+                <div className="bg-gradient-to-r from-slate-900 to-slate-950 text-white rounded-xl p-3.5 sm:p-4 border border-amber-500/30 shadow-xs flex flex-wrap items-center justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] uppercase font-black tracking-wider text-amber-400">
+                        1-Click Buyout Package:
+                      </span>
+                      <span className="text-xl sm:text-2xl font-black text-emerald-400 leading-none">
+                        ₱{selectedLotModal.lotPrice.toLocaleString('en-PH')}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-300">
+                      Spot cash take-all buyout for all {lotItems.length} line items in this specialty lot.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="bg-emerald-500 text-slate-950 text-xs font-black px-3 py-1 rounded-md shadow-xs">
+                      SAVE ₱{selectedLotModal.savings.toLocaleString('en-PH')}
+                    </span>
+                    <span className="text-xs text-emerald-300 font-bold">
+                      ~{selectedLotModal.discountPercent}% OFF SRP
+                    </span>
+                  </div>
+                </div>
+
+                {/* Search Bar inside Lot Manifest (Matching User Screenshot Layout) */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
+                  <div className="relative flex-1 w-full">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder={`Search ${lotItems.length} items in this lot (e.g. PPR, PVC Union, Elbow)...`}
+                      value={lotModalSearch}
+                      onChange={(e) => setLotModalSearch(e.target.value)}
+                      className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-amber-400 focus:bg-white transition-colors"
+                    />
+                    {lotModalSearch && (
+                      <button
+                        onClick={() => setLotModalSearch('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+
+                  <span className="text-xs text-slate-500 font-semibold whitespace-nowrap self-end sm:self-center">
+                    Showing <strong>{filteredLotItems.length}</strong> of <strong>{lotItems.length}</strong> lot items
                   </span>
                 </div>
               </div>
 
-              {/* Itemized Manifest Breakdown */}
-              <div>
-                <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wider mb-2 flex items-center justify-between">
-                  <span>Included Items & Manifest Breakdown:</span>
-                  <span className="text-slate-500 font-normal">{selectedLotModal.details.length} line items</span>
-                </h4>
-                <div className="border border-slate-200 rounded-xl overflow-hidden text-xs">
-                  <table className="w-full text-left">
-                    <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+              {/* Exact Data Table Format from User Screenshot */}
+              <div className="p-4 sm:p-5 flex-1 overflow-y-auto">
+                <div className="overflow-x-auto border border-slate-200 rounded-xl max-h-[380px] overflow-y-auto shadow-2xs">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="bg-slate-100 text-slate-700 font-bold sticky top-0 z-10 border-b border-slate-200 text-[11px]">
                       <tr>
-                        <th className="py-2 px-3">Description</th>
-                        <th className="py-2 px-3 text-right">Physical Quantity</th>
-                        <th className="py-2 px-3 text-right">Retail Value</th>
+                        <th className="py-2.5 px-3">SKU</th>
+                        <th className="py-2.5 px-3">Product Description</th>
+                        <th className="py-2.5 px-3">Category</th>
+                        <th className="py-2.5 px-3 text-right">Physical Stock</th>
+                        <th className="py-2.5 px-3 text-right">Retail Unit</th>
+                        <th className="py-2.5 px-3 text-right text-emerald-700 font-black">40% Wholesale</th>
+                        <th className="py-2.5 px-3 text-right">Line Valuation</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-slate-700">
-                      {selectedLotModal.details.map((item, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50">
-                          <td className="py-2 px-3 font-medium text-slate-900">{item.name}</td>
-                          <td className="py-2 px-3 text-right font-bold">{item.qty}</td>
-                          <td className="py-2 px-3 text-right text-slate-600">₱{item.retailVal.toLocaleString('en-PH')}</td>
+                      {filteredLotItems.map((item) => {
+                        const stock = Math.max(0, Number(item.stock) || 0);
+                        const price = Number(item.price) || 0;
+                        const wholesale = Math.round(price * 0.60 * 100) / 100;
+                        const lineVal = price * stock;
+                        return (
+                          <tr key={item.id} className="hover:bg-amber-50/40 transition-colors">
+                            {/* SKU: light gray monospace font */}
+                            <td className="py-2 px-3 font-mono text-[11px] text-slate-500 whitespace-nowrap">
+                              {item.id}
+                            </td>
+                            {/* Product Description: bold dark font */}
+                            <td className="py-2 px-3 font-bold text-slate-900 leading-snug">
+                              {item.name}
+                            </td>
+                            {/* Category: muted text */}
+                            <td className="py-2 px-3 text-slate-500 text-[11px] whitespace-nowrap">
+                              {item.category}
+                            </td>
+                            {/* Physical Stock: bold count with unit */}
+                            <td className="py-2 px-3 text-right font-bold text-slate-900 whitespace-nowrap">
+                              {stock} <span className="text-[10px] font-normal text-slate-500">{item.unit || 'pc'}</span>
+                            </td>
+                            {/* Retail Unit (SRP) with strike out */}
+                            <td className="py-2 px-3 text-right whitespace-nowrap font-medium text-slate-700">
+                              <span className="line-through text-slate-400 mr-1">₱{price.toLocaleString('en-PH')}</span>
+                            </td>
+                            {/* 40% Wholesale: emerald green bold (#059669) */}
+                            <td className="py-2 px-3 text-right bg-emerald-50/50 whitespace-nowrap font-black text-emerald-700">
+                              ₱{wholesale.toLocaleString('en-PH')}
+                            </td>
+                            {/* Line Valuation: bold black text */}
+                            <td className="py-2 px-3 text-right font-black text-slate-900 whitespace-nowrap">
+                              ₱{lineVal.toLocaleString('en-PH')}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {filteredLotItems.length === 0 && (
+                        <tr>
+                          <td colSpan={7} className="py-8 text-center text-slate-400">
+                            No items in this lot matched "{lotModalSearch}".
+                          </td>
                         </tr>
-                      ))}
+                      )}
                     </tbody>
+                    <tfoot className="bg-slate-50 font-bold border-t-2 border-slate-200 text-slate-900 text-xs sticky bottom-0">
+                      <tr>
+                        <td className="py-2.5 px-3 font-black uppercase text-[11px]" colSpan={3}>
+                          Total Verified Lot Breakdown ({filteredLotItems.length} SKUs)
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-black">
+                          {totalLotUnits} Units
+                        </td>
+                        <td className="py-2.5 px-3 text-right text-slate-400 text-[10px]">
+                          (Per-Unit Benchmark)
+                        </td>
+                        <td className="py-2.5 px-3 text-right bg-emerald-100 text-emerald-900 font-black text-xs">
+                          40% OFF Wholesale
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-black text-[#EE4D2D]">
+                          Buyout: ₱{selectedLotModal.lotPrice.toLocaleString('en-PH')}
+                        </td>
+                      </tr>
+                    </tfoot>
                   </table>
+                </div>
+
+                {/* Dispatch & Pickup Note (NO WAREHOUSE ADDRESS) */}
+                <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 text-slate-600 text-xs space-y-1 mt-3">
+                  <p className="font-bold text-slate-900">Commercial Buyout Conditions:</p>
+                  <p>• <strong>Inspection &amp; Pickup:</strong> Available upon scheduled coordination in Tacloban City (Call/SMS 0926 199 5703).</p>
+                  <p>• <strong>Payment:</strong> 100% Manager's Check, Real-time PesoNet / InstaPay bank transfer, or cash prior to release.</p>
+                  <p>• <strong>Trucking / Hauling:</strong> Buyer provides transport, or dispatch team can assist with trusted local haulers.</p>
                 </div>
               </div>
 
-              {/* Terms */}
-              <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 text-slate-600 text-xs space-y-1">
-                <p className="font-bold text-slate-900">Buyout & Pickup Conditions:</p>
-                <p>• <strong>Inspection:</strong> Open 8:00 AM – 5:00 PM at Cabalwan / Abucay Warehouse, Tacloban City.</p>
-                <p>• <strong>Payment:</strong> 100% Manager's Check, Real-time PesoNet / InstaPay bank transfer, or cash prior to hauling.</p>
-                <p>• <strong>Trucking:</strong> Buyer provides transport, or dispatch team can assist with local haulers.</p>
-              </div>
-            </div>
+              {/* Footer Buttons with 0926 199 5703 hotline */}
+              <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
+                <div className="flex items-center gap-2">
+                  <a
+                    href="tel:09261995703"
+                    className="bg-slate-900 hover:bg-black text-amber-400 font-black px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-xs transition-colors"
+                  >
+                    <Phone className="w-3.5 h-3.5" /> Call Dispatch: 0926 199 5703
+                  </a>
+                  <a
+                    href={`https://wa.me/639261995703?text=Hello%20Manna%20Hardware%20Dispatch.%20I%20am%20interested%20in%20inspecting%20and%20reserving%20${encodeURIComponent(selectedLotModal.name)}%20for%20₱${selectedLotModal.lotPrice.toLocaleString('en-PH')}.%20Please%20confirm%20availability%20and%20schedule.`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1 cursor-pointer shadow-2xs transition-all"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5" /> Viber
+                  </a>
+                  <button
+                    onClick={() => {
+                      const brief = `${selectedLotModal.name}\nBuyout Price: ₱${selectedLotModal.lotPrice.toLocaleString('en-PH')}\nSavings: ₱${selectedLotModal.savings.toLocaleString('en-PH')}\nLocation: Tacloban City, Leyte\nDispatch Hotline: 0926 199 5703`;
+                      navigator.clipboard.writeText(brief);
+                      setLotCopiedId(selectedLotModal.id);
+                      setTimeout(() => setLotCopiedId(null), 2500);
+                    }}
+                    className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+                  >
+                    <Copy className="w-3.5 h-3.5 text-slate-500" /> {lotCopiedId === selectedLotModal.id ? 'Copied Lot Brief!' : 'Copy Summary'}
+                  </button>
+                </div>
 
-            {/* Footer Buttons */}
-            <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
-              <button
-                onClick={() => {
-                  const brief = `${selectedLotModal.name}\nBuyout Price: ₱${selectedLotModal.lotPrice.toLocaleString('en-PH')} (Retail: ₱${selectedLotModal.retailValue.toLocaleString('en-PH')})\nSavings: ₱${selectedLotModal.savings.toLocaleString('en-PH')}\nWarehouse: Cabalwan, Tacloban City\nDispatch Hotline: 0917-882-9912`;
-                  navigator.clipboard.writeText(brief);
-                  setLotCopiedId(selectedLotModal.id);
-                  setTimeout(() => setLotCopiedId(null), 2500);
-                }}
-                className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-bold px-3 py-2 rounded-lg text-xs flex items-center gap-1.5 cursor-pointer"
-              >
-                {lotCopiedId === selectedLotModal.id ? (
-                  <>
-                    <Check className="w-3.5 h-3.5 text-emerald-600" /> Copied Brief!
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3.5 h-3.5" /> Copy Deal Brief
-                  </>
-                )}
-              </button>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <a
-                  href="tel:09178829912"
-                  className="bg-slate-800 hover:bg-slate-700 text-white font-bold px-3 py-2 rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-colors"
-                >
-                  <Phone className="w-3.5 h-3.5" /> Call
-                </a>
-                <a
-                  href={`https://wa.me/639178829912?text=Hello%20Manna%20Hardware%20Dispatch.%20I%20am%20interested%20in%20inspecting%20and%20reserving%20${encodeURIComponent(selectedLotModal.name)}%20for%20₱${selectedLotModal.lotPrice.toLocaleString('en-PH')}.%20Please%20confirm%20availability%20and%20schedule.`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-2 rounded-lg text-xs flex items-center gap-1 cursor-pointer shadow-2xs transition-all"
-                >
-                  <MessageCircle className="w-3.5 h-3.5" /> Viber
-                </a>
-                <button
-                  onClick={() => buyWholeLot(selectedLotModal)}
-                  className="bg-gradient-to-r from-amber-500 to-[#EE4D2D] hover:from-amber-600 hover:to-[#d73f20] text-white font-black px-4 py-2 rounded-lg text-xs flex items-center gap-1.5 cursor-pointer shadow-md transition-all active:scale-95"
-                >
-                  <ShoppingCart className="w-4 h-4 stroke-[2.5]" />
-                  <span>Buy Whole Lot (₱{selectedLotModal.lotPrice.toLocaleString('en-PH')})</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => { setSelectedLotModal(null); setLotModalSearch(''); }}
+                    className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold rounded-xl cursor-pointer transition-colors"
+                  >
+                    Close
+                  </button>
+                  <button
+                    onClick={() => buyWholeLot(selectedLotModal)}
+                    className="bg-gradient-to-r from-amber-500 via-orange-500 to-[#EE4D2D] hover:from-amber-600 hover:via-orange-600 hover:to-[#d73f20] text-white text-xs sm:text-sm font-black py-2.5 px-4 rounded-xl cursor-pointer shadow-md transition-all active:scale-98 flex items-center gap-1.5"
+                  >
+                    <ShoppingCart className="w-4 h-4 stroke-[2.5]" /> BUY WHOLE LOT (₱{selectedLotModal.lotPrice.toLocaleString('en-PH')})
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
-
+        );
+      })()}
 
       {/* ==================== MODAL: PRINTABLE COMMERCIAL SALES INVOICE & DISPATCH MANIFEST ==================== */}
       {invoiceModalOrder && (
@@ -6740,11 +7463,11 @@ export default function App() {
                     </p>
                     <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
                       <MapPin className="w-3.5 h-3.5 text-[#EE4D2D] shrink-0" />
-                      Brgy. 91, Cabalwan, Maharlika Highway, Tacloban City, Leyte 6500
+                      Tacloban City, Leyte 6500 (Dispatch Hub)
                     </p>
                     <p className="text-xs text-slate-500 mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
                       <span><strong>Hotline:</strong> (053) 832-4911</span>
-                      <span><strong>Mobile/Viber:</strong> 0917-826-5120</span>
+                      <span><strong>Mobile/Viber:</strong> 0926 199 5703</span>
                       <span><strong>Email:</strong> sales@mannahardware.ph</span>
                     </p>
                   </div>
@@ -6791,7 +7514,7 @@ export default function App() {
                       <p className="text-slate-500 mt-0.5">Email: {invoiceModalOrder.customer.email}</p>
                     )}
                     <p className="text-slate-700 mt-1 leading-relaxed">
-                      <strong>Delivery Site:</strong> {invoiceModalOrder.customer?.address || 'Pickup at Manna Cabalwan Warehouse'}
+                      <strong>Delivery Site:</strong> {invoiceModalOrder.customer?.address || 'Pickup / Scheduled Dispatch in Tacloban City'}
                     </p>
                     {invoiceModalOrder.customer?.deliveryZone && (
                       <p className="text-slate-600 mt-0.5">
@@ -6825,7 +7548,7 @@ export default function App() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500">Dispatch Depot:</span>
-                      <span className="text-slate-700 font-medium">Manna Central Hub (Cabalwan)</span>
+                      <span className="text-slate-700 font-medium">Tacloban Dispatch Hub</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500">Estimated Distance:</span>
@@ -7067,7 +7790,7 @@ export default function App() {
 }
 
 // ==================== MANNA PRODUCT CARD COMPONENT ====================
-function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = false, storewideDiscount = 0 }) {
+function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = false, storewideDiscount = 0, isRetailMode = false }) {
   const getDisplaySold = (p) => {
     let s = typeof p.sold === 'number' ? p.sold : null;
     if (s === null || isNaN(s)) {
@@ -7096,6 +7819,10 @@ function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = f
   const effectivePrice = maxDiscount > 0 ? product.price * (1 - maxDiscount / 100) : product.price;
   const isBulkPack = product.unit && product.unit.includes('100');
 
+  // Wholesale Pack Calculator
+  const pack = getProductWholesalePack(product, isRetailMode);
+  const packTotalPrice = effectivePrice * pack.minQty;
+
   return (
     <div className="bg-white rounded-sm overflow-hidden border border-[#EAEAEA] flex flex-col group relative shadow-2xs hover:shadow-md transition-shadow">
       
@@ -7112,10 +7839,15 @@ function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = f
           }}
         />
 
-        {/* Bulk 100-pack Badge */}
-        {isBulkPack && (
-          <div className="absolute top-1.5 left-1.5 bg-blue-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-xs">
-            PACK OF 100
+        {/* Wholesale Pack Badge vs Retail */}
+        {isRetailMode ? (
+          <div className="absolute top-1.5 left-1.5 bg-emerald-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-xs flex items-center gap-1">
+            <span>🛍️</span> RETAIL (PER PC)
+          </div>
+        ) : (
+          <div className="absolute top-1.5 left-1.5 bg-slate-900 text-amber-400 border border-amber-400/40 text-[8px] font-black px-1.5 py-0.5 rounded shadow-xs flex items-center gap-1">
+            <Box className="w-2.5 h-2.5 text-amber-400 shrink-0" />
+            <span>{pack.packLabel.toUpperCase()}</span>
           </div>
         )}
 
@@ -7173,12 +7905,18 @@ function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = f
         <div className="mt-2">
           <div className="flex items-baseline justify-between">
             <span className="text-[#EE4D2D] font-extrabold text-sm sm:text-base leading-none tracking-tight">
-              ₱{Math.floor(effectivePrice).toLocaleString()}
+              ₱{Math.floor(isRetailMode ? effectivePrice : packTotalPrice).toLocaleString()}
             </span>
             <span className="text-[10px] text-[#757575] font-normal">
               {soldCount} sold
             </span>
           </div>
+
+          {!isRetailMode && pack.minQty > 1 && (
+            <p className="text-[8.5px] text-slate-500 font-medium mt-0.5 truncate">
+              ₱{Math.floor(effectivePrice).toLocaleString()}/{product.unit || 'pc'} &bull; Min: {pack.packLabel}
+            </p>
+          )}
 
           {/* Delivery estimate & Location */}
           <div className="flex items-center justify-between mt-1.5 text-[9px] text-[#757575] border-t border-slate-50 pt-1">
@@ -7187,11 +7925,12 @@ function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = f
             </span>
             <span className="truncate max-w-[70px] text-[#757575]">{location}</span>
             <button 
-              onClick={() => onAddToCart(product)}
-              className="text-[#757575] hover:text-[#EE4D2D] cursor-pointer"
-              title="Add to cart"
+              onClick={() => onAddToCart(product, pack.minQty)}
+              className="text-white bg-[#EE4D2D] hover:bg-[#d73f20] px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-0.5 shadow-xs cursor-pointer transition-colors"
+              title={isRetailMode ? "Add 1 pc to cart" : `Add ${pack.packLabel} to cart`}
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className="w-3 h-3" />
+              <span>{isRetailMode ? 'Add' : `+${pack.minQty}`}</span>
             </button>
           </div>
         </div>

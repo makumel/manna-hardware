@@ -504,10 +504,38 @@ app.get('/api/admin/warehouse/boxes/:box_no', adminAuth, (req, res) => {
   res.json(rows);
 });
 
-// 4. Get distinct warehouses
+// 4. Get distinct warehouses and summary breakdown
 app.get('/api/admin/warehouse/warehouses', adminAuth, (req, res) => {
   const rows = db.prepare("SELECT DISTINCT warehouse FROM item_locations ORDER BY warehouse ASC").all();
   res.json(rows.map(r => r.warehouse));
+});
+
+app.get('/api/admin/warehouse/summary', adminAuth, (req, res) => {
+  const breakdown = db.prepare(`
+    SELECT 
+      warehouse,
+      COUNT(DISTINCT box_no) as total_boxes,
+      COUNT(*) as total_records,
+      SUM(qty) as total_qty,
+      SUM(qty * price) as total_cost
+    FROM item_locations
+    GROUP BY warehouse
+    ORDER BY total_cost DESC
+  `).all();
+
+  const overall = db.prepare(`
+    SELECT 
+      COUNT(*) as total_skus,
+      SUM(stock) as total_stock,
+      SUM(capital * stock) as total_capital,
+      SUM(price * stock) as total_selling_price
+    FROM products
+  `).get();
+
+  res.json({
+    breakdown,
+    overall
+  });
 });
 
 // 5. Ingest new inventory items from another warehouse / incoming quote file

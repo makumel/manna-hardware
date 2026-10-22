@@ -160,35 +160,38 @@ export const WHOLESALE_TIERS = [
 
 // Wholesale case/box/sack packaging calculator vs per-piece retail
 // Filter catalog SKUs matching a specific Wholesale Specialty Lot
-export function getLotProducts(lotId, allProducts) {
+export function getLotProducts(lotId, allProducts, includeCancelled = false) {
   if (!allProducts || allProducts.length === 0) return [];
+  const baseProducts = includeCancelled 
+    ? allProducts 
+    : allProducts.filter(p => !p.isCancelled && p.status !== 'cancelled');
   switch (lotId) {
     case 'structural-lot':
-      return allProducts.filter(p => {
+      return baseProducts.filter(p => {
         const cat = (p.category || '').toLowerCase();
         const n = (p.name || '').toLowerCase();
         return cat.includes('structural') || n.includes('purlin') || n.includes('plain bar') || n.includes('angle bar') || n.includes('deformed') || n.includes('tex screw') || (n.includes('screw') && n.includes('metal'));
       });
     case 'plumber-lot':
-      return allProducts.filter(p => {
+      return baseProducts.filter(p => {
         const cat = (p.category || '').toLowerCase();
         const n = (p.name || '').toLowerCase();
         return cat.includes('plumbing') || cat.includes('valves') || cat.includes('kitchen') || n.includes('ppr') || n.includes('pvc') || n.includes('gi pipe') || n.includes('pipe') || n.includes('teflon') || n.includes('valve') || n.includes('faucet') || n.includes('elbow') || n.includes('tee') || n.includes('coupling') || n.includes('union') || n.includes('nipple');
       });
     case 'fastener-lot':
-      return allProducts.filter(p => {
+      return baseProducts.filter(p => {
         const cat = (p.category || '').toLowerCase();
         const n = (p.name || '').toLowerCase();
         return cat.includes('fastener') || n.includes('nail') || n.includes('rivet') || n.includes('screw') || n.includes('bolt') || n.includes('dyna') || n.includes('anchor') || n.includes('washer') || n.includes('nut');
       });
     case 'paint-lot':
-      return allProducts.filter(p => {
+      return baseProducts.filter(p => {
         const cat = (p.category || '').toLowerCase();
         const n = (p.name || '').toLowerCase();
         return cat.includes('paint') || n.includes('paint') || n.includes('primer') || n.includes('enamel') || n.includes('sandpaper') || n.includes('roller') || n.includes('brush') || n.includes('thinner') || n.includes('lacquer') || n.includes('coat');
       });
     case 'electrical-lot':
-      return allProducts.filter(p => {
+      return baseProducts.filter(p => {
         const cat = (p.category || '').toLowerCase();
         const n = (p.name || '').toLowerCase();
         return cat.includes('electrical') || cat.includes('tools') || n.includes('bulb') || n.includes('firefly') || n.includes('wire') || n.includes('dewalt') || n.includes('drill') || n.includes('switch') || n.includes('outlet') || n.includes('breaker') || n.includes('conduit') || n.includes('receptacle');
@@ -816,9 +819,10 @@ const renderPopups = () => (
     return ['All', ...new Set(products.map(p => p.category))];
   }, [products]);
 
-  // Filtered products for public views
+  // Filtered products for public views (excludes cancelled / inconsistency items)
   const filteredProducts = useMemo(() => {
     return products.filter(p => {
+      if (p.isCancelled || p.status === 'cancelled') return false;
       const matchCat = selectedCategory === 'All' || p.category === selectedCategory;
       const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           p.id.toLowerCase().includes(searchQuery.toLowerCase());
@@ -962,10 +966,18 @@ const renderPopups = () => (
   // Sorted and filtered products for Merchant Dashboard
   const sortedDashboardProducts = useMemo(() => {
     let list = products.filter(p => {
-      // Stock filter
-      if (dashboardStockFilter === 'low' && (p.stock >= 10 || p.stock <= 0)) return false;
-      if (dashboardStockFilter === 'out' && p.stock > 0) return false;
-      if (dashboardStockFilter === 'in' && p.stock <= 0) return false;
+      const isItemCancelled = Boolean(p.isCancelled || p.status === 'cancelled');
+
+      // Stock & Inconsistency filter
+      if (dashboardStockFilter === 'cancelled') {
+        if (!isItemCancelled) return false;
+      } else if (dashboardStockFilter === 'low') {
+        if (p.stock >= 10 || p.stock <= 0 || isItemCancelled) return false;
+      } else if (dashboardStockFilter === 'out') {
+        if (p.stock > 0 || isItemCancelled) return false;
+      } else if (dashboardStockFilter === 'in') {
+        if (p.stock <= 0 || isItemCancelled) return false;
+      }
 
       if (!itemSearchTerm) return true;
       const term = itemSearchTerm.toLowerCase();
@@ -1063,8 +1075,14 @@ const renderPopups = () => (
     let totalStockCount = 0;
     let outOfStockCount = 0;
     let lowStockCount = 0;
+    let cancelledProductCount = 0;
 
     products.forEach(p => {
+      const isCancelled = Boolean(p.isCancelled || p.status === 'cancelled');
+      if (isCancelled) {
+        cancelledProductCount++;
+        return; // Exclude cancelled / discrepancy items from active valuation
+      }
       const stock = Math.max(0, Number(p.stock || 0));
       const cap = Number(p.capital || 0);
       const prc = Number(p.price || 0);
@@ -1082,6 +1100,8 @@ const renderPopups = () => (
     return {
       validOrdersCount: validOrders.length,
       cancelledOrdersCount: cancelledOrders.length,
+      cancelledProductCount,
+      activeProductCount: products.length - cancelledProductCount,
       totalGrossRevenue,
       totalCOGS,
       grossProfit,
@@ -1392,7 +1412,15 @@ const renderPopups = () => (
 
   const handleInlineStockChange = (id, newStock) => {
     const stockVal = Math.max(0, parseInt(newStock, 10) || 0);
-    setProducts(prev => prev.map(p => p.id === id ? { ...p, stock: stockVal } : p));
+    setProducts(prev => {
+      const updated = prev.map(p => p.id === id ? { ...p, stock: stockVal } : p);
+      try {
+        localStorage.setItem('manna_products', JSON.stringify(updated));
+      } catch (err) {
+        console.warn('LocalStorage save error:', err);
+      }
+      return updated;
+    });
     fetch(`/api/admin/products/${id}`, {
       method: 'PATCH',
       headers: {
@@ -1400,6 +1428,88 @@ const renderPopups = () => (
         'x-admin-key': 'asenso123'
       },
       body: JSON.stringify({ stock: stockVal })
+    }).catch(() => {});
+  };
+
+  const handleInlineDiscountChange = (id, newDiscount) => {
+    const discVal = Math.max(0, Math.min(95, parseFloat(newDiscount) || 0));
+    setProducts(prev => {
+      const updated = prev.map(p => p.id === id ? { ...p, discount_percent: discVal } : p);
+      try {
+        localStorage.setItem('manna_products', JSON.stringify(updated));
+      } catch (err) {
+        console.warn('LocalStorage save error:', err);
+      }
+      return updated;
+    });
+    fetch(`/api/admin/products/${id}/discount`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-key': 'asenso123'
+      },
+      body: JSON.stringify({ discount_percent: discVal })
+    }).catch(() => {});
+  };
+
+  const handleSaveDiscounts = async () => {
+    try {
+      const res = await fetch('/api/admin/save-discounts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': 'asenso123'
+        },
+        body: JSON.stringify({
+          discounts: products.map(p => ({ id: p.id, discount_percent: Number(p.discount_percent || 0) })),
+          storewideDiscount
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        localStorage.setItem('manna_products', JSON.stringify(products));
+        alert('All discounts have been successfully saved to database and public catalog files!');
+      } else {
+        alert('Notice: Saved locally in browser session.');
+      }
+    } catch (err) {
+      localStorage.setItem('manna_products', JSON.stringify(products));
+      alert('Saved discounts to local store session successfully!');
+    }
+  };
+
+  const handleToggleCancelItem = (id, customReason = 'Discrepancy with actual warehouse physical stock') => {
+    setProducts(prev => {
+      const target = prev.find(p => p.id === id);
+      if (!target) return prev;
+      const willCancel = !target.isCancelled && target.status !== 'cancelled';
+      const updated = prev.map(p => {
+        if (p.id === id) {
+          return {
+            ...p,
+            isCancelled: willCancel,
+            status: willCancel ? 'cancelled' : 'active',
+            cancelReason: willCancel ? customReason : undefined,
+            cancelledAt: willCancel ? new Date().toISOString() : undefined
+          };
+        }
+        return p;
+      });
+      try {
+        localStorage.setItem('manna_products', JSON.stringify(updated));
+      } catch (err) {
+        console.warn('LocalStorage save error:', err);
+      }
+      return updated;
+    });
+
+    fetch(`/api/admin/products/${id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-key': 'asenso123'
+      },
+      body: JSON.stringify({ isCancelled: true, status: 'cancelled' })
     }).catch(() => {});
   };
 
@@ -1833,7 +1943,9 @@ const renderPopups = () => (
         price: Number(editingItem.price),
         capital: Number(editingItem.capital),
         stock: Number(editingItem.stock),
-        discount_percent: Number(editingItem.discount_percent || 0)
+        discount_percent: Number(editingItem.discount_percent || 0),
+        isCancelled: Boolean(editingItem.isCancelled || editingItem.status === 'cancelled'),
+        status: (editingItem.isCancelled || editingItem.status === 'cancelled') ? 'cancelled' : 'active'
       } : p));
     }
     setItemModal(null);
@@ -2489,7 +2601,7 @@ const renderPopups = () => (
                     Commercial Warehouse Liquidation & Specialty Category Lots
                   </h1>
                   <p className="text-xs sm:text-sm text-slate-300 mt-2 leading-relaxed">
-                    Direct liquidation of commercial-grade hardware supplies and construction materials. Available in pre-packaged <strong>Specialty Category Lots</strong> or tiered bulk orders at <strong>20% to 40% below retail</strong> for general contractors, engineering firms, and hardware store resellers.
+                    Direct liquidation of Heavy-Duty (HD) and Premium hardware supplies and construction materials. Sold strictly on an <strong>As-Is, Where-Is</strong> basis—featuring warehouse surplus overstock and showroom display inventory priced at deep clearance discounts, verified 100% genuine, sound, and fully contractor-ready. Available in pre-packaged <strong>Specialty Category Lots</strong> or tiered bulk orders at <strong>20% to 40% below retail</strong>.
                   </p>
                 </div>
 
@@ -2555,8 +2667,8 @@ const renderPopups = () => (
                     Pre-packaged lots priced for immediate contractor acquisition and retail store inventory replenishment.
                   </p>
                 </div>
-                <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full w-fit">
-                  As-Is, Where-Is • Cash Before Load
+                <span className="text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full w-fit">
+                  As-Is, Where-Is • Showroom Display & Surplus Liquidation (Cash Before Load)
                 </span>
               </div>
 
@@ -2792,6 +2904,21 @@ const renderPopups = () => (
                 </select>
               </div>
 
+              {/* Admin Stock Audit Notice if Authenticated */}
+              {isMerchantAuthenticated && (
+                <div className="bg-amber-50 border border-amber-300 rounded-xl p-3 mb-3 flex items-center justify-between text-xs text-amber-950 shadow-2xs">
+                  <div className="flex items-center gap-2">
+                    <span className="bg-amber-600 text-white font-black text-[9px] px-1.5 py-0.5 rounded uppercase">
+                      Admin Floor Audit Mode
+                    </span>
+                    <span className="font-semibold text-slate-800">
+                      Discrepancies found? You can type physical counts directly or click <strong>Cancel Item</strong> to remove mismatches from this master manifest.
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-amber-800 font-mono font-bold">Auto-Syncing</span>
+                </div>
+              )}
+
               {/* Manifest Data Table */}
               <div className="overflow-x-auto border border-slate-200 rounded-xl max-h-[500px] overflow-y-auto">
                 <table className="w-full text-left text-xs border-collapse">
@@ -2817,11 +2944,16 @@ const renderPopups = () => (
                         <span>Wholesale Line Total</span>
                         <span className="text-[9px] text-slate-400 font-normal block">(Total Value)</span>
                       </th>
+                      {isMerchantAuthenticated && (
+                        <th className="py-2.5 px-3 text-center w-28 bg-amber-100/70 text-amber-900 font-black">Admin Action</th>
+                      )}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-slate-700">
                     {products
                       .filter(p => {
+                        // Buyers only see active verified items; admin sees all including cancelled for reconciliation
+                        if (!isMerchantAuthenticated && (p.isCancelled || p.status === 'cancelled')) return false;
                         const matchCat = manifestCategoryFilter === 'All' || p.category === manifestCategoryFilter;
                         if (!matchCat) return false;
                         if (!manifestSearchQuery) return true;
@@ -2830,21 +2962,49 @@ const renderPopups = () => (
                       })
                       .slice(0, 150)
                       .map((item) => {
+                        const isItemCancelled = Boolean(item.isCancelled || item.status === 'cancelled');
                         const stock = Math.max(0, Number(item.stock) || 0);
                         const price = Number(item.price) || 0;
                         const wholesale = Math.round(price * 0.60 * 100) / 100;
                         const lineVal = price * stock;
                         return (
-                          <tr key={item.id} className="hover:bg-amber-50/40 transition-colors">
+                          <tr key={item.id} className={`transition-colors ${isItemCancelled ? 'bg-rose-50/40 text-slate-400' : 'hover:bg-amber-50/40'}`}>
                             <td className="py-2 px-3 font-mono text-[11px] text-slate-500">{item.id}</td>
-                            <td className="py-2 px-3 font-medium text-slate-900">{item.name}</td>
+                            <td className="py-2 px-3 font-medium leading-snug">
+                              {isItemCancelled ? (
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  <span className="bg-rose-600 text-white text-[9px] font-black px-1.5 py-0.2 rounded uppercase not-italic no-underline">
+                                    Cancelled Discrepancy
+                                  </span>
+                                  <span className="line-through text-slate-400">{item.name}</span>
+                                </div>
+                              ) : (
+                                <span className="text-slate-900">{item.name}</span>
+                              )}
+                            </td>
                             <td className="py-2 px-3 text-slate-500 text-[11px]">{item.category}</td>
-                            <td className="py-2 px-3 text-center font-bold text-slate-900 whitespace-nowrap">
-                              {stock} <span className="text-[10px] font-normal text-slate-500">{item.unit || 'pc'}</span>
+                            <td className="py-2 px-3 text-center whitespace-nowrap">
+                              {isMerchantAuthenticated ? (
+                                <div className="inline-flex items-center justify-center gap-1">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={item.stock}
+                                    onChange={(e) => handleInlineStockChange(item.id, e.target.value)}
+                                    className="w-16 px-1.5 py-0.5 text-center font-black text-xs border border-amber-400 bg-amber-50/50 rounded focus:bg-white focus:outline-none"
+                                    title="Adjust actual physical count"
+                                  />
+                                  <span className="text-[10px] text-slate-500">{item.unit || 'pc'}</span>
+                                </div>
+                              ) : (
+                                <span className="font-bold text-slate-900">
+                                  {stock} <span className="text-[10px] font-normal text-slate-500">{item.unit || 'pc'}</span>
+                                </span>
+                              )}
                             </td>
                             {/* SRP with Strike Out */}
                             <td className="py-2 px-3 text-right whitespace-nowrap">
-                              <span className="line-through text-slate-400 font-semibold">
+                              <span className={`line-through font-semibold ${isItemCancelled ? 'text-slate-300' : 'text-slate-400'}`}>
                                 ₱{price.toLocaleString('en-PH')}
                               </span>
                             </td>
@@ -2853,19 +3013,43 @@ const renderPopups = () => (
                               ₱{(Number(item.capital) || Math.round(price * 0.78 * 100) / 100).toLocaleString('en-PH')}
                             </td>
                             {/* Discounted Wholesale Price */}
-                            <td className="py-2 px-3 text-right bg-emerald-50/50 whitespace-nowrap">
-                              <span className="font-black text-emerald-700 text-xs">
+                            <td className={`py-2 px-3 text-right whitespace-nowrap ${isItemCancelled ? 'text-slate-400' : 'bg-emerald-50/50'}`}>
+                              <span className={`font-black text-xs ${isItemCancelled ? 'text-slate-400' : 'text-emerald-700'}`}>
                                 ₱{wholesale.toLocaleString('en-PH')}
                               </span>
                               <span className="block text-[8.5px] text-emerald-600 font-bold">-40%</span>
                             </td>
                             {/* Wholesale Line Total */}
-                            <td className="py-2 px-3 text-right font-black text-slate-900 whitespace-nowrap">
+                            <td className={`py-2 px-3 text-right font-black whitespace-nowrap ${isItemCancelled ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
                               ₱{(Math.round(wholesale * stock * 100) / 100).toLocaleString('en-PH')}
                               <span className="block text-[9px] text-slate-400 line-through font-normal">
                                 ₱{lineVal.toLocaleString('en-PH')} SRP
                               </span>
                             </td>
+                            {/* Admin Action Column */}
+                            {isMerchantAuthenticated && (
+                              <td className="py-2 px-3 text-center whitespace-nowrap bg-amber-50/30">
+                                <button
+                                  onClick={() => handleToggleCancelItem(item.id)}
+                                  className={`px-2 py-1 rounded text-[10px] font-bold cursor-pointer transition-colors inline-flex items-center gap-1 ${
+                                    isItemCancelled
+                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs'
+                                      : 'bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white border border-rose-200'
+                                  }`}
+                                  title={isItemCancelled ? 'Restore item back into master manifest' : 'Cancel item due to warehouse discrepancy / damaged stock'}
+                                >
+                                  {isItemCancelled ? (
+                                    <>
+                                      <CheckCircle2 className="w-3 h-3" /> Restore
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Ban className="w-3 h-3" /> Cancel Item
+                                    </>
+                                  )}
+                                </button>
+                              </td>
+                            )}
                           </tr>
                         );
                       })}
@@ -3841,136 +4025,167 @@ const renderPopups = () => (
                   </div>
                 </div>
 
-                {/* 3. Sub-Navigation Tabs Bar (7 Enterprise ERP Tabs) */}
-                <div className="flex border-b border-slate-200 bg-white rounded-t-xl px-4 pt-3 gap-1 sm:gap-2 overflow-x-auto">
-                  <button
-                    onClick={() => setDashboardTab('analytics')}
-                    className={`pb-3 px-3 text-xs sm:text-sm font-bold flex items-center gap-1.5 border-b-2 cursor-pointer transition-colors whitespace-nowrap ${
-                      dashboardTab === 'analytics' 
-                        ? 'border-[#EE4D2D] text-[#EE4D2D]' 
-                        : 'border-transparent text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    <BarChart3 className="w-4 h-4" />
-                    Charts &amp; Trends
-                  </button>
+                {/* 3. Side Tab Layout Container (Sidebar + Content Workspace) */}
+                <div className="flex flex-col lg:flex-row gap-5 items-start">
+                  
+                  {/* Left Side Navigation Sidebar */}
+                  <aside className="w-full lg:w-64 bg-white rounded-xl border border-slate-200 shadow-xs p-3 shrink-0 lg:sticky lg:top-20 space-y-1">
+                    <div className="px-3 py-2 text-[10px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-100 mb-1">
+                      Dashboard Navigation
+                    </div>
 
-                  <button
-                    onClick={() => setDashboardTab('pnl')}
-                    className={`pb-3 px-3 text-xs sm:text-sm font-bold flex items-center gap-1.5 border-b-2 cursor-pointer transition-colors whitespace-nowrap ${
-                      dashboardTab === 'pnl' 
-                        ? 'border-[#EE4D2D] text-[#EE4D2D]' 
-                        : 'border-transparent text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    <TrendingUp className="w-4 h-4" />
-                    P&amp;L Statement
-                  </button>
-
-                  <button
-                    onClick={() => setDashboardTab('valuation')}
-                    className={`pb-3 px-3 text-xs sm:text-sm font-bold flex items-center gap-1.5 border-b-2 cursor-pointer transition-colors whitespace-nowrap ${
-                      dashboardTab === 'valuation' 
-                        ? 'border-[#1E3A8A] text-[#1E3A8A]' 
-                        : 'border-transparent text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    <FileSpreadsheet className="w-4 h-4 text-[#1E3A8A]" />
-                    Cost &amp; Potential Report
-                    <span className="bg-amber-100 text-amber-900 text-[10px] px-1.5 py-0.2 rounded-full font-bold">
-                      Owner Only
-                    </span>
-                  </button>
-
-                  <button
-                    onClick={() => setDashboardTab('sales-log')}
-                    className={`pb-3 px-3 text-xs sm:text-sm font-bold flex items-center gap-1.5 border-b-2 cursor-pointer transition-colors whitespace-nowrap ${
-                      dashboardTab === 'sales-log' 
-                        ? 'border-[#EE4D2D] text-[#EE4D2D]' 
-                        : 'border-transparent text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    <Receipt className="w-4 h-4" />
-                    Sales Log &amp; Tracker
-                    <span className="bg-slate-100 text-slate-700 text-[10px] px-1.5 py-0.2 rounded-full font-mono">
-                      {financialMetrics.itemizedSales.length}
-                    </span>
-                  </button>
-
-                  <button
-                    onClick={() => setDashboardTab('inventory')}
-                    className={`pb-3 px-3 text-xs sm:text-sm font-bold flex items-center gap-1.5 border-b-2 cursor-pointer transition-colors whitespace-nowrap ${
-                      dashboardTab === 'inventory' 
-                        ? 'border-[#EE4D2D] text-[#EE4D2D]' 
-                        : 'border-transparent text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    <Layers className="w-4 h-4" />
-                    Inventory &amp; SKUs
-                    <span className="bg-slate-100 text-slate-700 text-[10px] px-1.5 py-0.2 rounded-full font-mono">
-                      {products.length}
-                    </span>
-                  </button>
-
-                  <button
-                    onClick={() => setDashboardTab('orders')}
-                    className={`pb-3 px-3 text-xs sm:text-sm font-bold flex items-center gap-1.5 border-b-2 cursor-pointer transition-colors whitespace-nowrap ${
-                      dashboardTab === 'orders' 
-                        ? 'border-[#EE4D2D] text-[#EE4D2D]' 
-                        : 'border-transparent text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    <ShoppingBag className="w-4 h-4" />
-                    Orders &amp; Fulfillment
-                    <span className="bg-orange-100 text-[#EE4D2D] text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold">
-                      {orders.length}
-                    </span>
-                  </button>
-
-                  <button
-                    onClick={() => setDashboardTab('insights')}
-                    className={`pb-3 px-3 text-xs sm:text-sm font-bold flex items-center gap-1.5 border-b-2 cursor-pointer transition-colors whitespace-nowrap ${
-                      dashboardTab === 'insights' 
-                        ? 'border-[#EE4D2D] text-[#EE4D2D]' 
-                        : 'border-transparent text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    <Sparkles className="w-4 h-4 text-purple-600" />
-                    Forecast &amp; Deadstock
-                  </button>
-
-                  <button
-                    onClick={() => setDashboardTab('warehouse-boxes')}
-                    className={`pb-3 px-3 text-xs sm:text-sm font-bold flex items-center gap-1.5 border-b-2 cursor-pointer transition-colors whitespace-nowrap ${
-                      dashboardTab === 'warehouse-boxes' 
-                        ? 'border-[#EE4D2D] text-[#EE4D2D]' 
-                        : 'border-transparent text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    <Box className="w-4 h-4 text-amber-600" />
-                    Box &amp; Quote Retrieval
-                    <span className="bg-amber-100 text-amber-900 text-[10px] px-1.5 py-0.2 rounded-full font-bold">
-                      Staff Pick
-                    </span>
-                  </button>
-
-                  <button
-                    onClick={() => setDashboardTab('promotions')}
-                    className={`pb-3 px-3 text-xs sm:text-sm font-bold flex items-center gap-1.5 border-b-2 cursor-pointer transition-colors whitespace-nowrap ${
-                      dashboardTab === 'promotions' 
-                        ? 'border-[#EE4D2D] text-[#EE4D2D]' 
-                        : 'border-transparent text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    <Flame className="w-4 h-4 text-orange-500" />
-                    Discounts &amp; Vouchers
-                    {storewideDiscount > 0 && (
-                      <span className="bg-rose-100 text-rose-700 text-[10px] px-1.5 py-0.2 rounded-full font-bold">
-                        {storewideDiscount}% ON
+                    <button
+                      onClick={() => setDashboardTab('inventory')}
+                      className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold flex items-center justify-between transition-colors cursor-pointer ${
+                        dashboardTab === 'inventory' 
+                          ? 'bg-[#EE4D2D] text-white shadow-xs' 
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <Layers className="w-4 h-4" /> Inventory &amp; SKUs
                       </span>
-                    )}
-                  </button>
-                </div>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${
+                        dashboardTab === 'inventory' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+                      }`}>
+                        {products.length}
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => setDashboardTab('promotions')}
+                      className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold flex items-center justify-between transition-colors cursor-pointer ${
+                        dashboardTab === 'promotions' 
+                          ? 'bg-[#EE4D2D] text-white shadow-xs' 
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <Flame className="w-4 h-4 text-orange-400" /> Discounts &amp; Vouchers
+                      </span>
+                      {storewideDiscount > 0 && (
+                        <span className="text-[10px] bg-rose-500 text-white font-bold px-1.5 py-0.5 rounded">
+                          {storewideDiscount}%
+                        </span>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={() => setDashboardTab('warehouse-boxes')}
+                      className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold flex items-center justify-between transition-colors cursor-pointer ${
+                        dashboardTab === 'warehouse-boxes' 
+                          ? 'bg-[#EE4D2D] text-white shadow-xs' 
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <Box className="w-4 h-4 text-amber-500" /> Box &amp; Quote Retrieval
+                      </span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                        dashboardTab === 'warehouse-boxes' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-900'
+                      }`}>
+                        Pick
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => setDashboardTab('orders')}
+                      className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold flex items-center justify-between transition-colors cursor-pointer ${
+                        dashboardTab === 'orders' 
+                          ? 'bg-[#EE4D2D] text-white shadow-xs' 
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <ShoppingBag className="w-4 h-4" /> Orders &amp; Fulfillment
+                      </span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
+                        dashboardTab === 'orders' ? 'bg-white/20 text-white' : 'bg-orange-100 text-[#EE4D2D]'
+                      }`}>
+                        {orders.length}
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => setDashboardTab('valuation')}
+                      className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold flex items-center justify-between transition-colors cursor-pointer ${
+                        dashboardTab === 'valuation' 
+                          ? 'bg-blue-900 text-white shadow-xs' 
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <FileSpreadsheet className="w-4 h-4 text-blue-400" /> Cost &amp; Valuation
+                      </span>
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded font-black ${
+                        dashboardTab === 'valuation' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-900'
+                      }`}>
+                        Owner
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => setDashboardTab('pnl')}
+                      className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer ${
+                        dashboardTab === 'pnl' 
+                          ? 'bg-[#EE4D2D] text-white shadow-xs' 
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      <TrendingUp className="w-4 h-4" /> P&amp;L Statement
+                    </button>
+
+                    <button
+                      onClick={() => setDashboardTab('analytics')}
+                      className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer ${
+                        dashboardTab === 'analytics' 
+                          ? 'bg-[#EE4D2D] text-white shadow-xs' 
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      <BarChart3 className="w-4 h-4" /> Charts &amp; Trends
+                    </button>
+
+                    <button
+                      onClick={() => setDashboardTab('sales-log')}
+                      className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold flex items-center justify-between transition-colors cursor-pointer ${
+                        dashboardTab === 'sales-log' 
+                          ? 'bg-[#EE4D2D] text-white shadow-xs' 
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <Receipt className="w-4 h-4" /> Sales Log
+                      </span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-mono">
+                        {financialMetrics.itemizedSales.length}
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => setDashboardTab('insights')}
+                      className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer ${
+                        dashboardTab === 'insights' 
+                          ? 'bg-[#EE4D2D] text-white shadow-xs' 
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      <Sparkles className="w-4 h-4 text-purple-500" /> Forecast &amp; Deadstock
+                    </button>
+
+                    {/* Quick Save Discounts Action in Sidebar */}
+                    <div className="pt-3 border-t border-slate-100">
+                      <button
+                        onClick={handleSaveDiscounts}
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs py-2 px-3 rounded-lg shadow-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                      >
+                        <Check className="w-3.5 h-3.5" /> Save All Discounts
+                      </button>
+                    </div>
+                  </aside>
+
+                  {/* Right Content Workspace */}
+                  <div className="flex-1 min-w-0 w-full">
 
                 {/* ==================== SUBTAB 1: CHARTS & GRAPHS ==================== */}
                 {dashboardTab === 'analytics' && (
@@ -5069,7 +5284,17 @@ const renderPopups = () => (
                               : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
                           }`}
                         >
-                          In Stock ({products.filter(p => p.stock > 0).length})
+                          In Stock ({products.filter(p => p.stock > 0 && !p.isCancelled && p.status !== 'cancelled').length})
+                        </button>
+                        <button
+                          onClick={() => setDashboardStockFilter('cancelled')}
+                          className={`px-3 py-1.5 rounded-lg font-bold cursor-pointer transition-colors ${
+                            dashboardStockFilter === 'cancelled'
+                              ? 'bg-rose-700 text-white shadow-xs'
+                              : 'bg-rose-50 text-rose-800 hover:bg-rose-100 border border-rose-200'
+                          }`}
+                        >
+                          Cancelled / Discrepancies ({financialMetrics.cancelledProductCount || 0})
                         </button>
                       </div>
                     </div>
@@ -5242,7 +5467,14 @@ const renderPopups = () => (
                                       }}
                                     />
                                     <div className="min-w-0">
-                                      <p className="font-bold text-slate-900 truncate max-w-xs">{item.name}</p>
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <p className={`font-bold truncate max-w-xs ${item.isCancelled || item.status === 'cancelled' ? 'line-through text-slate-400' : 'text-slate-900'}`}>{item.name}</p>
+                                        {(item.isCancelled || item.status === 'cancelled') && (
+                                          <span className="bg-rose-600 text-white text-[9px] font-black px-1.5 py-0.2 rounded uppercase">
+                                            Discrepancy / Cancelled
+                                          </span>
+                                        )}
+                                      </div>
                                       {item.description && (
                                         <p className="text-[10px] text-slate-400 truncate max-w-xs">{item.description}</p>
                                       )}
@@ -5276,39 +5508,65 @@ const renderPopups = () => (
                                       value={item.stock}
                                       onChange={e => handleInlineStockChange(item.id, e.target.value)}
                                       className="w-16 px-1.5 py-1 text-center font-bold text-xs border border-slate-300 rounded bg-white focus:border-[#EE4D2D] focus:outline-none"
-                                      title="Type to manually adjust quantity/stock"
+                                      title="Type to manually adjust quantity/stock to resolve actual warehouse discrepancy"
                                     />
                                     <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                                      item.stock <= 0 
-                                        ? 'bg-rose-100 text-rose-700' 
-                                        : item.stock < 10 
-                                          ? 'bg-amber-100 text-amber-800' 
-                                          : 'bg-emerald-100 text-emerald-800'
+                                      item.isCancelled || item.status === 'cancelled'
+                                        ? 'bg-rose-100 text-rose-700'
+                                        : item.stock <= 0 
+                                          ? 'bg-rose-100 text-rose-700' 
+                                          : item.stock < 10 
+                                            ? 'bg-amber-100 text-amber-800' 
+                                            : 'bg-emerald-100 text-emerald-800'
                                     }`}>
-                                      {item.stock <= 0 ? 'OUT' : item.stock < 10 ? 'LOW' : 'OK'}
+                                      {item.isCancelled || item.status === 'cancelled' ? 'VOID' : item.stock <= 0 ? 'OUT' : item.stock < 10 ? 'LOW' : 'OK'}
                                     </span>
                                   </div>
                                 </td>
 
                                 <td className="py-2.5 px-3 text-center">
-                                  {item.discount_percent > 0 ? (
-                                    <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                                      {item.discount_percent}% OFF
-                                    </span>
-                                  ) : (
-                                    <span className="text-slate-400 font-mono">0%</span>
-                                  )}
+                                  <div className="inline-flex items-center gap-1 justify-center">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="95"
+                                      value={item.discount_percent || 0}
+                                      onChange={e => handleInlineDiscountChange(item.id, e.target.value)}
+                                      className={`w-14 px-1 py-0.5 text-center font-bold text-xs border rounded focus:outline-none ${
+                                        Number(item.discount_percent || 0) > 0 
+                                          ? 'border-emerald-400 bg-emerald-50/70 text-emerald-800 focus:bg-white' 
+                                          : 'border-slate-300 bg-white text-slate-700 focus:border-[#EE4D2D]'
+                                      }`}
+                                      title="Type discount percentage (e.g. 20 for 20% OFF)"
+                                    />
+                                    <span className="text-[10px] font-bold text-slate-500">%</span>
+                                  </div>
                                 </td>
 
                                 <td className="py-2.5 px-3 text-center">
                                   <div className="flex items-center justify-center gap-1.5">
+                                    <button
+                                      onClick={() => handleToggleCancelItem(item.id)}
+                                      className={`p-1.5 rounded cursor-pointer transition-colors ${
+                                        item.isCancelled || item.status === 'cancelled'
+                                          ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
+                                          : 'text-amber-700 bg-amber-50 hover:bg-rose-100 hover:text-rose-700'
+                                      }`}
+                                      title={item.isCancelled || item.status === 'cancelled' ? 'Restore item back to active inventory' : 'Cancel item (actual warehouse discrepancy / damaged)'}
+                                    >
+                                      {item.isCancelled || item.status === 'cancelled' ? (
+                                        <CheckCircle2 className="w-3.5 h-3.5" />
+                                      ) : (
+                                        <Ban className="w-3.5 h-3.5" />
+                                      )}
+                                    </button>
                                     <button
                                       onClick={() => {
                                         setEditingItem({ ...item });
                                         setItemModal('edit');
                                       }}
                                       className="p-1.5 text-blue-600 hover:bg-blue-50 rounded cursor-pointer"
-                                      title="Edit Item"
+                                      title="Edit Item Details"
                                     >
                                       <Edit3 className="w-3.5 h-3.5" />
                                     </button>
@@ -5862,6 +6120,25 @@ const renderPopups = () => (
 {dashboardTab === 'promotions' && (
                   <div className="bg-white p-4 sm:p-5 rounded-b-xl border border-slate-200 border-t-0 shadow-xs space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Save Discount Action Banner */}
+                      <div className="md:col-span-2 bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-transparent p-4 rounded-xl border border-amber-300 flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-[#EE4D2D] text-white flex items-center justify-center font-black">
+                            <Tag className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h4 className="font-black text-sm text-slate-900">Live Discount &amp; Pricing Synchronization</h4>
+                            <p className="text-xs text-slate-500">Save and publish all storewide and per-item discounts immediately to public catalog files and database.</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={handleSaveDiscounts}
+                          className="bg-[#EE4D2D] hover:bg-[#d73f20] text-white font-black text-xs px-6 py-2.5 rounded-lg shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+                        >
+                          <Check className="w-4 h-4" /> Save Discounts
+                        </button>
+                      </div>
+
                       {/* Storewide Flash Discount */}
                       <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
                         <div className="flex items-center justify-between mb-2">
@@ -5919,7 +6196,8 @@ const renderPopups = () => (
                     </div>
                   </div>
                 )}
-
+                  </div>
+                </div>
               </div>
             )}
           </main>
@@ -6708,6 +6986,37 @@ const renderPopups = () => (
                 />
               </div>
 
+              {/* Discrepancy & Cancellation Status Toggle */}
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="font-bold text-slate-800 text-xs block">Warehouse Stock Status & Online Visibility</span>
+                    <span className="text-[11px] text-slate-500">Cancel or delist if actual physical inventory differs or is damaged</span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!editingItem.isCancelled && editingItem.status !== 'cancelled'}
+                      onChange={e => {
+                        const isActive = e.target.checked;
+                        setEditingItem({
+                          ...editingItem,
+                          isCancelled: !isActive,
+                          status: isActive ? 'active' : 'cancelled'
+                        });
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                  </label>
+                </div>
+                {(editingItem.isCancelled || editingItem.status === 'cancelled') && (
+                  <div className="text-[11px] text-rose-700 bg-rose-50 border border-rose-200 p-2 rounded-lg font-medium">
+                    ⚠️ <strong>Item Cancelled / Discrepancy Marked:</strong> This SKU is excluded from customer-facing lot manifests and catalog checkout until restocked or restored.
+                  </div>
+                )}
+              </div>
+
               <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
@@ -7138,15 +7447,17 @@ const renderPopups = () => (
 
       {/* ==================== CONTRACTOR LOT INSPECTION & RESERVATION MODAL ==================== */}
       {selectedLotModal && (() => {
-        // Resolve all catalog items matching this specialty lot
-        const lotItems = getLotProducts(selectedLotModal.id, products);
+        // Resolve all catalog items matching this specialty lot (admin sees all items including cancelled for floor reconciliation)
+        const lotItems = getLotProducts(selectedLotModal.id, products, isMerchantAuthenticated);
         const filteredLotItems = lotItems.filter(p => {
           if (!lotModalSearch) return true;
           const q = lotModalSearch.toLowerCase();
           return (p.name || '').toLowerCase().includes(q) || (p.id || '').toLowerCase().includes(q) || (p.category || '').toLowerCase().includes(q);
         });
 
-        const totalLotUnits = filteredLotItems.reduce((sum, p) => sum + (Number(p.stock) || 0), 0);
+        // Calculate verified active (non-cancelled) units and valuations
+        const activeLotItems = filteredLotItems.filter(p => !p.isCancelled && p.status !== 'cancelled');
+        const totalLotUnits = activeLotItems.reduce((sum, p) => sum + (Number(p.stock) || 0), 0);
 
         return (
           <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
@@ -7204,6 +7515,23 @@ const renderPopups = () => (
                   </div>
                 </div>
 
+                {/* Admin Stock Discrepancy Controls Banner */}
+                {isMerchantAuthenticated && (
+                  <div className="bg-amber-50 border border-amber-300 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-amber-950 shadow-2xs">
+                    <div className="flex items-center gap-2">
+                      <span className="bg-amber-600 text-white font-black text-[10px] px-2 py-0.5 rounded uppercase tracking-wider">
+                        Admin Audit Mode
+                      </span>
+                      <span className="font-semibold text-slate-800">
+                        Warehouse stock discrepancy? Adjust physical counts directly or click <strong>Cancel Item</strong> below.
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-amber-800 font-mono font-bold whitespace-nowrap">
+                      Live Manifest Sync Active
+                    </span>
+                  </div>
+                )}
+
                 {/* Search Bar inside Lot Manifest (Matching User Screenshot Layout) */}
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
                   <div className="relative flex-1 w-full">
@@ -7244,44 +7572,97 @@ const renderPopups = () => (
                         <th className="py-2.5 px-3 text-right">Retail Unit</th>
                         <th className="py-2.5 px-3 text-right text-emerald-700 font-black">40% Wholesale</th>
                         <th className="py-2.5 px-3 text-right">Line Valuation</th>
+                        {isMerchantAuthenticated && (
+                          <th className="py-2.5 px-3 text-center w-28 bg-amber-100/70 text-amber-900 font-black">Admin Action</th>
+                        )}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-slate-700">
                       {filteredLotItems.map((item) => {
+                        const isItemCancelled = Boolean(item.isCancelled || item.status === 'cancelled');
                         const stock = Math.max(0, Number(item.stock) || 0);
                         const price = Number(item.price) || 0;
                         const wholesale = Math.round(price * 0.60 * 100) / 100;
                         const lineVal = price * stock;
                         return (
-                          <tr key={item.id} className="hover:bg-amber-50/40 transition-colors">
+                          <tr key={item.id} className={`transition-colors ${isItemCancelled ? 'bg-rose-50/40 text-slate-400' : 'hover:bg-amber-50/40'}`}>
                             {/* SKU: light gray monospace font */}
                             <td className="py-2 px-3 font-mono text-[11px] text-slate-500 whitespace-nowrap">
                               {item.id}
                             </td>
-                            {/* Product Description: bold dark font */}
-                            <td className="py-2 px-3 font-bold text-slate-900 leading-snug">
-                              {item.name}
+                            {/* Product Description */}
+                            <td className="py-2 px-3 font-bold leading-snug">
+                              {isItemCancelled ? (
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="bg-rose-600 text-white text-[9px] font-black px-1.5 py-0.2 rounded uppercase not-italic no-underline">
+                                    Cancelled Discrepancy
+                                  </span>
+                                  <span className="line-through text-slate-400">{item.name}</span>
+                                </div>
+                              ) : (
+                                <span className="text-slate-900">{item.name}</span>
+                              )}
                             </td>
                             {/* Category: muted text */}
                             <td className="py-2 px-3 text-slate-500 text-[11px] whitespace-nowrap">
                               {item.category}
                             </td>
-                            {/* Physical Stock: bold count with unit */}
-                            <td className="py-2 px-3 text-right font-bold text-slate-900 whitespace-nowrap">
-                              {stock} <span className="text-[10px] font-normal text-slate-500">{item.unit || 'pc'}</span>
+                            {/* Physical Stock: editable if admin, bold count if buyer */}
+                            <td className="py-2 px-3 text-right whitespace-nowrap">
+                              {isMerchantAuthenticated ? (
+                                <div className="inline-flex items-center justify-end gap-1">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={item.stock}
+                                    onChange={(e) => handleInlineStockChange(item.id, e.target.value)}
+                                    className="w-16 px-1.5 py-0.5 text-right font-black text-xs border border-amber-400 bg-amber-50/50 rounded focus:bg-white focus:outline-none"
+                                    title="Adjust physical warehouse count"
+                                  />
+                                  <span className="text-[10px] text-slate-500">{item.unit || 'pc'}</span>
+                                </div>
+                              ) : (
+                                <div className="font-bold text-slate-900">
+                                  {stock} <span className="text-[10px] font-normal text-slate-500">{item.unit || 'pc'}</span>
+                                </div>
+                              )}
                             </td>
                             {/* Retail Unit (SRP) with strike out */}
                             <td className="py-2 px-3 text-right whitespace-nowrap font-medium text-slate-700">
-                              <span className="line-through text-slate-400 mr-1">₱{price.toLocaleString('en-PH')}</span>
+                              <span className={`line-through mr-1 ${isItemCancelled ? 'text-slate-300' : 'text-slate-400'}`}>₱{price.toLocaleString('en-PH')}</span>
                             </td>
                             {/* 40% Wholesale: emerald green bold (#059669) */}
-                            <td className="py-2 px-3 text-right bg-emerald-50/50 whitespace-nowrap font-black text-emerald-700">
+                            <td className={`py-2 px-3 text-right whitespace-nowrap font-black ${isItemCancelled ? 'text-slate-400' : 'bg-emerald-50/50 text-emerald-700'}`}>
                               ₱{wholesale.toLocaleString('en-PH')}
                             </td>
-                            {/* Line Valuation: bold black text */}
-                            <td className="py-2 px-3 text-right font-black text-slate-900 whitespace-nowrap">
+                            {/* Line Valuation */}
+                            <td className={`py-2 px-3 text-right font-black whitespace-nowrap ${isItemCancelled ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
                               ₱{lineVal.toLocaleString('en-PH')}
                             </td>
+                            {/* Admin Action Column */}
+                            {isMerchantAuthenticated && (
+                              <td className="py-2 px-3 text-center whitespace-nowrap bg-amber-50/30">
+                                <button
+                                  onClick={() => handleToggleCancelItem(item.id)}
+                                  className={`px-2 py-1 rounded text-[10px] font-bold cursor-pointer transition-colors inline-flex items-center gap-1 ${
+                                    isItemCancelled
+                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs'
+                                      : 'bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white border border-rose-200'
+                                  }`}
+                                  title={isItemCancelled ? 'Restore item back into lot manifest' : 'Cancel item due to warehouse discrepancy / damaged stock'}
+                                >
+                                  {isItemCancelled ? (
+                                    <>
+                                      <CheckCircle2 className="w-3 h-3" /> Restore
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Ban className="w-3 h-3" /> Cancel Item
+                                    </>
+                                  )}
+                                </button>
+                              </td>
+                            )}
                           </tr>
                         );
                       })}
@@ -7296,7 +7677,7 @@ const renderPopups = () => (
                     <tfoot className="bg-slate-50 font-bold border-t-2 border-slate-200 text-slate-900 text-xs sticky bottom-0">
                       <tr>
                         <td className="py-2.5 px-3 font-black uppercase text-[11px]" colSpan={3}>
-                          Total Verified Lot Breakdown ({filteredLotItems.length} SKUs)
+                          Total Verified Lot Breakdown ({activeLotItems.length} active SKUs, {totalLotUnits.toLocaleString('en-PH')} units)
                         </td>
                         <td className="py-2.5 px-3 text-right font-black">
                           {totalLotUnits} Units
@@ -7839,6 +8220,13 @@ function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = f
           }}
         />
 
+        {/* Prominent Per-Item Discount Banner on top right */}
+        {maxDiscount > 0 && (
+          <div className="absolute top-1.5 right-1.5 bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded shadow-md z-10 flex items-center gap-0.5">
+            <span>{maxDiscount}% OFF</span>
+          </div>
+        )}
+
         {/* Wholesale Pack Badge vs Retail */}
         {isRetailMode ? (
           <div className="absolute top-1.5 left-1.5 bg-emerald-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-xs flex items-center gap-1">
@@ -7894,8 +8282,8 @@ function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = f
               Wholesale Deal
             </span>
             {maxDiscount > 0 && (
-              <span className="bg-emerald-600 text-white text-[8px] font-black px-1 rounded-xs leading-none py-0.5">
-                -{maxDiscount}%
+              <span className="bg-red-600 text-white text-[9px] font-black px-1.5 rounded-xs leading-tight py-0.5 tracking-tight shadow-xs flex items-center gap-0.5 animate-pulse">
+                <span>🔥</span> {maxDiscount}% OFF
               </span>
             )}
           </div>

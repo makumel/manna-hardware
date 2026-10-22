@@ -1,5 +1,7 @@
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
 const { db, seedProductsFromCatalog } = require('./db');
 const {
   hashPassword,
@@ -431,7 +433,49 @@ app.post('/api/admin/products/:id/discount', adminAuth, (req, res) => {
   if (result.changes === 0) {
     return res.status(404).json({ error: 'Product not found' });
   }
+
+  // Also sync changes directly to public catalog.json so public files immediately reflect discounts
+  try {
+    const allProducts = db.prepare("SELECT * FROM products ORDER BY name ASC").all();
+    const catPath = path.join(__dirname, 'storefront-app', 'src', 'catalog.json');
+    const rootCatPath = path.join(__dirname, 'catalog.json');
+    fs.writeFileSync(catPath, JSON.stringify(allProducts, null, 2), 'utf-8');
+    fs.writeFileSync(rootCatPath, JSON.stringify(allProducts, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Error writing catalog.json:', err);
+  }
+
   res.json({ success: true, id: req.params.id, discount_percent: discountVal });
+});
+
+// Admin Save All Discounts to public files & database
+app.post('/api/admin/save-discounts', adminAuth, (req, res) => {
+  const { discounts, storewideDiscount } = req.body;
+  
+  if (Array.isArray(discounts)) {
+    const updateStmt = db.prepare("UPDATE products SET discount_percent = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+    const runBatch = db.transaction((list) => {
+      for (const item of list) {
+        if (item.id && item.discount_percent !== undefined) {
+          updateStmt.run(Math.max(0, Math.min(100, Number(item.discount_percent || 0))), item.id);
+        }
+      }
+    });
+    runBatch(discounts);
+  }
+
+  // Sync to catalog.json in storefront-app/src and root
+  try {
+    const allProducts = db.prepare("SELECT * FROM products ORDER BY name ASC").all();
+    const catPath = path.join(__dirname, 'storefront-app', 'src', 'catalog.json');
+    const rootCatPath = path.join(__dirname, 'catalog.json');
+    fs.writeFileSync(catPath, JSON.stringify(allProducts, null, 2), 'utf-8');
+    fs.writeFileSync(rootCatPath, JSON.stringify(allProducts, null, 2), 'utf-8');
+    res.json({ success: true, message: 'Discounts successfully saved to database and public catalog.json files', totalCount: allProducts.length });
+  } catch (err) {
+    console.error('Failed to sync catalog.json:', err);
+    res.status(500).json({ error: 'Failed to write public catalog files', details: err.message });
+  }
 });
 
 // ==================== INTERNAL WAREHOUSE & BOX PICK LOCATION API (ADMIN ONLY) ====================

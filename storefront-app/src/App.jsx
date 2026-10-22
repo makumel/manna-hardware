@@ -2463,9 +2463,11 @@ const renderPopups = () => (
             >
               <div className="relative">
                 <ShoppingCart className="w-6 h-6 stroke-[1.8]" />
-                <span className="absolute -top-1 -right-1.5 bg-white text-[#EE4D2D] text-[9px] font-black px-1 py-0.2 rounded-full border border-[#EE4D2D] leading-tight">
-                  {cart.reduce((s, i) => s + i.quantity, 0) > 0 ? cart.reduce((s, i) => s + i.quantity, 0) : '99+'}
-                </span>
+                {cart.reduce((s, i) => s + i.quantity, 0) > 0 && (
+                  <span className="absolute -top-1 -right-1.5 bg-white text-[#EE4D2D] text-[9px] font-black px-1.5 py-0.2 rounded-full border border-[#EE4D2D] leading-tight">
+                    {cart.reduce((s, i) => s + i.quantity, 0) > 99 ? '99+' : cart.reduce((s, i) => s + i.quantity, 0)}
+                  </span>
+                )}
               </div>
               <span className="hidden lg:inline text-xs font-bold">
                 {cartSubtotal > 0 ? `₱${cartSubtotal.toLocaleString()}` : 'Cart'}
@@ -2619,19 +2621,22 @@ const renderPopups = () => (
                   </span>
                 </button>
 
-                {/* 1B. Authentic Hardware Items in Story Rings (NO FACES!) */}
+                {/* 1B. Structural, Plumbing & Hardware Items in Story Rings (NO FACES!) */}
                 {[
+                  { name: 'Steel Purlins', cat: 'Structural & Building Materials', search: 'purlin', img: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRJ1lDF-ht6yaqParkahCFb91OYZoNf7fsHZoLZhP8q7g&s=10' },
+                  { name: 'Angle Bars', cat: 'Structural & Building Materials', search: 'angle bar', img: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTJzVHyZ12Skv8mdJfdA16ZpAhOWE03o76OVgrOxW1ffA&s=10' },
+                  { name: 'Brass Valves', cat: 'Plumbing & Fixtures', search: 'valve', img: '/images/brass_swing_valve_clean.jpg' },
+                  { name: 'Rosco Faucets', brand: 'ROSCO', cat: 'Plumbing & Fixtures', img: '/images/gooseneck_faucet_clean.jpg' },
+                  { name: 'GI Pipes S-40', cat: 'Plumbing & Fixtures', search: 'gi pipe', img: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSMZpMBjpVDDLSyOrOm4Psyg9boBCTCQx0x9ZVXL7SXlA&s=10' },
+                  { name: 'Floor Drains', cat: 'Plumbing & Fixtures', search: 'drain', img: '/images/floor_drain_clean.jpg' },
+                  { name: 'Blind Rivets', brand: 'BLIND RIVET', cat: 'Hardware & Fasteners', img: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQRFZtrOeadPeOXo9jb5u54sIQVGBf5238GsLSpoKbC0g&s' },
+                  { name: '2-Way Faucets', cat: 'Plumbing & Fixtures', img: '/images/two_way_faucet_clean.jpg' },
                   { name: 'Davies Enamel', brand: 'DAVIES', img: '/images/davies_gloss_it_clean.jpg' },
                   { name: 'Boysen Paints', brand: 'BOYSEN', img: '/images/boysen_otc_clean.jpg' },
                   { name: 'Pylox Spray', brand: 'PYLOX', img: '/images/pylox_16_scarlet_clean.jpg' },
-                  { name: 'Rosco Faucets', brand: 'ROSCO', img: '/images/gooseneck_faucet_clean.jpg' },
-                  { name: 'Brass Valves', cat: 'Plumbing & Fixtures', img: '/images/brass_swing_valve_clean.jpg' },
-                  { name: 'Blind Rivets', brand: 'BLIND RIVET', img: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQRFZtrOeadPeOXo9jb5u54sIQVGBf5238GsLSpoKbC0g&s' },
                   { name: 'Anam Outlets', brand: 'ANAM', img: '/images/anam_outlet_3213_clean.jpg' },
                   { name: 'Island Paints', brand: 'ISLAND', img: '/images/island_qde_clean.png' },
-                  { name: 'Stikwel Glue', brand: 'STIKWEL', img: '/images/stikwel_clean.jpg' },
-                  { name: 'Bosny Acrylic', brand: 'BOSNY', img: '/images/bosny_flat_black_04_clean.jpg' },
-                  { name: 'Steel Purlins', cat: 'Structural & Building Materials', img: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTJzVHyZ12Skv8mdJfdA16ZpAhOWE03o76OVgrOxW1ffA&s=10' }
+                  { name: 'Stikwel Glue', brand: 'STIKWEL', img: '/images/stikwel_clean.jpg' }
                 ].map((st, i) => {
                   const isSelected = selectedBrandFilter === st.brand || (st.cat && selectedCategory === st.cat);
                   return (
@@ -2676,21 +2681,21 @@ const renderPopups = () => (
               </div>
             </div>
 
-            {/* 2. PROMO BANNER WITH SHORT INTRO, PROMOS & PROCEED TO WHOLESALE CLICK */}
+            {/* 2. PROMO BANNER WITH STRUCTURAL, PLUMBING & HARDWARE FOCUS */}
             <div className="bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 text-slate-900 rounded-2xl p-4 sm:p-6 shadow-md border border-amber-300 relative overflow-hidden">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
                 <div className="max-w-xl space-y-1.5">
                   <div className="inline-flex items-center gap-1.5 bg-red-600 text-white text-[10px] sm:text-xs font-black uppercase px-2.5 py-0.5 rounded-full shadow-xs">
                     <Flame className="w-3.5 h-3.5 animate-pulse" />
-                    <span>SURPLUS & DISPLAY SALE • AS-IS, WHERE-IS</span>
+                    <span>STRUCTURAL STEEL • PLUMBING • COATINGS • AS-IS CLEARANCE</span>
                   </div>
 
                   <h2 className="text-xl sm:text-3xl font-black text-slate-950 tracking-tight leading-tight">
-                    Up to 40% OFF Construction Surplus
+                    Up to 40% OFF Structural Steel & Plumbing
                   </h2>
 
                   <p className="text-xs sm:text-sm text-slate-800 font-medium leading-snug">
-                    Affordable contractor overstock, showroom display units & building materials. 100% sound, authentic & contractor-ready at below-retail prices.
+                    Direct warehouse liquidation: <strong>C-Purlins, 6mm Angle Bars, Schedule 40 GI Pipes, Brass & PPR Valves, Rosco Fixtures, Fasteners & Premium Coatings</strong>. Sold As-Is, Where-Is at below-retail clearance prices.
                   </p>
 
                   {/* Active Tier Promos */}
@@ -2717,28 +2722,47 @@ const renderPopups = () => (
                       <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                     </button>
                     <button
-                      onClick={() => { setActiveTab('catalog'); setSelectedCategory('All'); setSelectedBrandFilter(null); }}
+                      onClick={() => { setActiveTab('catalog'); setSelectedCategory('Structural & Building Materials'); }}
                       className="bg-slate-900/10 hover:bg-slate-900/20 text-slate-950 font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl cursor-pointer transition-all border border-slate-900/20"
                     >
-                      Browse 934 SKUs
+                      Structural Catalog
                     </button>
                   </div>
                 </div>
 
-                {/* Right Hero Visual: Authentic Hardware Packshots */}
+                {/* Right Hero Visual: Structural Steel + Brass Plumbing + Paint Can Trio */}
                 <div className="shrink-0 hidden sm:flex items-center justify-center relative">
-                  <div className="relative w-40 h-40 sm:w-48 sm:h-48 flex items-center justify-center">
+                  <div className="relative w-44 h-44 sm:w-52 sm:h-52 flex items-center justify-center">
+                    {/* Structural Steel Purlin visual background */}
+                    <div className="absolute inset-0 rounded-2xl bg-slate-900/10 border border-slate-900/20 flex flex-col justify-between p-2 overflow-hidden shadow-inner">
+                      <span className="text-[9px] font-mono font-black text-slate-800 uppercase tracking-widest bg-amber-300/80 px-1.5 py-0.5 rounded w-fit">
+                        C-PURLINS • VALVES • PAINTS
+                      </span>
+                      <img
+                        src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRJ1lDF-ht6yaqParkahCFb91OYZoNf7fsHZoLZhP8q7g&s=10"
+                        alt="C-Purlins Steel"
+                        className="w-full h-16 object-cover rounded opacity-80"
+                      />
+                    </div>
+                    {/* Brass Valve (Plumbing) */}
+                    <img
+                      src="/images/brass_swing_valve_clean.jpg"
+                      alt="Brass Valve"
+                      className="w-20 h-20 object-contain drop-shadow-xl absolute -bottom-1 -left-2 z-20 bg-white/90 p-1 rounded-xl border border-amber-200"
+                    />
+                    {/* Davies Paint Can */}
                     <img
                       src="/images/davies_gloss_it_clean.jpg"
                       alt="Davies Paint"
-                      className="w-32 h-32 object-contain drop-shadow-xl z-10"
+                      className="w-24 h-24 object-contain drop-shadow-2xl absolute -top-1 -right-2 z-10"
                     />
+                    {/* Rosco Faucet */}
                     <img
-                      src="/images/pylox_16_scarlet_clean.jpg"
-                      alt="Pylox Spray"
-                      className="w-24 h-24 object-contain drop-shadow-lg absolute -bottom-2 -left-3 z-20"
+                      src="/images/gooseneck_faucet_clean.jpg"
+                      alt="Rosco Faucet"
+                      className="w-18 h-18 object-contain drop-shadow-xl absolute top-8 left-4 z-15 bg-white/80 p-0.5 rounded-lg border border-slate-200"
                     />
-                    <div className="absolute top-1 right-1 bg-red-600 text-white font-black text-xs px-2.5 py-1 rounded-full shadow-lg z-30 animate-pulse">
+                    <div className="absolute -bottom-2 right-1 bg-red-600 text-white font-black text-xs px-2.5 py-1 rounded-full shadow-lg z-30 animate-pulse">
                       -40% OFF
                     </div>
                   </div>
@@ -2753,14 +2777,15 @@ const renderPopups = () => (
               </div>
             </div>
 
-            {/* 3. 5 QUICK NAVIGATION ACTION ICONS */}
-            <div className="grid grid-cols-5 gap-2 sm:gap-4 my-2">
+            {/* 3. 6 QUICK CONTRACTOR & CATEGORY NAVIGATION ICONS */}
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 sm:gap-3 my-2">
               {[
+                { id: 'structural', label: 'Structural Steel', cat: 'Structural & Building Materials', icon: Layers, bg: 'bg-slate-100 text-slate-800 border-slate-300' },
+                { id: 'plumbing', label: 'Plumbing & Pipes', cat: 'Plumbing & Fixtures', icon: Box, bg: 'bg-sky-50 text-sky-700 border-sky-200' },
                 { id: 'bestseller', label: 'Best Seller', icon: Star, bg: 'bg-amber-50 text-amber-600 border-amber-200' },
-                { id: 'new', label: 'New Arrival', icon: Sparkles, bg: 'bg-emerald-50 text-emerald-600 border-emerald-200' },
                 { id: 'deals', label: 'Best Deals', icon: Tag, bg: 'bg-red-50 text-red-600 border-red-200' },
-                { id: 'under100', label: 'Below ₱100', icon: Coins, bg: 'bg-blue-50 text-blue-600 border-blue-200' },
-                { id: 'surplus', label: 'Surplus / Display', icon: RefreshCw, bg: 'bg-purple-50 text-purple-600 border-purple-200' },
+                { id: 'surplus', label: 'Surplus / As-Is', icon: RefreshCw, bg: 'bg-purple-50 text-purple-600 border-purple-200' },
+                { id: 'under100', label: 'Below ₱100', icon: Coins, bg: 'bg-emerald-50 text-emerald-600 border-emerald-200' },
               ].map(btn => {
                 const Icon = btn.icon;
                 const isActive = homeQuickFilter === btn.id;
@@ -2768,8 +2793,14 @@ const renderPopups = () => (
                   <button
                     key={btn.id}
                     onClick={() => {
-                      setHomeQuickFilter(isActive ? 'all' : btn.id);
-                      setSelectedBrandFilter(null);
+                      if (btn.cat) {
+                        setSelectedCategory(selectedCategory === btn.cat ? 'All' : btn.cat);
+                        setSelectedBrandFilter(null);
+                        setHomeQuickFilter('all');
+                      } else {
+                        setHomeQuickFilter(isActive ? 'all' : btn.id);
+                        setSelectedBrandFilter(null);
+                      }
                     }}
                     className="flex flex-col items-center justify-center group cursor-pointer focus:outline-none"
                   >
@@ -2788,14 +2819,17 @@ const renderPopups = () => (
               })}
             </div>
 
-            {/* 4. TWO SIDE-BY-SIDE CARDS: FLASH SALE & SHOWROOM DISPLAY HUB (NO FACES - REAL HARDWARE ITEMS) */}
+            {/* 4. TWO SIDE-BY-SIDE CARDS: STRUCTURAL STEEL FLASH SALE & PLUMBING SHOWROOM HUB */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {/* Card 4A: Flash Sale with Countdown Clock */}
+              {/* Card 4A: Flash Sale with Countdown Clock - Featuring Structural Steel & Plumbing */}
               <div className="bg-white rounded-2xl p-3 sm:p-4 border border-slate-200/90 shadow-2xs flex flex-col justify-between">
                 <div className="flex items-center justify-between mb-2.5">
                   <div className="flex items-center gap-1.5">
                     <span className="font-black text-sm sm:text-base text-slate-900 flex items-center gap-1">
                       Flash <Flame className="w-4 h-4 text-[#EE4D2D] fill-[#EE4D2D]" /> Sale
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                      Structural & Plumbing
                     </span>
                   </div>
                   {/* Real Countdown Timer */}
@@ -2814,59 +2848,59 @@ const renderPopups = () => (
                   </div>
                 </div>
 
-                {/* 2 Flash Deals Side-by-Side */}
+                {/* 2 Flash Deals Side-by-Side: Structural Steel + Brass Plumbing */}
                 <div className="grid grid-cols-2 gap-2">
-                  {/* Pylox Deal */}
+                  {/* Deal 1: C-Purlin 2x4 (Structural Steel) */}
                   <div className="bg-slate-50/70 border border-slate-100 rounded-xl p-2 flex flex-col justify-between relative group hover:bg-slate-100/60 transition-colors">
                     <div className="relative aspect-square w-full rounded-lg overflow-hidden bg-white mb-1.5 flex items-center justify-center">
-                      <img src="/images/pylox_16_scarlet_clean.jpg" alt="Pylox Scarlet" className="w-full h-full object-contain p-1 group-hover:scale-105 transition-transform" />
-                      <span className="absolute bottom-1 left-1 bg-red-600 text-white text-[9px] font-black px-1.5 py-0.2 rounded shadow-xs">
-                        -40%
+                      <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRJ1lDF-ht6yaqParkahCFb91OYZoNf7fsHZoLZhP8q7g&s=10" alt="C-Purlins Steel" className="w-full h-full object-cover p-1 group-hover:scale-105 transition-transform" />
+                      <span className="absolute bottom-1 left-1 bg-slate-900 text-amber-400 text-[8.5px] font-black px-1.5 py-0.2 rounded shadow-xs">
+                        🏗️ STRUCTURAL -28%
                       </span>
                     </div>
-                    <div className="text-[11px] font-bold text-slate-800 line-clamp-1">Pylox Lazer #16 Scarlet</div>
+                    <div className="text-[11px] font-bold text-slate-800 line-clamp-1">C-Purlins 2x4 1.2mm HD</div>
                     <div className="flex items-baseline gap-1 mt-0.5">
-                      <span className="text-[#EE4D2D] font-black text-xs sm:text-sm">₱140</span>
-                      <span className="text-[10px] text-slate-400 line-through">₱235</span>
+                      <span className="text-[#EE4D2D] font-black text-xs sm:text-sm">₱775</span>
+                      <span className="text-[10px] text-slate-400 line-through">₱1,080</span>
                     </div>
                     <button
                       onClick={() => {
-                        const p = products.find(x => x.name.toLowerCase().includes('pylox') && x.name.toLowerCase().includes('scarlet')) || products[0];
+                        const p = products.find(x => x.name.toLowerCase().includes('purlin')) || products[0];
                         addToCart(p, 1);
                       }}
                       className="mt-1.5 w-full bg-[#EE4D2D] hover:bg-[#d73f20] text-white text-[10px] font-bold py-1 rounded-md transition-colors cursor-pointer"
                     >
-                      + Add Flash Deal
+                      + Add Steel Deal
                     </button>
                   </div>
 
-                  {/* Davies Gloss-It Deal */}
+                  {/* Deal 2: Brass Swing Check Valve (Plumbing) */}
                   <div className="bg-slate-50/70 border border-slate-100 rounded-xl p-2 flex flex-col justify-between relative group hover:bg-slate-100/60 transition-colors">
                     <div className="relative aspect-square w-full rounded-lg overflow-hidden bg-white mb-1.5 flex items-center justify-center">
-                      <img src="/images/davies_gloss_it_clean.jpg" alt="Davies Gloss-It" className="w-full h-full object-contain p-1 group-hover:scale-105 transition-transform" />
-                      <span className="absolute bottom-1 left-1 bg-red-600 text-white text-[9px] font-black px-1.5 py-0.2 rounded shadow-xs">
-                        -30%
+                      <img src="/images/brass_swing_valve_clean.jpg" alt="Brass Valve" className="w-full h-full object-contain p-1 group-hover:scale-105 transition-transform" />
+                      <span className="absolute bottom-1 left-1 bg-sky-700 text-white text-[8.5px] font-black px-1.5 py-0.2 rounded shadow-xs">
+                        🚰 PLUMBING -35%
                       </span>
                     </div>
-                    <div className="text-[11px] font-bold text-slate-800 line-clamp-1">Davies Gloss-It Enamel 4L</div>
+                    <div className="text-[11px] font-bold text-slate-800 line-clamp-1">Brass Swing Valve 1/2 HD</div>
                     <div className="flex items-baseline gap-1 mt-0.5">
-                      <span className="text-[#EE4D2D] font-black text-xs sm:text-sm">₱265</span>
-                      <span className="text-[10px] text-slate-400 line-through">₱380</span>
+                      <span className="text-[#EE4D2D] font-black text-xs sm:text-sm">₱380</span>
+                      <span className="text-[10px] text-slate-400 line-through">₱580</span>
                     </div>
                     <button
                       onClick={() => {
-                        const p = products.find(x => x.name.toLowerCase().includes('davies') && x.name.toLowerCase().includes('gloss-it')) || products[1];
+                        const p = products.find(x => x.name.toLowerCase().includes('valve') && x.name.toLowerCase().includes('brass')) || products[1];
                         addToCart(p, 1);
                       }}
                       className="mt-1.5 w-full bg-[#EE4D2D] hover:bg-[#d73f20] text-white text-[10px] font-bold py-1 rounded-md transition-colors cursor-pointer"
                     >
-                      + Add Flash Deal
+                      + Add Valve Deal
                     </button>
                   </div>
                 </div>
               </div>
 
-              {/* Card 4B: Showroom Display Hub & Top Lots (NO FACES - HARDWARE ITEMS INSTEAD) */}
+              {/* Card 4B: Showroom Display Hub & Top Lots (Rosco Plumbing + 6mm Angle Bar Steel) */}
               <div className="bg-white rounded-2xl p-3 sm:p-4 border border-slate-200/90 shadow-2xs flex flex-col justify-between">
                 <div className="flex items-center justify-between mb-2.5">
                   <div className="flex items-center gap-1.5">
@@ -2883,14 +2917,14 @@ const renderPopups = () => (
                   </button>
                 </div>
 
-                {/* 2 Featured Showroom / Display Items */}
+                {/* 2 Featured Showroom / Display Items: Rosco Plumbing + 6mm Angle Bar Steel */}
                 <div className="grid grid-cols-2 gap-2">
-                  {/* Rosco Faucet */}
+                  {/* Rosco Faucet (Plumbing) */}
                   <div className="bg-slate-50/70 border border-slate-100 rounded-xl p-2 flex flex-col justify-between relative group hover:bg-slate-100/60 transition-colors">
                     <div className="relative aspect-square w-full rounded-lg overflow-hidden bg-white mb-1.5 flex items-center justify-center">
                       <img src="/images/gooseneck_faucet_clean.jpg" alt="Rosco Faucet" className="w-full h-full object-contain p-1 group-hover:scale-105 transition-transform" />
-                      <span className="absolute bottom-1 left-1 bg-amber-500 text-slate-950 text-[9px] font-black px-1.5 py-0.2 rounded shadow-xs">
-                        SURPLUS
+                      <span className="absolute bottom-1 left-1 bg-amber-500 text-slate-950 text-[8.5px] font-black px-1.5 py-0.2 rounded shadow-xs">
+                        🚰 SURPLUS PLUMBING
                       </span>
                     </div>
                     <div className="text-[11px] font-bold text-slate-800 line-clamp-1">Rosco Gooseneck Basin Faucet</div>
@@ -2909,34 +2943,34 @@ const renderPopups = () => (
                     </button>
                   </div>
 
-                  {/* Blind Rivets Box */}
+                  {/* 6mm Angle Bar (Structural Steel) */}
                   <div className="bg-slate-50/70 border border-slate-100 rounded-xl p-2 flex flex-col justify-between relative group hover:bg-slate-100/60 transition-colors">
                     <div className="relative aspect-square w-full rounded-lg overflow-hidden bg-white mb-1.5 flex items-center justify-center">
-                      <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQRFZtrOeadPeOXo9jb5u54sIQVGBf5238GsLSpoKbC0g&s" alt="Blind Rivets" className="w-full h-full object-contain p-1 group-hover:scale-105 transition-transform" />
-                      <span className="absolute bottom-1 left-1 bg-amber-500 text-slate-950 text-[9px] font-black px-1.5 py-0.2 rounded shadow-xs">
-                        DISPLAY
+                      <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTJzVHyZ12Skv8mdJfdA16ZpAhOWE03o76OVgrOxW1ffA&s=10" alt="Angle Bar" className="w-full h-full object-cover p-1 group-hover:scale-105 transition-transform" />
+                      <span className="absolute bottom-1 left-1 bg-slate-900 text-amber-400 text-[8.5px] font-black px-1.5 py-0.2 rounded shadow-xs">
+                        🏗️ STRUCTURAL STEEL
                       </span>
                     </div>
-                    <div className="text-[11px] font-bold text-slate-800 line-clamp-1">Blind Rivets 1/8x1/2 (1000s)</div>
+                    <div className="text-[11px] font-bold text-slate-800 line-clamp-1">6mm x 2-1/2 Angle Bar</div>
                     <div className="flex items-baseline gap-1 mt-0.5">
-                      <span className="text-[#EE4D2D] font-black text-xs sm:text-sm">₱180</span>
-                      <span className="text-[10px] text-slate-400 line-through">₱300</span>
+                      <span className="text-[#EE4D2D] font-black text-xs sm:text-sm">₱2,050</span>
+                      <span className="text-[10px] text-slate-400 line-through">₱2,500</span>
                     </div>
                     <button
                       onClick={() => {
-                        const p = products.find(x => x.name.toLowerCase().includes('blind rivet')) || products[3];
+                        const p = products.find(x => x.name.toLowerCase().includes('angle bar')) || products[3];
                         addToCart(p, 1);
                       }}
                       className="mt-1.5 w-full bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-bold py-1 rounded-md transition-colors cursor-pointer"
                     >
-                      Claim As-Is
+                      Claim Steel
                     </button>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* 5. CATEGORY & BRAND PILL BAR */}
+            {/* 5. CATEGORY & BRAND/MATERIAL PILL BAR */}
             <div className="bg-white rounded-2xl p-3 border border-slate-200/90 shadow-2xs space-y-2.5">
               {/* Category Pills */}
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
@@ -2950,7 +2984,13 @@ const renderPopups = () => (
                 >
                   All Items
                 </button>
-                {['Plumbing & Fixtures', 'Electrical & Lighting', 'Paints & Coatings', 'Hardware & Fasteners', 'Structural & Building Materials'].map(cat => (
+                {[
+                  'Structural & Building Materials',
+                  'Plumbing & Fixtures',
+                  'Hardware & Fasteners',
+                  'Electrical & Lighting',
+                  'Paints & Coatings'
+                ].map(cat => (
                   <button
                     key={cat}
                     onClick={() => { setSelectedCategory(cat); setSelectedBrandFilter(null); }}
@@ -2960,24 +3000,29 @@ const renderPopups = () => (
                         : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                     }`}
                   >
-                    {cat}
+                    {cat === 'Structural & Building Materials' ? '🏗️ Structural Steel' :
+                     cat === 'Plumbing & Fixtures' ? '🚰 Plumbing & Fixtures' :
+                     cat === 'Hardware & Fasteners' ? '🔩 Fasteners & Tools' :
+                     cat === 'Electrical & Lighting' ? '⚡ Electrical' : '🎨 Paints & Coatings'}
                   </button>
                 ))}
               </div>
 
-              {/* Brand Logo / Tag Chips */}
+              {/* Material & Brand Chips (Structural, Plumbing, Tools, Coatings) */}
               <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none pt-1 border-t border-slate-100">
                 {[
-                  { name: 'BOYSEN', color: 'border-red-400 text-red-600' },
-                  { name: 'DAVIES', color: 'border-blue-500 text-blue-600' },
-                  { name: 'ISLAND', color: 'border-emerald-500 text-emerald-600' },
-                  { name: 'PYLOX', color: 'border-orange-500 text-orange-600' },
-                  { name: 'BOSNY', color: 'border-amber-500 text-amber-600' },
-                  { name: 'MAKITA', color: 'border-cyan-600 text-cyan-700' },
-                  { name: 'ROYU', color: 'border-orange-600 text-orange-700' },
-                  { name: 'PIONEER', color: 'border-indigo-500 text-indigo-600' },
-                  { name: 'ROSCO', color: 'border-slate-500 text-slate-700' },
-                  { name: 'ANAM', color: 'border-purple-500 text-purple-700' }
+                  { name: 'C-PURLINS', color: 'border-slate-800 text-slate-900 bg-slate-100 font-extrabold', cat: 'Structural & Building Materials', search: 'purlin' },
+                  { name: 'ANGLE BAR', color: 'border-slate-800 text-slate-900 bg-slate-100 font-extrabold', cat: 'Structural & Building Materials', search: 'angle bar' },
+                  { name: 'GI PIPES', color: 'border-sky-600 text-sky-700 bg-sky-50 font-extrabold', cat: 'Plumbing & Fixtures', search: 'gi pipe' },
+                  { name: 'ROSCO', color: 'border-sky-500 text-sky-600', brand: 'ROSCO' },
+                  { name: 'VALVES', color: 'border-sky-700 text-sky-800 bg-sky-50', cat: 'Plumbing & Fixtures', search: 'valve' },
+                  { name: 'RIVETS', color: 'border-slate-500 text-slate-700', brand: 'BLIND RIVET' },
+                  { name: 'BOYSEN', color: 'border-red-400 text-red-600', brand: 'BOYSEN' },
+                  { name: 'DAVIES', color: 'border-blue-500 text-blue-600', brand: 'DAVIES' },
+                  { name: 'ISLAND', color: 'border-emerald-500 text-emerald-600', brand: 'ISLAND' },
+                  { name: 'PYLOX', color: 'border-orange-500 text-orange-600', brand: 'PYLOX' },
+                  { name: 'MAKITA', color: 'border-cyan-600 text-cyan-700', brand: 'MAKITA' },
+                  { name: 'ANAM', color: 'border-purple-500 text-purple-700', brand: 'ANAM' }
                 ].map(b => (
                   <button
                     key={b.name}

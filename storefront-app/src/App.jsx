@@ -15,7 +15,7 @@ import {
   Laptop, Smartphone, HelpCircle, ExternalLink, Sparkles, Box,
   ArrowUpDown, ArrowUp, ArrowDown, Ban, XCircle, BarChart3, Copy, Printer,
   TrendingUp, TrendingDown, DollarSign, PieChart, FileText, Receipt, ArrowUpRight, Percent, Coins, AlertTriangle
-, Star, Zap, Award } from 'lucide-react';
+, Star, Zap, Award, PanelLeftClose, PanelLeft, LayoutDashboard, Settings, Users, MessageSquare } from 'lucide-react';
 
 // Helper to detect 10ft+ long structural and pipe items (Angle bar, C-Purlins, GI Pipe, Rebar, etc.)
 export const isLongCargoItem = (item) => {
@@ -284,9 +284,9 @@ export default function App() {
   const [defaultLandingMode, setDefaultLandingMode] = useState(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('manna_default_landing_mode');
-      if (stored === 'retail' || stored === 'wholesale') return stored;
+      if (stored === 'retail' || stored === 'home') return stored;
     }
-    return 'wholesale'; // Default is Wholesale Liquidation
+    return 'home'; // User Directive: Default is Home Feed
   });
 
   // Active session mode: forced by ?mode=retail / ?mode=wholesale, or falls back to defaultLandingMode
@@ -295,9 +295,11 @@ export default function App() {
     const p = new URLSearchParams(window.location.search);
     if (p.get('mode') === 'retail' || window.location.hash === '#retail') return true;
     if (p.get('mode') === 'wholesale') return false;
-    return localStorage.getItem('manna_retail_mode') === 'true';
+    const stored = localStorage.getItem('manna_retail_mode');
+    if (stored !== null) return stored === 'true';
+    return true;
   }
-  return false;
+  return true;
 });
 
 // --- Subtle random purchase notification (orange pill) ---
@@ -364,7 +366,7 @@ const renderPopups = () => (
       const stored = localStorage.getItem('manna_default_landing_mode');
       if (stored === 'retail') return 'home';
     }
-    return 'lots'; // Default landing page is Wholesale Lots
+    return 'home'; // Default landing page is Home Feed
   });
 
   const [copiedRetailLink, setCopiedRetailLink] = useState(false);
@@ -560,7 +562,10 @@ const renderPopups = () => (
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [catalogFilterInStock, setCatalogFilterInStock] = useState(false);
-  const [catalogViewMode, setCatalogViewMode] = useState('table'); // 'table' | 'cards'
+  const [catalogViewMode, setCatalogViewMode] = useState(() => (typeof window !== 'undefined' && window.innerWidth < 768 ? 'cards' : 'table'));
+  const [manifestViewMode, setManifestViewMode] = useState(() => (typeof window !== 'undefined' && window.innerWidth < 768 ? 'cards' : 'table'));
+  const [expandedLots, setExpandedLots] = useState({});
+  const toggleLotDetails = (lotId) => setExpandedLots(prev => ({ ...prev, [lotId]: !prev[lotId] }));
   const [catalogSortField, setCatalogSortField] = useState('name');
   const [catalogSortOrder, setCatalogSortOrder] = useState('asc'); // 'asc' | 'desc'
   const [catalogQuantities, setCatalogQuantities] = useState({});
@@ -640,6 +645,15 @@ const renderPopups = () => (
   });
 
   // Merchant Web Dashboard Layout States
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [sidebarExpandedGroups, setSidebarExpandedGroups] = useState({
+    stock: true,
+    finance: true,
+    system: false
+  });
+  const toggleSidebarGroup = (groupKey) => {
+    setSidebarExpandedGroups(prev => ({ ...prev, [groupKey]: !prev[groupKey] }));
+  };
   const [dashboardTab, setDashboardTab] = useState('inventory'); // 'inventory' | 'orders' | 'promotions'
   const [dashboardSortField, setDashboardSortField] = useState('name');
   const [dashboardSortOrder, setDashboardSortOrder] = useState('asc'); // 'asc' | 'desc'
@@ -3467,7 +3481,7 @@ const renderPopups = () => (
                     <a href="tel:09261995703" className="text-base sm:text-lg font-black text-white hover:text-amber-400 mt-0.5 block truncate">
                       0926 199 5703
                     </a>
-                    <p className="text-[10px] text-slate-400">Viber / Calls Open 8AM-5PM</p>
+                    <p className="text-[10px] text-slate-400">Calls / Messenger Open 8AM-5PM</p>
                   </div>
                 </div>
 
@@ -3487,12 +3501,12 @@ const renderPopups = () => (
                     <Download className="w-3.5 h-3.5" /> Export CSV
                   </button>
                   <a
-                    href="https://wa.me/639261995703?text=Good%20day.%20I%20am%20a%20contractor%20/%20hardware%20buyer%20interested%20in%20inspecting%20your%20commercial%20liquidation%20lots.%20Please%20send%20schedule%20and%20terms."
+                    href="https://m.me/110311578465073?text=Good%20day%20Manna%20Hardware!%20I%20am%20interested%20in%20inspecting%20your%20commercial%20liquidation%20lots.%20Please%20send%20schedule%20and%20terms."
                     target="_blank"
                     rel="noreferrer"
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-lg text-xs flex items-center gap-2 cursor-pointer shadow-sm transition-all active:scale-95"
+                    className="bg-[#0084FF] hover:bg-[#0072de] text-white font-bold px-4 py-2 rounded-lg text-xs flex items-center gap-2 cursor-pointer shadow-sm transition-all active:scale-95"
                   >
-                    <MessageCircle className="w-4 h-4" /> Inquire via Viber / WhatsApp
+                    <MessageCircle className="w-4 h-4 fill-current" /> Send to Messenger
                   </a>
                   <button
                     onClick={() => setActiveTab('catalog')}
@@ -3546,21 +3560,46 @@ const renderPopups = () => (
                           {lot.summary}
                         </p>
 
-                        {/* Key Items Preview List */}
-                        <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-1.5 mb-4 text-xs">
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                            Key Inventory In Lot:
-                          </p>
-                          {lot.details.slice(0, 4).map((d, i) => (
-                            <div key={i} className="flex items-center justify-between text-slate-700">
-                              <span className="truncate pr-2 font-medium">• {d.name}</span>
-                              <span className="font-bold text-slate-900 shrink-0">{d.qty}</span>
+                        {/* Interactive Dropdown for Lot Items */}
+                        <div className="mb-3">
+                          <button
+                            type="button"
+                            onClick={() => toggleLotDetails(lot.id)}
+                            className="w-full flex items-center justify-between py-2 px-3 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 transition-colors cursor-pointer group"
+                          >
+                            <span className="flex items-center gap-1.5">
+                              <Package className="w-3.5 h-3.5 text-[#EE4D2D]" />
+                              <span>View Included Items ({lot.details.length} line items)</span>
+                            </span>
+                            <span className="flex items-center gap-1 text-[11px] text-slate-500 font-semibold group-hover:text-slate-900">
+                              {expandedLots[lot.id] ? 'Hide' : 'Show'}
+                              <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${expandedLots[lot.id] ? 'rotate-180 text-slate-700' : ''}`} />
+                            </span>
+                          </button>
+
+                          {expandedLots[lot.id] && (
+                            <div className="mt-1.5 bg-slate-50/90 rounded-xl p-3 border border-slate-200 space-y-1.5 text-xs">
+                              <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400 pb-1 border-b border-slate-200/80 mb-1">
+                                <span>Item Description</span>
+                                <span>Physical Qty</span>
+                              </div>
+                              {lot.details.map((d, i) => (
+                                <div key={i} className="flex items-center justify-between text-slate-700 hover:text-slate-900 py-0.5">
+                                  <span className="truncate pr-2 font-medium">• {d.name}</span>
+                                  <span className="font-bold text-slate-900 shrink-0 bg-white px-1.5 py-0.2 rounded border border-slate-200 text-[11px]">{d.qty}</span>
+                                </div>
+                              ))}
+                              <div className="pt-2 mt-2 border-t border-slate-200 flex justify-between items-center">
+                                <span className="text-[10px] text-slate-500 italic">Total Lot SRP: ₱{lot.retailValue.toLocaleString('en-PH')}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedLotModal(lot)}
+                                  className="text-[10px] text-[#EE4D2D] hover:underline font-bold inline-flex items-center gap-0.5 cursor-pointer"
+                                >
+                                  Full Manifest <ArrowRight className="w-2.5 h-2.5" />
+                                </button>
+                              </div>
                             </div>
-                          ))}
-                          {lot.details.length > 4 && (
-                            <p className="text-[10px] text-slate-400 font-semibold pt-1">
-                              + {lot.details.length - 4} more line items in manifest...
-                            </p>
                           )}
                         </div>
 
@@ -3627,12 +3666,12 @@ const renderPopups = () => (
                               <FileSpreadsheet className="w-3.5 h-3.5 text-slate-600" /> Manifest
                             </button>
                             <a
-                              href={`https://wa.me/639261995703?text=Hello%20Manna%20Hardware.%20I%20am%20ready%20to%20buy%20${encodeURIComponent(lot.name)}%20for%20₱${lot.lotPrice.toLocaleString('en-PH')}.%20Please%20send%20payment%20instructions%20and%20hauling%20schedule.`}
+                              href={`https://m.me/110311578465073?text=${encodeURIComponent(`Hello Manna Hardware! I want to order / inquire about ${lot.name} (₱${lot.lotPrice.toLocaleString('en-PH')}). Please send payment and hauling details.`)}`}
                               target="_blank"
                               rel="noreferrer"
-                              className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold py-2 px-2.5 rounded-lg cursor-pointer transition-colors text-center shadow-xs flex items-center justify-center gap-1"
+                              className="bg-[#0084FF] hover:bg-[#0072de] text-white text-xs font-bold py-2 px-2.5 rounded-lg cursor-pointer transition-colors text-center shadow-xs flex items-center justify-center gap-1 active:scale-95"
                             >
-                              <MessageCircle className="w-3.5 h-3.5" /> Viber Buy
+                              <MessageCircle className="w-3.5 h-3.5 fill-current" /> Send to Messenger
                             </a>
                           </div>
                         </div>
@@ -3709,7 +3748,27 @@ const renderPopups = () => (
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center bg-slate-100 p-0.5 rounded border border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => setManifestViewMode('cards')}
+                      className={`p-1.5 rounded text-xs font-bold flex items-center gap-1 cursor-pointer ${
+                        manifestViewMode === 'cards' ? 'bg-white shadow-xs text-slate-900' : 'text-slate-500'
+                      }`}
+                    >
+                      <Grid className="w-3.5 h-3.5" /> Cards
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setManifestViewMode('table')}
+                      className={`p-1.5 rounded text-xs font-bold flex items-center gap-1 cursor-pointer ${
+                        manifestViewMode === 'table' ? 'bg-white shadow-xs text-slate-900' : 'text-slate-500'
+                      }`}
+                    >
+                      <Table className="w-3.5 h-3.5" /> Table
+                    </button>
+                  </div>
                   <button
                     onClick={downloadManifestPDF}
                     className="bg-[#EE4D2D] hover:bg-[#d73f20] text-white text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer flex items-center gap-1.5 shadow-2xs transition-colors shrink-0"
@@ -3775,9 +3834,77 @@ const renderPopups = () => (
                 </div>
               )}
 
-              {/* Manifest Data Table */}
-              <div className="overflow-x-auto border border-slate-200 rounded-xl max-h-[500px] overflow-y-auto">
-                <table className="w-full text-left text-xs border-collapse">
+              {/* Manifest Data Display: Cards or Table */}
+              {manifestViewMode === 'cards' ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-[600px] overflow-y-auto p-1">
+                  {products
+                    .filter(p => {
+                      if (!isMerchantAuthenticated && (p.isCancelled || p.status === 'cancelled')) return false;
+                      const matchCat = manifestCategoryFilter === 'All' || p.category === manifestCategoryFilter;
+                      if (!matchCat) return false;
+                      if (!manifestSearchQuery) return true;
+                      const q = manifestSearchQuery.toLowerCase();
+                      return (p.name || '').toLowerCase().includes(q) || (p.id || '').toLowerCase().includes(q);
+                    })
+                    .slice(0, 150)
+                    .map((item) => {
+                      const isItemCancelled = Boolean(item.isCancelled || item.status === 'cancelled');
+                      const stock = Math.max(0, Number(item.stock) || 0);
+                      const price = Number(item.price) || 0;
+                      const wholesale = Math.round(price * 0.60 * 100) / 100;
+                      return (
+                        <div key={item.id} className="bg-slate-50 hover:bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between shadow-2xs transition-all">
+                          <div>
+                            <div className="flex items-center justify-between gap-1 text-[10px] mb-1">
+                              <span className="font-mono font-bold text-slate-500">{item.id}</span>
+                              <span className="bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-medium">{item.category}</span>
+                            </div>
+                            <h4 className="font-bold text-slate-900 text-xs line-clamp-2 leading-snug mb-2">{item.name}</h4>
+                            <div className="flex items-center justify-between text-xs mb-2">
+                              <span className="text-slate-500">Physical Stock:</span>
+                              <span className={`font-black ${stock > 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                                {stock > 0 ? `${stock} ${item.unit || 'pcs'}` : 'Out of Stock'}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="pt-2 border-t border-slate-200">
+                            <div className="flex items-baseline justify-between mb-2">
+                              <span className="line-through text-slate-400 text-xs">₱{price.toLocaleString('en-PH')} SRP</span>
+                              <div className="text-right">
+                                <span className="font-black text-emerald-600 text-sm">₱{wholesale.toLocaleString('en-PH')}</span>
+                                <span className="text-[9px] font-bold text-emerald-700 ml-1">(-40%)</span>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-1.5">
+                              <button
+                                onClick={() => addToCart(item, 1)}
+                                disabled={stock <= 0}
+                                className={`text-[11px] font-bold py-1.5 px-2 rounded-lg flex items-center justify-center gap-1 ${
+                                  stock <= 0 ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-[#EE4D2D] text-white hover:bg-[#d73f20] cursor-pointer'
+                                }`}
+                              >
+                                <ShoppingCart className="w-3 h-3" /> Add
+                              </button>
+                              <a
+                                href={`https://m.me/110311578465073?text=${encodeURIComponent(`Hello Manna Hardware! I want to inquire about manifest item: ${item.name} (${item.id}) - ₱${wholesale.toLocaleString('en-PH')}.`)}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[11px] font-bold py-1.5 px-2 rounded-lg bg-[#0084FF] hover:bg-[#0072de] text-white flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
+                              >
+                                <MessageCircle className="w-3 h-3 fill-current" /> Messenger
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              ) : (
+                <div className="overflow-x-auto border border-slate-200 rounded-xl max-h-[500px] overflow-y-auto">
+                  <p className="sm:hidden text-[10px] text-slate-500 bg-amber-50 px-3 py-1 border-b border-amber-200">
+                    👈 Swipe left/right to view all columns 👉
+                  </p>
+                  <table className="w-full text-left text-xs border-collapse min-w-[760px]">
                   <thead className="bg-slate-100 text-slate-700 font-bold sticky top-0 z-10 border-b border-slate-200 text-[11px]">
                     <tr>
                       <th className="py-2.5 px-3">SKU</th>
@@ -3911,7 +4038,8 @@ const renderPopups = () => (
                       })}
                   </tbody>
                 </table>
-              </div>
+                </div>
+              )}
               <p className="text-[11px] text-slate-400 mt-2 text-right">
                 Showing top manifest results. Click "Export Manifest (CSV)" for full offline Excel review.
               </p>
@@ -3965,7 +4093,7 @@ const renderPopups = () => (
 
                 <div className="flex items-center gap-2">
                   {/* View Mode Toggle (Table / Grid) */}
-                  <div className="hidden sm:flex items-center bg-slate-100 p-0.5 rounded border border-slate-200">
+                  <div className="flex items-center bg-slate-100 p-0.5 rounded border border-slate-200">
                     <button
                       onClick={() => setCatalogViewMode('table')}
                       className={`p-1.5 rounded text-xs font-bold flex items-center gap-1 cursor-pointer ${
@@ -4030,7 +4158,10 @@ const renderPopups = () => (
             {catalogViewMode === 'table' ? (
               <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse">
+                  <p className="sm:hidden text-[10px] text-slate-500 bg-amber-50 px-3 py-1 border-b border-amber-200">
+                    👈 Swipe left/right to view all columns 👉
+                  </p>
+                  <table className="w-full text-left text-xs border-collapse min-w-[760px]">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase text-[10px] tracking-wider select-none">
                         <th className="py-3 px-3 w-14 text-center">Photo</th>
@@ -4932,159 +5063,328 @@ const renderPopups = () => (
                 {/* 3. Side Tab Layout Container (Sidebar + Content Workspace) */}
                 <div className="flex flex-col lg:flex-row gap-5 items-start">
                   
-                  {/* Left Side Navigation Sidebar */}
-                  <aside className="w-full lg:w-64 bg-white rounded-xl border border-slate-200 shadow-xs p-3 shrink-0 lg:sticky lg:top-20 space-y-1">
-                    <div className="px-3 py-2 text-[10px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-100 mb-1">
-                      Dashboard Navigation
+                  {/* Left Side Navigation Sidebar (Premium Collapsible ProPanel Style) */}
+                  <aside 
+                    className={`transition-all duration-300 ease-in-out bg-white rounded-2xl border border-slate-200/80 shadow-md p-3 shrink-0 lg:sticky lg:top-20 flex flex-col justify-between ${
+                      isSidebarCollapsed ? 'w-full lg:w-20' : 'w-full lg:w-72'
+                    }`}
+                  >
+                    <div>
+                      {/* Premium Header: Brand Badge & Collapse Toggle Icon */}
+                      <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-100 px-1.5">
+                        {!isSidebarCollapsed ? (
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#EE4D2D] to-orange-500 text-white flex items-center justify-center font-black text-base shadow-sm ring-2 ring-orange-100">
+                              M
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-black text-slate-900 text-sm tracking-tight">MANNA PRO</span>
+                                <span className="text-[9px] bg-orange-100 text-[#EE4D2D] font-extrabold px-1.5 py-0.2 rounded-full uppercase tracking-wider">
+                                  HQ
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-slate-400 font-medium leading-none mt-0.5">Tacloban Seller Centre</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="mx-auto">
+                            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#EE4D2D] to-orange-500 text-white flex items-center justify-center font-black text-base shadow-sm ring-2 ring-orange-100">
+                              M
+                            </div>
+                          </div>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                          className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer hidden lg:inline-flex"
+                          title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+                        >
+                          {isSidebarCollapsed ? (
+                            <PanelLeft className="w-4 h-4 text-slate-600" />
+                          ) : (
+                            <PanelLeftClose className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Navigation Section 1: INVENTORY & STOCK MANAGEMENT */}
+                      <div className="space-y-1">
+                        {!isSidebarCollapsed && (
+                          <button
+                            type="button"
+                            onClick={() => toggleSidebarGroup('stock')}
+                            className="w-full flex items-center justify-between px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400 hover:text-slate-600 transition-colors"
+                          >
+                            <span>Inventory & Warehouses</span>
+                            <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${sidebarExpandedGroups.stock ? '' : '-rotate-90'}`} />
+                          </button>
+                        )}
+
+                        {(isSidebarCollapsed || sidebarExpandedGroups.stock) && (
+                          <div className="space-y-1">
+                            {/* Inventory & SKUs */}
+                            <button
+                              onClick={() => setDashboardTab('inventory')}
+                              className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer ${
+                                dashboardTab === 'inventory' 
+                                  ? 'bg-[#EE4D2D] text-white shadow-sm shadow-orange-500/20' 
+                                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                              }`}
+                              title="Inventory & SKUs"
+                            >
+                              <span className="flex items-center gap-2.5 min-w-0">
+                                <Layers className={`w-4 h-4 shrink-0 ${dashboardTab === 'inventory' ? 'text-white' : 'text-slate-500'}`} />
+                                {!isSidebarCollapsed && <span className="truncate">Inventory &amp; SKUs</span>}
+                              </span>
+                              {!isSidebarCollapsed && (
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold ${
+                                  dashboardTab === 'inventory' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+                                }`}>
+                                  {products.length}
+                                </span>
+                              )}
+                            </button>
+
+                            {/* Box & Quote Retrieval */}
+                            <button
+                              onClick={() => setDashboardTab('warehouse-boxes')}
+                              className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer ${
+                                dashboardTab === 'warehouse-boxes' 
+                                  ? 'bg-[#EE4D2D] text-white shadow-sm shadow-orange-500/20' 
+                                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                              }`}
+                              title="Box & Quote Retrieval"
+                            >
+                              <span className="flex items-center gap-2.5 min-w-0">
+                                <Box className={`w-4 h-4 shrink-0 ${dashboardTab === 'warehouse-boxes' ? 'text-white' : 'text-amber-500'}`} />
+                                {!isSidebarCollapsed && <span className="truncate">Box &amp; Picking Bins</span>}
+                              </span>
+                              {!isSidebarCollapsed && (
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-black tracking-wider uppercase ${
+                                  dashboardTab === 'warehouse-boxes' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-800'
+                                }`}>
+                                  52 Boxes
+                                </span>
+                              )}
+                            </button>
+
+                            {/* Stock Alerts & Deadstock */}
+                            <button
+                              onClick={() => setDashboardTab('insights')}
+                              className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer ${
+                                dashboardTab === 'insights' 
+                                  ? 'bg-[#EE4D2D] text-white shadow-sm shadow-orange-500/20' 
+                                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                              }`}
+                              title="Forecast & Deadstock Alerts"
+                            >
+                              <span className="flex items-center gap-2.5 min-w-0">
+                                <Sparkles className={`w-4 h-4 shrink-0 ${dashboardTab === 'insights' ? 'text-white' : 'text-purple-500'}`} />
+                                {!isSidebarCollapsed && <span className="truncate">Stock Alerts &amp; AI</span>}
+                              </span>
+                              {!isSidebarCollapsed && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold">
+                                  {financialMetrics.outOfStockCount + financialMetrics.lowStockCount}
+                                </span>
+                              )}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Navigation Section 2: ORDERS & COMMERCIAL FULFILLMENT */}
+                      <div className="pt-2 mt-2 border-t border-slate-100 space-y-1">
+                        {!isSidebarCollapsed && (
+                          <div className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                            Fulfillment & Orders
+                          </div>
+                        )}
+
+                        {/* Orders & Fulfillment */}
+                        <button
+                          onClick={() => setDashboardTab('orders')}
+                          className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer ${
+                            dashboardTab === 'orders' 
+                              ? 'bg-[#EE4D2D] text-white shadow-sm shadow-orange-500/20' 
+                              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                          }`}
+                          title="Orders & Fulfillment"
+                        >
+                          <span className="flex items-center gap-2.5 min-w-0">
+                            <ShoppingBag className={`w-4 h-4 shrink-0 ${dashboardTab === 'orders' ? 'text-white' : 'text-[#EE4D2D]'}`} />
+                            {!isSidebarCollapsed && <span className="truncate">Orders &amp; Dispatch</span>}
+                          </span>
+                          {!isSidebarCollapsed && (
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold ${
+                              dashboardTab === 'orders' ? 'bg-white/20 text-white' : 'bg-orange-100 text-[#EE4D2D]'
+                            }`}>
+                              {orders.length}
+                            </span>
+                          )}
+                        </button>
+
+                        {/* Sales Log */}
+                        <button
+                          onClick={() => setDashboardTab('sales-log')}
+                          className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer ${
+                            dashboardTab === 'sales-log' 
+                              ? 'bg-[#EE4D2D] text-white shadow-sm shadow-orange-500/20' 
+                              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                          }`}
+                          title="Sales Log"
+                        >
+                          <span className="flex items-center gap-2.5 min-w-0">
+                            <Receipt className={`w-4 h-4 shrink-0 ${dashboardTab === 'sales-log' ? 'text-white' : 'text-slate-500'}`} />
+                            {!isSidebarCollapsed && <span className="truncate">Itemized Sales Log</span>}
+                          </span>
+                          {!isSidebarCollapsed && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-mono">
+                              {financialMetrics.itemizedSales.length}
+                            </span>
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Navigation Section 3: VALUATION & FINANCIALS */}
+                      <div className="pt-2 mt-2 border-t border-slate-100 space-y-1">
+                        {!isSidebarCollapsed && (
+                          <button
+                            type="button"
+                            onClick={() => toggleSidebarGroup('finance')}
+                            className="w-full flex items-center justify-between px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400 hover:text-slate-600 transition-colors"
+                          >
+                            <span>Finance & Valuation</span>
+                            <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${sidebarExpandedGroups.finance ? '' : '-rotate-90'}`} />
+                          </button>
+                        )}
+
+                        {(isSidebarCollapsed || sidebarExpandedGroups.finance) && (
+                          <div className="space-y-1">
+                            {/* Cost & Valuation */}
+                            <button
+                              onClick={() => setDashboardTab('valuation')}
+                              className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer ${
+                                dashboardTab === 'valuation' 
+                                  ? 'bg-slate-900 text-white shadow-md' 
+                                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                              }`}
+                              title="Owner Cost & Valuation Report"
+                            >
+                              <span className="flex items-center gap-2.5 min-w-0">
+                                <FileSpreadsheet className={`w-4 h-4 shrink-0 ${dashboardTab === 'valuation' ? 'text-amber-400' : 'text-blue-600'}`} />
+                                {!isSidebarCollapsed && <span className="truncate">Cost &amp; Valuation</span>}
+                              </span>
+                              {!isSidebarCollapsed && (
+                                <span className={`text-[9px] px-1.5 py-0.5 rounded font-black tracking-wide uppercase ${
+                                  dashboardTab === 'valuation' ? 'bg-amber-400 text-slate-950' : 'bg-amber-100 text-amber-900'
+                                }`}>
+                                  Owner
+                                </span>
+                              )}
+                            </button>
+
+                            {/* P&L Statement */}
+                            <button
+                              onClick={() => setDashboardTab('pnl')}
+                              className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 transition-all cursor-pointer ${
+                                dashboardTab === 'pnl' 
+                                  ? 'bg-[#EE4D2D] text-white shadow-sm shadow-orange-500/20' 
+                                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                              }`}
+                              title="P&L Statement"
+                            >
+                              <TrendingUp className={`w-4 h-4 shrink-0 ${dashboardTab === 'pnl' ? 'text-white' : 'text-emerald-600'}`} />
+                              {!isSidebarCollapsed && <span>P&amp;L Financial Statement</span>}
+                            </button>
+
+                            {/* Charts & Trends */}
+                            <button
+                              onClick={() => setDashboardTab('analytics')}
+                              className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 transition-all cursor-pointer ${
+                                dashboardTab === 'analytics' 
+                                  ? 'bg-[#EE4D2D] text-white shadow-sm shadow-orange-500/20' 
+                                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                              }`}
+                              title="Charts & Performance Trends"
+                            >
+                              <BarChart3 className={`w-4 h-4 shrink-0 ${dashboardTab === 'analytics' ? 'text-white' : 'text-blue-500'}`} />
+                              {!isSidebarCollapsed && <span>Charts &amp; Visual Analytics</span>}
+                            </button>
+
+                            {/* Discounts & Vouchers */}
+                            <button
+                              onClick={() => setDashboardTab('promotions')}
+                              className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer ${
+                                dashboardTab === 'promotions' 
+                                  ? 'bg-[#EE4D2D] text-white shadow-sm shadow-orange-500/20' 
+                                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                              }`}
+                              title="Discounts & Promotion Vouchers"
+                            >
+                              <span className="flex items-center gap-2.5 min-w-0">
+                                <Flame className={`w-4 h-4 shrink-0 ${dashboardTab === 'promotions' ? 'text-white' : 'text-orange-500'}`} />
+                                {!isSidebarCollapsed && <span className="truncate">Discounts &amp; Vouchers</span>}
+                              </span>
+                              {!isSidebarCollapsed && storewideDiscount > 0 && (
+                                <span className="text-[10px] bg-rose-500 text-white font-bold px-1.5 py-0.5 rounded">
+                                  {storewideDiscount}%
+                                </span>
+                              )}
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
-                    <button
-                      onClick={() => setDashboardTab('inventory')}
-                      className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold flex items-center justify-between transition-colors cursor-pointer ${
-                        dashboardTab === 'inventory' 
-                          ? 'bg-[#EE4D2D] text-white shadow-xs' 
-                          : 'text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      <span className="flex items-center gap-2">
-                        <Layers className="w-4 h-4" /> Inventory &amp; SKUs
-                      </span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${
-                        dashboardTab === 'inventory' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
-                      }`}>
-                        {products.length}
-                      </span>
-                    </button>
-
-                    <button
-                      onClick={() => setDashboardTab('promotions')}
-                      className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold flex items-center justify-between transition-colors cursor-pointer ${
-                        dashboardTab === 'promotions' 
-                          ? 'bg-[#EE4D2D] text-white shadow-xs' 
-                          : 'text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      <span className="flex items-center gap-2">
-                        <Flame className="w-4 h-4 text-orange-400" /> Discounts &amp; Vouchers
-                      </span>
-                      {storewideDiscount > 0 && (
-                        <span className="text-[10px] bg-rose-500 text-white font-bold px-1.5 py-0.5 rounded">
-                          {storewideDiscount}%
-                        </span>
-                      )}
-                    </button>
-
-                    <button
-                      onClick={() => setDashboardTab('warehouse-boxes')}
-                      className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold flex items-center justify-between transition-colors cursor-pointer ${
-                        dashboardTab === 'warehouse-boxes' 
-                          ? 'bg-[#EE4D2D] text-white shadow-xs' 
-                          : 'text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      <span className="flex items-center gap-2">
-                        <Box className="w-4 h-4 text-amber-500" /> Box &amp; Quote Retrieval
-                      </span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                        dashboardTab === 'warehouse-boxes' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-900'
-                      }`}>
-                        Pick
-                      </span>
-                    </button>
-
-                    <button
-                      onClick={() => setDashboardTab('orders')}
-                      className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold flex items-center justify-between transition-colors cursor-pointer ${
-                        dashboardTab === 'orders' 
-                          ? 'bg-[#EE4D2D] text-white shadow-xs' 
-                          : 'text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      <span className="flex items-center gap-2">
-                        <ShoppingBag className="w-4 h-4" /> Orders &amp; Fulfillment
-                      </span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
-                        dashboardTab === 'orders' ? 'bg-white/20 text-white' : 'bg-orange-100 text-[#EE4D2D]'
-                      }`}>
-                        {orders.length}
-                      </span>
-                    </button>
-
-                    <button
-                      onClick={() => setDashboardTab('valuation')}
-                      className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold flex items-center justify-between transition-colors cursor-pointer ${
-                        dashboardTab === 'valuation' 
-                          ? 'bg-blue-900 text-white shadow-xs' 
-                          : 'text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      <span className="flex items-center gap-2">
-                        <FileSpreadsheet className="w-4 h-4 text-blue-400" /> Cost &amp; Valuation
-                      </span>
-                      <span className={`text-[9px] px-1.5 py-0.5 rounded font-black ${
-                        dashboardTab === 'valuation' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-900'
-                      }`}>
-                        Owner
-                      </span>
-                    </button>
-
-                    <button
-                      onClick={() => setDashboardTab('pnl')}
-                      className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer ${
-                        dashboardTab === 'pnl' 
-                          ? 'bg-[#EE4D2D] text-white shadow-xs' 
-                          : 'text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      <TrendingUp className="w-4 h-4" /> P&amp;L Statement
-                    </button>
-
-                    <button
-                      onClick={() => setDashboardTab('analytics')}
-                      className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer ${
-                        dashboardTab === 'analytics' 
-                          ? 'bg-[#EE4D2D] text-white shadow-xs' 
-                          : 'text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      <BarChart3 className="w-4 h-4" /> Charts &amp; Trends
-                    </button>
-
-                    <button
-                      onClick={() => setDashboardTab('sales-log')}
-                      className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold flex items-center justify-between transition-colors cursor-pointer ${
-                        dashboardTab === 'sales-log' 
-                          ? 'bg-[#EE4D2D] text-white shadow-xs' 
-                          : 'text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      <span className="flex items-center gap-2">
-                        <Receipt className="w-4 h-4" /> Sales Log
-                      </span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-mono">
-                        {financialMetrics.itemizedSales.length}
-                      </span>
-                    </button>
-
-                    <button
-                      onClick={() => setDashboardTab('insights')}
-                      className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer ${
-                        dashboardTab === 'insights' 
-                          ? 'bg-[#EE4D2D] text-white shadow-xs' 
-                          : 'text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      <Sparkles className="w-4 h-4 text-purple-500" /> Forecast &amp; Deadstock
-                    </button>
-
-                    {/* Quick Save Discounts Action in Sidebar */}
-                    <div className="pt-3 border-t border-slate-100">
+                    {/* Bottom Area: Save Discounts + User Profile Card */}
+                    <div className="pt-3 mt-4 border-t border-slate-100 space-y-2">
+                      {/* Save All Discounts Button */}
                       <button
                         onClick={handleSaveDiscounts}
-                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs py-2 px-3 rounded-lg shadow-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                        className={`w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs py-2 rounded-xl shadow-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 ${
+                          isSidebarCollapsed ? 'px-1' : 'px-3'
+                        }`}
+                        title="Save All Discounts to Catalog & Database"
                       >
-                        <Check className="w-3.5 h-3.5" /> Save All Discounts
+                        <Check className="w-3.5 h-3.5 shrink-0" />
+                        {!isSidebarCollapsed && <span>Save All Discounts</span>}
                       </button>
+
+                      {/* Premium Mini Admin Profile Card (As shown in Reel) */}
+                      {!isSidebarCollapsed ? (
+                        <div className="bg-slate-50/80 hover:bg-slate-100/80 rounded-xl p-2.5 border border-slate-100 flex items-center justify-between transition-colors">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-8 h-8 rounded-lg bg-slate-900 text-white font-black text-xs flex items-center justify-center shrink-0 shadow-2xs">
+                              AP
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-bold text-slate-800 text-xs truncate leading-tight">Admin Principal</p>
+                              <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Pro Member
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => { setIsMerchantAuthenticated(false); sessionStorage.removeItem('manna_merchant_auth'); }}
+                            className="text-slate-400 hover:text-rose-600 p-1 rounded-md cursor-pointer transition-colors"
+                            title="Sign out of Merchant Centre"
+                          >
+                            <LogOut className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex justify-center pt-1">
+                          <div 
+                            className="w-8 h-8 rounded-lg bg-slate-900 text-white font-black text-xs flex items-center justify-center shadow-2xs cursor-pointer"
+                            title="Admin Principal (Pro Member)"
+                          >
+                            AP
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </aside>
 
@@ -7967,6 +8267,16 @@ const renderPopups = () => (
                     ? `Add ₱${wholesaleDeficit.toLocaleString(undefined, { minimumFractionDigits: 0 })} more for Wholesale Min (₱15k)`
                     : `Proceed to Checkout ${!currentUser ? '(Log In Required)' : ''}`}
                 </button>
+                <a
+                  href={`https://m.me/110311578465073?text=${encodeURIComponent(
+                    `Hello Manna Hardware! I would like to place an order from my cart:\n\n${cart.map(i => `• ${i.name} (${i.quantity} ${i.unit || 'pc'}) - ₱${(i.price * i.quantity).toLocaleString('en-PH')}`).join('\n')}\n\nEstimated Subtotal: ₱${cartSubtotal.toLocaleString('en-PH')}\nDelivery / Pickup: Tacloban & Leyte`
+                  )}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full mt-2 py-2.5 rounded-lg font-bold text-xs bg-[#0084FF] hover:bg-[#0072de] text-white flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer"
+                >
+                  <MessageCircle className="w-4 h-4 fill-current" /> Send Order to Messenger
+                </a>
               </div>
             )}
           </div>
@@ -8490,7 +8800,15 @@ const renderPopups = () => (
               <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-1">
                 <p className="font-bold text-slate-800">Direct Contractor Hotline:</p>
                 <p className="text-base font-black text-[#EE4D2D] font-mono">0926 199 5703 / (053) 888-2910</p>
-                <p className="text-[10px] text-slate-400">Viber, SMS & WhatsApp connected</p>
+                <p className="text-[10px] text-slate-400">Calls & SMS Connected</p>
+                <a
+                  href="https://m.me/110311578465073"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-[11px] font-bold text-[#0084FF] hover:underline mt-0.5"
+                >
+                  <MessageCircle className="w-3 h-3 fill-current" /> Chat on Manna Hardware Messenger
+                </a>
               </div>
 
               <div className="space-y-1 text-slate-600">
@@ -8825,12 +9143,12 @@ const renderPopups = () => (
                     <Phone className="w-3.5 h-3.5" /> Call Dispatch: 0926 199 5703
                   </a>
                   <a
-                    href={`https://wa.me/639261995703?text=Hello%20Manna%20Hardware%20Dispatch.%20I%20am%20interested%20in%20inspecting%20and%20reserving%20${encodeURIComponent(selectedLotModal.name)}%20for%20₱${selectedLotModal.lotPrice.toLocaleString('en-PH')}.%20Please%20confirm%20availability%20and%20schedule.`}
+                    href={`https://m.me/110311578465073?text=${encodeURIComponent(`Hello Manna Hardware! I am interested in reserving ${selectedLotModal.name} for ₱${selectedLotModal.lotPrice.toLocaleString('en-PH')}. Please confirm availability and hauling schedule.`)}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1 cursor-pointer shadow-2xs transition-all"
+                    className="bg-[#0084FF] hover:bg-[#0072de] text-white font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all active:scale-95"
                   >
-                    <MessageCircle className="w-3.5 h-3.5" /> Viber
+                    <MessageCircle className="w-3.5 h-3.5 fill-current" /> Send to Messenger
                   </a>
                   <button
                     onClick={() => {
@@ -8958,7 +9276,8 @@ const renderPopups = () => (
                     </p>
                     <p className="text-xs text-slate-500 mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
                       <span><strong>Hotline:</strong> (053) 832-4911</span>
-                      <span><strong>Mobile/Viber:</strong> 0926 199 5703</span>
+                      <span><strong>Mobile:</strong> 0926 199 5703</span>
+                      <span><a href="https://m.me/110311578465073" target="_blank" rel="noreferrer" className="text-[#0084FF] hover:underline font-bold inline-flex items-center gap-0.5"><MessageCircle className="w-3 h-3 fill-current" /> Messenger: MANNA Hardware</a></span>
                       <span><strong>Email:</strong> sales@mannahardware.ph</span>
                     </p>
                   </div>

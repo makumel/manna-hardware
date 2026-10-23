@@ -204,6 +204,10 @@ export function getLotProducts(lotId, allProducts, includeCancelled = false) {
 }
 
 export function getProductWholesalePack(product, isRetail) {
+  const stock = Math.max(0, Number(product?.stock || 0));
+  if (stock <= 0) {
+    return { minQty: 1, step: 1, packLabel: 'Out of Stock' };
+  }
   if (isRetail) {
     return { minQty: 1, step: 1, packLabel: '1 pc (Retail)' };
   }
@@ -211,56 +215,67 @@ export function getProductWholesalePack(product, isRetail) {
   const unit = (product?.unit || '').toLowerCase();
   const price = Number(product?.price || 0);
 
+  // Helper to cap minQty and step to available stock
+  const makePack = (minQty, step, label) => {
+    const safeMin = Math.max(1, Math.min(minQty, stock));
+    const safeStep = Math.max(1, Math.min(step, stock));
+    const finalLabel = safeMin < minQty ? `${safeMin} ${product?.unit || 'pcs'} (Last Stock)` : label;
+    return { minQty: safeMin, step: safeStep, packLabel: finalLabel };
+  };
+
   // High-value commercial equipment (> ₱1,500) sold individually
   if (price >= 1500) {
-    return { minQty: 1, step: 1, packLabel: 'Commercial Unit (1 pc)' };
+    return makePack(1, 1, 'Commercial Unit (1 pc)');
   }
-  // Nails & Kilo Materials: Sold per kilo (1 kg) - user confirmed no 25kg sacks in stock
+  // Rigid Pipes (GI, PVC, PE, PNS, PPR): Sold per length / piece
+  if (name.includes('pipe') && !name.includes('holder') && !name.includes('clamp') && !name.includes('wrench')) {
+    return makePack(1, 1, '1 pc (Full Pipe Length)');
+  }
+  // Nails & Kilo Materials: Sold per kilo (1 kg)
   if (name.includes('nail') || unit === 'kg' || unit.includes('kilo')) {
-    return { minQty: 1, step: 1, packLabel: '1 kg (Per Kilo)' };
+    return makePack(1, 1, '1 kg (Per Kilo)');
   }
-  // Blind Rivets: Minimum box of 10 packs (1,000 pcs)
-  if (name.includes('rivet') || name.includes('blind rivet')) {
-    const min = Math.min(10, Math.max(1, product?.stock || 10));
-    return { minQty: min, step: min, packLabel: `Box of ${min} packs (1k pcs)` };
+  // Spray Paints & Cans (Bosny, Pylox, Sherlux): Sold per can
+  if (name.includes('spray') || name.includes('bosny') || name.includes('pylox') || name.includes('sherlux')) {
+    return makePack(1, 1, '1 Can (400cc)');
   }
-  // Tex Screws / Drywall Screws: Minimum 10 packs
-  if (name.includes('screw') || name.includes('tex screw') || name.includes('gypsum')) {
-    const min = Math.min(10, Math.max(1, product?.stock || 10));
-    return { minQty: min, step: min, packLabel: `Box of ${min} packs` };
+  // Pre-packaged 100-pc boxes (Rivets, Tex screws, Gypsum screws): Min 1 pack (100 pcs)
+  if (unit.includes('100') || name.includes('100 pcs') || name.includes('100pcs')) {
+    return makePack(1, 1, '1 Pack (100 pcs)');
   }
-  // Teflon & Seal Tapes: Minimum box of 50 rolls
+  // Hand Tools (wrenches, pliers, hammers, chisels, saws, multitesters): Sold per piece
+  if (name.includes('wrench') || name.includes('plier') || name.includes('hammer') || name.includes('chisel') || name.includes('saw') || name.includes('tester') || name.includes('trowel')) {
+    return makePack(1, 1, '1 pc (Contractor Tool)');
+  }
+  // Plumbing Fixtures (faucets, angle valves, drains, sinks, showers): Sold per piece
+  if (name.includes('faucet') || name.includes('angle valve') || name.includes('drain') || name.includes('sink') || name.includes('shower') || name.includes('p-trap') || name.includes('bibcock')) {
+    return makePack(1, 1, '1 pc (Jobsite Fixture)');
+  }
+  // Teflon & Seal Tapes: Pack of 5 rolls (or remaining stock)
   if (name.includes('teflon') || name.includes('seal tape')) {
-    const min = Math.min(50, Math.max(1, product?.stock || 50));
-    return { minQty: min, step: min, packLabel: `Box of ${min} rolls` };
+    return makePack(5, 5, 'Pack of 5 rolls');
   }
-  // Cutting / Grinding Discs / Sandpaper: Minimum bundle of 25 pcs
+  // Cutting / Grinding Discs / Sandpaper: Pack of 5 pcs
   if (name.includes('cutting disc') || name.includes('grinding disc') || name.includes('sandpaper')) {
-    const min = Math.min(25, Math.max(1, product?.stock || 25));
-    return { minQty: min, step: min, packLabel: `Bundle of ${min} pcs` };
+    return makePack(5, 5, 'Bundle of 5 pcs');
   }
-  // Plumbing & Electrical Fittings: Minimum contractor bag of 10 pcs
+  // Plumbing & Electrical Fittings: Pack of 5 pcs
   if (name.includes('elbow') || name.includes('tee') || name.includes('coupling') || name.includes('fitting') || name.includes('ppr') || name.includes('pvc')) {
-    const min = Math.min(10, Math.max(1, product?.stock || 10));
-    return { minQty: min, step: min, packLabel: `Contractor Bag (${min} pcs)` };
+    return makePack(5, 5, 'Contractor Pack (5 pcs)');
   }
-  // Heavy Steel / Purlins / Pipes: Minimum contractor bundle of 5 pcs
-  if (name.includes('purlin') || name.includes('gi pipe') || name.includes('deformed') || name.includes('plain bar') || name.includes('angle bar')) {
-    const min = Math.min(5, Math.max(1, product?.stock || 5));
-    return { minQty: min, step: min, packLabel: `Bundle of ${min} pcs` };
+  // Heavy Steel / Purlins: Min 1 pc
+  if (name.includes('purlin') || name.includes('deformed') || name.includes('plain bar') || name.includes('angle bar')) {
+    return makePack(1, 1, '1 pc (Steel Length)');
   }
-  // Low cost consumables (<= ₱50): Box of 20 pcs
+  // Low cost consumables (<= ₱50): Pack of 5 pcs
   if (price <= 50) {
-    const min = Math.min(20, Math.max(1, product?.stock || 20));
-    return { minQty: min, step: min, packLabel: `Case of ${min} pcs` };
+    return makePack(5, 5, 'Pack of 5 pcs');
   }
-  // Mid-range consumables (<= ₱200): Pack of 10 pcs
+  // Mid-range items (<= ₱200): Pack of 2 pcs
   if (price <= 200) {
-    const min = Math.min(10, Math.max(1, product?.stock || 10));
-    return { minQty: min, step: min, packLabel: `Pack of ${min} pcs` };
+    return makePack(2, 2, 'Pack of 2 pcs');
   }
-  const min = Math.min(5, Math.max(1, product?.stock || 5));
-  return { minQty: min, step: min, packLabel: `Wholesale Pack (${min} pcs)` };
+  return makePack(1, 1, '1 pc (Wholesale)');
 }
 
 export default function App() {
@@ -531,6 +546,15 @@ const renderPopups = () => (
   const [appliedPromo, setAppliedPromo] = useState(null);
   const [promoInput, setPromoInput] = useState('');
   const [promoMessage, setPromoMessage] = useState({ text: '', type: '' });
+
+  // Stock protection toast state
+  const [stockToast, setStockToast] = useState(null); // { title: string, message: string, type: 'warning' | 'error' | 'success' | 'info' }
+
+  useEffect(() => {
+    if (!stockToast) return;
+    const timer = setTimeout(() => setStockToast(null), 3800);
+    return () => clearTimeout(timer);
+  }, [stockToast]);
 
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -821,6 +845,33 @@ const renderPopups = () => (
   useEffect(() => {
     localStorage.setItem('manna_orders', JSON.stringify(orders));
   }, [orders]);
+
+  // Strict stock protection: sanitize cart against live product stock
+  useEffect(() => {
+    if (!products || products.length === 0) return;
+    setCart(prev => {
+      let changed = false;
+      const sanitized = prev.map(item => {
+        const live = products.find(p => p.id === item.id);
+        if (!live) return item;
+        const maxStock = Math.max(0, Number(live.stock || 0));
+        if (maxStock <= 0) {
+          changed = true;
+          return null;
+        }
+        if (item.quantity > maxStock) {
+          changed = true;
+          return { ...item, stock: maxStock, quantity: maxStock };
+        }
+        if (item.stock !== maxStock) {
+          changed = true;
+          return { ...item, stock: maxStock };
+        }
+        return item;
+      }).filter(Boolean);
+      return changed ? sanitized : prev;
+    });
+  }, [products]);
 
   // UX Polish: Scroll progress & scroll-to-top detection
   useEffect(() => {
@@ -1417,17 +1468,66 @@ const renderPopups = () => (
     document.body.removeChild(link);
   };
 
-  // Cart actions with Wholesale packaging increments
+  // Cart actions with Wholesale packaging increments and STRICT available stock guard
   const addToCart = (product, qty = null) => {
-    if (product.stock <= 0) return;
+    if (!product) return;
+    const maxStock = Math.max(0, Number(product.stock || 0));
+
+    if (maxStock <= 0) {
+      setStockToast({
+        title: 'Out of Stock',
+        message: `"${product.name}" is currently sold out.`,
+        type: 'error'
+      });
+      return;
+    }
+
+    const existing = cart.find(item => item.id === product.id);
+    const currentInCart = existing ? existing.quantity : 0;
+
+    if (currentInCart >= maxStock) {
+      setStockToast({
+        title: 'Max Stock in Cart',
+        message: `You already have all available stock (${maxStock} ${product.unit || 'pcs'}) of "${product.name}" in your cart.`,
+        type: 'warning'
+      });
+      return;
+    }
+
     const pack = getProductWholesalePack(product, isRetailMode);
-    const quantityToAdd = (qty !== null && qty !== undefined) ? qty : pack.minQty;
+    const desiredAdd = (qty !== null && qty !== undefined) ? qty : pack.minQty;
+    const remainingStock = maxStock - currentInCart;
+    const actualAdd = Math.min(desiredAdd, remainingStock);
+
+    if (actualAdd <= 0) {
+      setStockToast({
+        title: 'Maximum Stock Reached',
+        message: `No more units available for "${product.name}".`,
+        type: 'warning'
+      });
+      return;
+    }
+
+    if (actualAdd < desiredAdd) {
+      setStockToast({
+        title: 'Stock Limit Reached',
+        message: `Only ${remainingStock} ${product.unit || 'pcs'} left in stock. Added ${actualAdd} to cart (Max: ${maxStock}).`,
+        type: 'warning'
+      });
+    } else {
+      setStockToast({
+        title: 'Added to Cart',
+        message: `Added ${actualAdd} ${product.unit || 'pcs'} of "${product.name}" to cart.`,
+        type: 'success'
+      });
+    }
+
     setCart(prev => {
-      const existing = prev.find(item => item.id === product.id);
-      if (existing) {
-        return prev.map(item => item.id === product.id ? { ...item, quantity: item.quantity + quantityToAdd } : item);
+      const exists = prev.find(item => item.id === product.id);
+      if (exists) {
+        return prev.map(item => item.id === product.id ? { ...item, quantity: item.quantity + actualAdd, stock: maxStock } : item);
       }
-      return [...prev, { ...product, quantity: quantityToAdd }];
+      return [...prev, { ...product, quantity: actualAdd, stock: maxStock }];
     });
   };
 
@@ -1469,28 +1569,57 @@ const renderPopups = () => (
   };
 
   const updateCartQty = (id, delta) => {
+    const item = cart.find(i => i.id === id);
+    if (!item) return;
+
+    const maxStock = Math.max(0, Number(item.stock || 0));
+
+    if (delta > 0) {
+      if (item.quantity >= maxStock) {
+        setStockToast({
+          title: 'Maximum Stock Reached',
+          message: `Cannot add more. Only ${maxStock} ${item.unit || 'pcs'} available in stock for "${item.name}".`,
+          type: 'warning'
+        });
+        return;
+      }
+    }
+
     setCart(prev => {
-      return prev.map(item => {
-        if (item.id === id) {
-          const newQty = item.quantity + delta;
+      return prev.map(i => {
+        if (i.id === id) {
+          const newQty = i.quantity + delta;
           if (newQty <= 0) return null;
-          return { ...item, quantity: newQty };
+          const cappedQty = Math.min(newQty, maxStock);
+          return { ...i, quantity: cappedQty };
         }
-        return item;
+        return i;
       }).filter(Boolean);
     });
   };
 
   const setCartItemQty = (id, newQty) => {
+    const item = cart.find(i => i.id === id);
+    if (!item) return;
+    const maxStock = Math.max(0, Number(item.stock || 0));
     const val = parseInt(newQty, 10);
-    setCart(prev => prev.map(item => {
-      if (item.id === id) {
-        if (isNaN(val) || val <= 0) return { ...item, quantity: 1 };
-        const max = item.stock || 9999;
-        return { ...item, quantity: Math.min(val, max) };
-      }
-      return item;
-    }));
+
+    if (isNaN(val) || val <= 0) {
+      setCart(prev => prev.map(i => i.id === id ? { ...i, quantity: 1 } : i));
+      return;
+    }
+
+    if (val > maxStock) {
+      setStockToast({
+        title: 'Stock Limit Exceeded',
+        message: `Requested ${val} exceeds available stock of ${maxStock} ${item.unit || 'pcs'}. Clamped to ${maxStock}.`,
+        type: 'warning'
+      });
+      setCart(prev => prev.map(i => i.id === id ? { ...i, quantity: maxStock } : i));
+      return;
+    }
+
+    setCart(prev => prev.map(i => i.id === id ? { ...i, quantity: val } : i));
   };
 
   const handleInlineStockChange = (id, newStock) => {
@@ -2293,6 +2422,22 @@ const renderPopups = () => (
         style={{ width: `${scrollProgress}%` }} 
       />
 
+      {/* Stock Protection Toast Notification */}
+      {stockToast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[130] max-w-md w-[92%] sm:w-auto shadow-2xl rounded-xl p-3 flex items-start gap-2.5 border backdrop-blur-md transition-all bg-slate-900/95 text-white border-amber-400/40 animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className={`p-1.5 rounded-lg shrink-0 ${stockToast.type === 'error' ? 'bg-rose-500/20 text-rose-400' : stockToast.type === 'warning' ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+            <AlertCircle className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-0 pr-2">
+            <h4 className="text-xs font-black text-amber-300 uppercase tracking-wider">{stockToast.title}</h4>
+            <p className="text-xs text-slate-200 mt-0.5 leading-snug">{stockToast.message}</p>
+          </div>
+          <button onClick={() => setStockToast(null)} className="text-slate-400 hover:text-white p-1 cursor-pointer">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* 20 Frontend Polish: Accessible Skip-To-Content Link */}
       <a 
         href="#main-content" 
@@ -2862,15 +3007,26 @@ const renderPopups = () => (
                       <span className="text-[#EE4D2D] font-black text-xs sm:text-sm">₱775</span>
                       <span className="text-[10px] text-slate-400 line-through">₱1,080</span>
                     </div>
-                    <button
-                      onClick={() => {
-                        const p = products.find(x => x.name.toLowerCase().includes('purlin')) || products[0];
-                        addToCart(p, 1);
-                      }}
-                      className="mt-1.5 w-full bg-[#EE4D2D] hover:bg-[#d73f20] text-white text-[10px] font-bold py-1 rounded-md transition-colors cursor-pointer"
-                    >
-                      + Add Steel Deal
-                    </button>
+                    {(() => {
+                      const p = products.find(x => x.name.toLowerCase().includes('purlin')) || products[0];
+                      const pStock = Math.max(0, Number(p?.stock || 0));
+                      const pInCart = cart.find(c => c.id === p?.id)?.quantity || 0;
+                      const pDisabled = pStock <= 0 || pInCart >= pStock;
+
+                      return (
+                        <button
+                          disabled={pDisabled}
+                          onClick={() => addToCart(p, 1)}
+                          className={`mt-1.5 w-full text-[10px] font-bold py-1 rounded-md transition-colors ${
+                            pDisabled 
+                              ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300' 
+                              : 'bg-[#EE4D2D] hover:bg-[#d73f20] text-white cursor-pointer shadow-xs'
+                          }`}
+                        >
+                          {pStock <= 0 ? 'Sold Out' : pInCart >= pStock ? `Max in Cart (${pInCart})` : '+ Add Steel Deal'}
+                        </button>
+                      );
+                    })()}
                   </div>
 
                   {/* Deal 2: Brass Swing Check Valve (Plumbing) */}
@@ -2886,15 +3042,26 @@ const renderPopups = () => (
                       <span className="text-[#EE4D2D] font-black text-xs sm:text-sm">₱380</span>
                       <span className="text-[10px] text-slate-400 line-through">₱580</span>
                     </div>
-                    <button
-                      onClick={() => {
-                        const p = products.find(x => x.name.toLowerCase().includes('valve') && x.name.toLowerCase().includes('brass')) || products[1];
-                        addToCart(p, 1);
-                      }}
-                      className="mt-1.5 w-full bg-[#EE4D2D] hover:bg-[#d73f20] text-white text-[10px] font-bold py-1 rounded-md transition-colors cursor-pointer"
-                    >
-                      + Add Valve Deal
-                    </button>
+                    {(() => {
+                      const p = products.find(x => x.name.toLowerCase().includes('valve') && x.name.toLowerCase().includes('brass')) || products[1];
+                      const pStock = Math.max(0, Number(p?.stock || 0));
+                      const pInCart = cart.find(c => c.id === p?.id)?.quantity || 0;
+                      const pDisabled = pStock <= 0 || pInCart >= pStock;
+
+                      return (
+                        <button
+                          disabled={pDisabled}
+                          onClick={() => addToCart(p, 1)}
+                          className={`mt-1.5 w-full text-[10px] font-bold py-1 rounded-md transition-colors ${
+                            pDisabled 
+                              ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300' 
+                              : 'bg-[#EE4D2D] hover:bg-[#d73f20] text-white cursor-pointer shadow-xs'
+                          }`}
+                        >
+                          {pStock <= 0 ? 'Sold Out' : pInCart >= pStock ? `Max in Cart (${pInCart})` : '+ Add Valve Deal'}
+                        </button>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
@@ -2931,15 +3098,26 @@ const renderPopups = () => (
                       <span className="text-[#EE4D2D] font-black text-xs sm:text-sm">₱390</span>
                       <span className="text-[10px] text-slate-400 line-through">₱600</span>
                     </div>
-                    <button
-                      onClick={() => {
-                        const p = products.find(x => x.name.toLowerCase().includes('rosco') && x.name.toLowerCase().includes('gooseneck')) || products[2];
-                        addToCart(p, 1);
-                      }}
-                      className="mt-1.5 w-full bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-bold py-1 rounded-md transition-colors cursor-pointer"
-                    >
-                      Claim As-Is
-                    </button>
+                    {(() => {
+                      const p = products.find(x => x.name.toLowerCase().includes('rosco') && x.name.toLowerCase().includes('gooseneck')) || products[2];
+                      const pStock = Math.max(0, Number(p?.stock || 0));
+                      const pInCart = cart.find(c => c.id === p?.id)?.quantity || 0;
+                      const pDisabled = pStock <= 0 || pInCart >= pStock;
+
+                      return (
+                        <button
+                          disabled={pDisabled}
+                          onClick={() => addToCart(p, 1)}
+                          className={`mt-1.5 w-full text-[10px] font-bold py-1 rounded-md transition-colors ${
+                            pDisabled 
+                              ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300' 
+                              : 'bg-slate-900 hover:bg-slate-800 text-white cursor-pointer shadow-xs'
+                          }`}
+                        >
+                          {pStock <= 0 ? 'Sold Out' : pInCart >= pStock ? `Max in Cart (${pInCart})` : 'Claim As-Is'}
+                        </button>
+                      );
+                    })()}
                   </div>
 
                   {/* 6mm Angle Bar (Structural Steel) */}
@@ -2955,15 +3133,26 @@ const renderPopups = () => (
                       <span className="text-[#EE4D2D] font-black text-xs sm:text-sm">₱2,050</span>
                       <span className="text-[10px] text-slate-400 line-through">₱2,500</span>
                     </div>
-                    <button
-                      onClick={() => {
-                        const p = products.find(x => x.name.toLowerCase().includes('angle bar')) || products[3];
-                        addToCart(p, 1);
-                      }}
-                      className="mt-1.5 w-full bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-bold py-1 rounded-md transition-colors cursor-pointer"
-                    >
-                      Claim Steel
-                    </button>
+                    {(() => {
+                      const p = products.find(x => x.name.toLowerCase().includes('angle bar')) || products[3];
+                      const pStock = Math.max(0, Number(p?.stock || 0));
+                      const pInCart = cart.find(c => c.id === p?.id)?.quantity || 0;
+                      const pDisabled = pStock <= 0 || pInCart >= pStock;
+
+                      return (
+                        <button
+                          disabled={pDisabled}
+                          onClick={() => addToCart(p, 1)}
+                          className={`mt-1.5 w-full text-[10px] font-bold py-1 rounded-md transition-colors ${
+                            pDisabled 
+                              ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300' 
+                              : 'bg-slate-900 hover:bg-slate-800 text-white cursor-pointer shadow-xs'
+                          }`}
+                        >
+                          {pStock <= 0 ? 'Sold Out' : pInCart >= pStock ? `Max in Cart (${pInCart})` : 'Claim Steel'}
+                        </button>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
@@ -3084,6 +3273,8 @@ const renderPopups = () => (
                   product={item} 
                   onAddToCart={addToCart} 
                   storewideDiscount={storewideDiscount} 
+                  isRetailMode={isRetailMode}
+                  cart={cart}
                   isRightCol={idx % 2 === 1}
                 />
               ))}
@@ -3959,62 +4150,99 @@ const renderPopups = () => (
 
                             {/* Type Quantity Manually */}
                             <td className="py-2.5 px-3 text-center">
-                              <div className="inline-flex items-center border border-slate-300 rounded bg-white shadow-2xs">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const step = pack.step;
-                                    const cur = catalogQuantities[item.id] || pack.minQty;
-                                    if (cur > step) setCatalogQuantities(prev => ({ ...prev, [item.id]: cur - step }));
-                                  }}
-                                  className="px-2 py-1 text-slate-600 hover:bg-slate-100 font-bold select-none cursor-pointer"
-                                >
-                                  -
-                                </button>
-                                <input
-                                  type="number"
-                                  min={pack.minQty}
-                                  step={pack.step}
-                                  max={item.stock || 9999}
-                                  value={qtyToBuy}
-                                  onChange={(e) => {
-                                    const val = Math.max(pack.minQty, parseInt(e.target.value, 10) || pack.minQty);
-                                    setCatalogQuantities(prev => ({ ...prev, [item.id]: val }));
-                                  }}
-                                  className="w-14 text-center text-xs font-black border-x border-slate-200 py-1 focus:outline-none focus:bg-orange-50 text-slate-900"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const step = pack.step;
-                                    const cur = catalogQuantities[item.id] || pack.minQty;
-                                    setCatalogQuantities(prev => ({ ...prev, [item.id]: cur + step }));
-                                  }}
-                                  className="px-2 py-1 text-slate-600 hover:bg-slate-100 font-bold select-none cursor-pointer"
-                                >
-                                  +
-                                </button>
-                              </div>
-                              {!isRetailMode && (
-                                <span className="block text-[8px] text-amber-700 font-bold mt-0.5">
-                                  {pack.packLabel}
-                                </span>
-                              )}
+                              {(() => {
+                                const maxStock = Math.max(0, Number(item.stock || 0));
+                                const inCartQty = cart.find(c => c.id === item.id)?.quantity || 0;
+                                const isOOS = maxStock <= 0;
+                                const isMax = inCartQty >= maxStock;
+
+                                return (
+                                  <>
+                                    <div className="inline-flex items-center border border-slate-300 rounded bg-white shadow-2xs">
+                                      <button
+                                        type="button"
+                                        disabled={isOOS || qtyToBuy <= 1}
+                                        onClick={() => {
+                                          const step = pack.step;
+                                          const cur = catalogQuantities[item.id] || pack.minQty;
+                                          if (cur > step) setCatalogQuantities(prev => ({ ...prev, [item.id]: cur - step }));
+                                        }}
+                                        className={`px-2 py-1 font-bold select-none ${isOOS || qtyToBuy <= 1 ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-slate-600 hover:bg-slate-100 cursor-pointer'}`}
+                                      >
+                                        -
+                                      </button>
+                                      <input
+                                        type="number"
+                                        min={1}
+                                        step={pack.step}
+                                        max={Math.max(1, maxStock)}
+                                        disabled={isOOS || isMax}
+                                        value={isOOS ? 0 : Math.min(qtyToBuy, Math.max(1, maxStock))}
+                                        onChange={(e) => {
+                                          const raw = parseInt(e.target.value, 10);
+                                          const clamped = Math.min(maxStock, Math.max(1, isNaN(raw) ? 1 : raw));
+                                          setCatalogQuantities(prev => ({ ...prev, [item.id]: clamped }));
+                                        }}
+                                        className="w-14 text-center text-xs font-black border-x border-slate-200 py-1 focus:outline-none focus:bg-orange-50 text-slate-900 disabled:bg-slate-100 disabled:text-slate-400"
+                                      />
+                                      <button
+                                        type="button"
+                                        disabled={isOOS || isMax || qtyToBuy >= maxStock}
+                                        onClick={() => {
+                                          const step = pack.step;
+                                          const cur = catalogQuantities[item.id] || pack.minQty;
+                                          const next = Math.min(maxStock, cur + step);
+                                          setCatalogQuantities(prev => ({ ...prev, [item.id]: next }));
+                                        }}
+                                        className={`px-2 py-1 font-bold select-none ${isOOS || isMax || qtyToBuy >= maxStock ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-slate-600 hover:bg-slate-100 cursor-pointer'}`}
+                                      >
+                                        +
+                                      </button>
+                                    </div>
+                                    {!isRetailMode && (
+                                      <span className="block text-[8px] text-amber-700 font-bold mt-0.5">
+                                        {pack.packLabel}
+                                      </span>
+                                    )}
+                                  </>
+                                );
+                              })()}
                             </td>
 
                             {/* Action Add to Cart */}
                             <td className="py-2.5 px-3 text-center">
-                              <button
-                                onClick={() => addToCart(item, qtyToBuy)}
-                                disabled={item.stock <= 0}
-                                className={`px-3 py-1.5 rounded text-xs font-bold transition-all inline-flex items-center gap-1 cursor-pointer ${
-                                  item.stock <= 0
-                                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                                    : 'bg-[#EE4D2D] hover:bg-[#d73f20] text-white shadow-xs'
-                                }`}
-                              >
-                                <Plus className="w-3.5 h-3.5" /> Add ({qtyToBuy})
-                              </button>
+                              {(() => {
+                                const inCartQty = cart.find(c => c.id === item.id)?.quantity || 0;
+                                const maxStock = Math.max(0, Number(item.stock || 0));
+                                const isOOS = maxStock <= 0;
+                                const isMax = inCartQty >= maxStock;
+                                const remainingStock = Math.max(0, maxStock - inCartQty);
+                                const addAmount = Math.min(qtyToBuy, remainingStock);
+
+                                return (
+                                  <button
+                                    onClick={() => addToCart(item, addAmount)}
+                                    disabled={isOOS || isMax}
+                                    className={`px-3 py-1.5 rounded text-xs font-bold transition-all inline-flex items-center gap-1 ${
+                                      isOOS
+                                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                        : isMax
+                                        ? 'bg-amber-100 text-amber-800 border border-amber-300 cursor-not-allowed'
+                                        : 'bg-[#EE4D2D] hover:bg-[#d73f20] text-white shadow-xs cursor-pointer'
+                                    }`}
+                                  >
+                                    {isOOS ? (
+                                      'Out of Stock'
+                                    ) : isMax ? (
+                                      `Max in Cart (${inCartQty})`
+                                    ) : (
+                                      <>
+                                        <Plus className="w-3.5 h-3.5" /> Add ({addAmount})
+                                      </>
+                                    )}
+                                  </button>
+                                );
+                              })()}
                             </td>
                           </tr>
                         );
@@ -4032,6 +4260,8 @@ const renderPopups = () => (
                     product={item} 
                     onAddToCart={addToCart} 
                     storewideDiscount={storewideDiscount} 
+                    isRetailMode={isRetailMode}
+                    cart={cart}
                     isRightCol={idx % 2 === 1}
                   />
                 ))}
@@ -4221,7 +4451,7 @@ const renderPopups = () => (
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3">
               {filteredProducts.slice(0, 18).map((item, idx) => (
-                <ProductCard key={item.id} product={item} onAddToCart={addToCart} storewideDiscount={storewideDiscount} isRetailMode={isRetailMode} isRightCol={idx % 2 === 1} />
+                <ProductCard key={item.id} product={item} onAddToCart={addToCart} storewideDiscount={storewideDiscount} isRetailMode={isRetailMode} cart={cart} isRightCol={idx % 2 === 1} />
               ))}
             </div>
           </main>
@@ -4244,7 +4474,7 @@ const renderPopups = () => (
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3">
               {filteredProducts.slice(10, 28).map((item, idx) => (
-                <ProductCard key={item.id} product={item} onAddToCart={addToCart} isVideoCard storewideDiscount={storewideDiscount} isRetailMode={isRetailMode} isRightCol={idx % 2 === 1} />
+                <ProductCard key={item.id} product={item} onAddToCart={addToCart} isVideoCard storewideDiscount={storewideDiscount} isRetailMode={isRetailMode} cart={cart} isRightCol={idx % 2 === 1} />
               ))}
             </div>
           </main>
@@ -7550,16 +7780,34 @@ const renderPopups = () => (
                           <input
                             type="number"
                             min="1"
-                            max={item.stock || 9999}
+                            max={item.stock || 1}
                             value={item.quantity}
                             onChange={(e) => setCartItemQty(item.id, e.target.value)}
                             className="w-14 text-center font-black text-xs py-1 border-x border-slate-200 focus:outline-none focus:bg-orange-50 text-slate-900"
                           />
-                          <button onClick={() => updateCartQty(item.id, 1)} className="px-2.5 py-1 text-slate-600 hover:bg-slate-100 cursor-pointer font-bold select-none">+</button>
+                          <button 
+                            onClick={() => updateCartQty(item.id, 1)} 
+                            disabled={item.quantity >= (item.stock || 0)}
+                            className={`px-2.5 py-1 font-bold select-none ${
+                              item.quantity >= (item.stock || 0)
+                                ? 'text-slate-300 bg-slate-50 cursor-not-allowed'
+                                : 'text-slate-600 hover:bg-slate-100 cursor-pointer'
+                            }`}
+                            title={item.quantity >= (item.stock || 0) ? `Max stock (${item.stock}) reached` : 'Add 1'}
+                          >
+                            +
+                          </button>
                         </div>
-                        <button onClick={() => removeFromCart(item.id)} className="text-slate-400 hover:text-rose-600 cursor-pointer p-1">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          {item.quantity >= (item.stock || 0) && (
+                            <span className="text-[9px] font-black text-amber-700 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded">
+                              Max Stock ({item.stock})
+                            </span>
+                          )}
+                          <button onClick={() => removeFromCart(item.id)} className="text-slate-400 hover:text-rose-600 cursor-pointer p-1">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -9033,7 +9281,7 @@ const renderPopups = () => (
 }
 
 // ==================== MANNA PRODUCT CARD COMPONENT ====================
-function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = false, storewideDiscount = 0, isRetailMode = false }) {
+function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = false, storewideDiscount = 0, isRetailMode = false, cart = [] }) {
   const getDisplaySold = (p) => {
     let s = typeof p.sold === 'number' ? p.sold : null;
     if (s === null || isNaN(s)) {
@@ -9062,9 +9310,18 @@ function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = f
   const effectivePrice = maxDiscount > 0 ? product.price * (1 - maxDiscount / 100) : product.price;
   const isBulkPack = product.unit && product.unit.includes('100');
 
+  // Available stock calculation & in-cart guard
+  const maxStock = Math.max(0, Number(product.stock || 0));
+  const inCartItem = cart?.find(item => item.id === product.id);
+  const currentInCart = inCartItem ? inCartItem.quantity : 0;
+  const isOutOfStock = maxStock <= 0;
+  const isMaxStockReached = currentInCart >= maxStock;
+  const remainingStock = Math.max(0, maxStock - currentInCart);
+
   // Wholesale Pack Calculator
   const pack = getProductWholesalePack(product, isRetailMode);
-  const packTotalPrice = effectivePrice * pack.minQty;
+  const effectivePackQty = isRetailMode ? 1 : Math.min(pack.minQty, remainingStock > 0 ? remainingStock : maxStock || 1);
+  const packTotalPrice = effectivePrice * effectivePackQty;
 
   return (
     <div className="bg-white rounded-sm overflow-hidden border border-[#EAEAEA] flex flex-col group relative shadow-2xs hover:shadow-md transition-shadow">
@@ -9077,7 +9334,7 @@ function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = f
           loading="lazy"
           draggable={false}
           onContextMenu={(e) => e.preventDefault()}
-          className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300 select-none pointer-events-auto"
+          className={`w-full h-full object-cover group-hover:scale-102 transition-transform duration-300 select-none pointer-events-auto ${isOutOfStock ? 'grayscale opacity-60' : ''}`}
           onError={(e) => {
             e.target.onerror = null;
             e.target.src = "https://images.pexels.com/photos/175039/pexels-photo-175039.jpeg?auto=compress&cs=tinysrgb&h=650&w=940";
@@ -9085,14 +9342,22 @@ function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = f
         />
 
         {/* Prominent Per-Item Discount Banner on top right */}
-        {maxDiscount > 0 && (
+        {maxDiscount > 0 && !isOutOfStock && (
           <div className="absolute top-1.5 right-1.5 bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded shadow-md z-10 flex items-center gap-0.5">
             <span>{maxDiscount}% OFF</span>
           </div>
         )}
 
-        {/* Wholesale Pack Badge vs Retail */}
-        {isRetailMode ? (
+        {/* Wholesale Pack Badge vs Retail vs Stock Status */}
+        {isOutOfStock ? (
+          <div className="absolute top-1.5 left-1.5 bg-rose-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-xs flex items-center gap-1 z-10">
+            <span>✕</span> OUT OF STOCK
+          </div>
+        ) : isMaxStockReached ? (
+          <div className="absolute top-1.5 left-1.5 bg-amber-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-xs flex items-center gap-1 z-10">
+            <span>✓</span> ALL IN CART ({currentInCart})
+          </div>
+        ) : isRetailMode ? (
           <div className="absolute top-1.5 left-1.5 bg-emerald-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-xs flex items-center gap-1">
             <span>🛍️</span> RETAIL (PER PC)
           </div>
@@ -9137,6 +9402,24 @@ function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = f
             <span className="border border-emerald-600 text-emerald-700 text-[8px] font-bold px-1 rounded-xs leading-none py-0.5 bg-emerald-50">
               Tacloban Stock
             </span>
+            {isOutOfStock ? (
+              <span className="bg-rose-100 text-rose-700 text-[8px] font-black px-1.5 rounded-xs leading-none py-0.5 border border-rose-300">
+                0 In Stock
+              </span>
+            ) : maxStock <= 5 ? (
+              <span className="bg-amber-100 text-amber-800 text-[8px] font-black px-1.5 rounded-xs leading-none py-0.5 border border-amber-300 animate-pulse">
+                Only {maxStock} Left
+              </span>
+            ) : (
+              <span className="text-[8px] text-slate-500 font-semibold leading-none py-0.5">
+                {maxStock} in stock
+              </span>
+            )}
+            {currentInCart > 0 && !isOutOfStock && (
+              <span className="bg-blue-100 text-blue-800 text-[8px] font-black px-1.5 rounded-xs leading-none py-0.5 border border-blue-300">
+                {currentInCart} in Cart
+              </span>
+            )}
             {isLongCargoItem(product) && (
               <span className="bg-amber-600 text-white text-[8px] font-bold px-1 rounded-xs leading-none py-0.5 flex items-center gap-0.5">
                 <Truck className="w-2.5 h-2.5" /> 10ft+ (₱50/km)
@@ -9177,12 +9460,35 @@ function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = f
             </span>
             <span className="truncate max-w-[70px] text-[#757575]">{location}</span>
             <button 
-              onClick={() => onAddToCart(product, pack.minQty)}
-              className="text-white bg-[#EE4D2D] hover:bg-[#d73f20] px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-0.5 shadow-xs cursor-pointer transition-colors"
-              title={isRetailMode ? "Add 1 pc to cart" : `Add ${pack.packLabel} to cart`}
+              onClick={() => onAddToCart(product, isRetailMode ? 1 : Math.min(pack.minQty, remainingStock))}
+              disabled={isOutOfStock || isMaxStockReached}
+              className={`px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-0.5 shadow-xs transition-colors ${
+                isOutOfStock 
+                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300'
+                  : isMaxStockReached
+                  ? 'bg-amber-100 text-amber-800 border border-amber-300 cursor-not-allowed'
+                  : 'text-white bg-[#EE4D2D] hover:bg-[#d73f20] cursor-pointer'
+              }`}
+              title={
+                isOutOfStock 
+                  ? 'Out of stock' 
+                  : isMaxStockReached 
+                  ? `All ${maxStock} in stock already added to cart` 
+                  : isRetailMode 
+                  ? 'Add 1 pc to cart' 
+                  : `Add ${Math.min(pack.minQty, remainingStock)} to cart`
+              }
             >
-              <Plus className="w-3 h-3" />
-              <span>{isRetailMode ? 'Add' : `+${pack.minQty}`}</span>
+              {isOutOfStock ? (
+                <span>Sold Out</span>
+              ) : isMaxStockReached ? (
+                <span>Max ({currentInCart})</span>
+              ) : (
+                <>
+                  <Plus className="w-3 h-3" />
+                  <span>{isRetailMode ? 'Add' : `+${Math.min(pack.minQty, remainingStock)}`}</span>
+                </>
+              )}
             </button>
           </div>
         </div>

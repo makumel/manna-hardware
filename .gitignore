@@ -13,3 +13,6 @@ build/
 proof_*.png
 live_*.png
 *.py
+.vercel
+
+worker/

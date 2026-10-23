@@ -827,6 +827,17 @@ app.post('/api/auth/register', authRateLimiter, honeypotGuard, (req, res) => {
   });
 });
 
+
+// Admin Authentication Login Endpoint
+app.post('/api/admin/login', (req, res) => {
+  const { password } = req.body;
+  if (!password || password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Incorrect security key. Access denied.' });
+  }
+  const token = 'manna_sec_token_' + Date.now();
+  return res.json({ success: true, token, role: 'admin' });
+});
+
 // User Login
 app.post('/api/auth/login', authRateLimiter, honeypotGuard, (req, res) => {
   const { email, password } = req.body;

@@ -1,6 +1,49 @@
+# ========================================================
+# MANNA HARDWARE - ANTI-SCRAPING & ROBOT DEFENSE DIRECTIVES
+# ========================================================
+
+# General Search Engines (Google, Bing allowed for standard public indexing)
 User-agent: *
 Allow: /
-Disallow: /api/admin/
-Disallow: /api/auth/
+Disallow: /api/
+Disallow: /catalog-export/
+Disallow: /spider-trap/
+Disallow: /*.json$
+Disallow: /*.sqlite$
 
+# Block AI Scraping & Data Harvester Crawlers
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ChatGPT-User
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: Anthropic-ai
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /
+
+User-agent: Diffbot
+Disallow: /
+
+User-agent: PerplexityBot
+Disallow: /
+
+User-agent: Scrapy
+Disallow: /
+
+User-agent: Omgilibot
+Disallow: /
+
+User-agent: PetalBot
+Disallow: /
+
+# Canonical Sitemap
 Sitemap: https://manna.mikabiz.space/sitemap.xml

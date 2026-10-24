@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import initialCatalog from './catalog.json';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import QRCode from 'qrcode';
 import { 
   Search, Camera, ShoppingCart, MessageCircle, Home, ShoppingBag, 
   Tv, Bell, User, Truck, MapPin, MoreHorizontal, ShieldCheck, 
@@ -15,7 +16,7 @@ import {
   Laptop, Smartphone, HelpCircle, ExternalLink, Sparkles, Box,
   ArrowUpDown, ArrowUp, ArrowDown, Ban, XCircle, BarChart3, Copy, Printer,
   TrendingUp, TrendingDown, DollarSign, PieChart, FileText, Receipt, ArrowUpRight, Percent, Coins, AlertTriangle
-, Star, Zap, Award, PanelLeftClose, PanelLeft, LayoutDashboard, Settings, Users, MessageSquare } from 'lucide-react';
+, Star, Zap, Award, PanelLeftClose, PanelLeft, LayoutDashboard, Settings, Users, MessageSquare, Menu, ImageUp, QrCode } from 'lucide-react';
 
 // Helper to detect 10ft+ long structural and pipe items (Angle bar, C-Purlins, GI Pipe, Rebar, etc.)
 export const isLongCargoItem = (item) => {
@@ -125,7 +126,7 @@ export const CONTRACTOR_LOTS = [
     lotPrice: 38000,    // Discounted Wholesale Lot Buyout Price
     savings: 19640,
     discountPercent: 34,
-    summary: 'Island primer & gloss paints, 175+ pcs sandpapers, rollers, brushes, and thinners.',
+    summary: 'Island primer & gloss paints, 175+ sandpaper sheets, rollers, brushes, and thinners.',
     details: [
       { name: 'Sandpaper # 600 Ultra-Fine Finish', qty: '175 pcs', retailVal: 3500, costVal: 2740, wholesaleVal: 2310 },
       { name: 'Island Paints Primer & Gloss Cans', qty: '35 gals/qts', retailVal: 32400, costVal: 25400, wholesaleVal: 21360 },
@@ -422,7 +423,7 @@ const renderPopups = () => (
   const copyRetailOutreachScript = () => {
     if (typeof window !== 'undefined') {
       const retailUrl = `${window.location.origin}${window.location.pathname}?mode=retail`;
-      const script = `Good day! Here is your exclusive direct access link to purchase hardware supplies per piece with no minimum spend: ${retailUrl} - Manna Hardware Warehouse (Same-day dispatch in Tacloban & Leyte).`;
+      const script = `Good day! Here is your exclusive direct access link to purchase hardware supplies per piece: ${retailUrl} - Manna Hardware Warehouse (Same-day dispatch in Tacloban & Leyte).`;
       navigator.clipboard.writeText(script).then(() => {
         setCopiedScript(true);
         setTimeout(() => setCopiedScript(false), 4000);
@@ -473,6 +474,59 @@ const renderPopups = () => (
   const [lotCopiedId, setLotCopiedId] = useState(null);
   const [manifestSearchQuery, setManifestSearchQuery] = useState('');
   const [manifestCategoryFilter, setManifestCategoryFilter] = useState('All');
+
+    // Batch Product Image File Handler
+  const handleBatchImageUpload = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    const logs = [];
+    let updatedCount = 0;
+
+    const filePromises = files.map(file => {
+      return new Promise((resolve) => {
+        const rawBase = file.name.replace(/\.[^/.]+$/, '').trim().toLowerCase();
+        const reader = new FileReader();
+        reader.onload = (loadEvt) => {
+          resolve({
+            filename: file.name,
+            rawBase,
+            dataUrl: loadEvt.target.result
+          });
+        };
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(file);
+      });
+    });
+
+    const parsedFiles = (await Promise.all(filePromises)).filter(Boolean);
+
+    setProducts(prev => {
+      const updatedList = prev.map(p => {
+        const skuMatch = parsedFiles.find(f => f.rawBase === p.id.toLowerCase());
+        const nameMatch = parsedFiles.find(f => {
+          const cleanProd = p.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const cleanFile = f.rawBase.replace(/[^a-z0-9]/g, '');
+          return cleanProd && cleanFile && (cleanProd === cleanFile || cleanProd.includes(cleanFile) || cleanFile.includes(cleanProd));
+        });
+
+        const match = skuMatch || nameMatch;
+        if (match) {
+          updatedCount++;
+          logs.push(`Assigned ${match.filename} -> ${p.name} (${p.id})`);
+          return { ...p, image: match.dataUrl };
+        }
+        return p;
+      });
+      return updatedList;
+    });
+
+    setBatchImageLogs(logs);
+    if (updatedCount > 0) {
+      alert(`Successfully matched and updated ${updatedCount} product image(s)! Click 'Save All Discounts' to sync to database.`);
+    } else {
+      alert(`No direct filename match found for ${files.length} image(s). Name files by SKU (e.g. MNA-1001.jpg) or item title.`);
+    }
+  };
 
   // Merchant Admin Authentication Gate (Server-Verified via /api/admin/login)
   const [isMerchantAuthenticated, setIsMerchantAuthenticated] = useState(() => {
@@ -646,6 +700,11 @@ const renderPopups = () => (
 
   // Merchant Web Dashboard Layout States
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [batchImageModal, setBatchImageModal] = useState(false);
+  const [batchImageLogs, setBatchImageLogs] = useState([]);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const batchImageInputRef = useRef(null);
   const [sidebarExpandedGroups, setSidebarExpandedGroups] = useState({
     stock: true,
     finance: true,
@@ -2506,7 +2565,7 @@ const renderPopups = () => (
               onClick={() => setActiveTab('me')} 
               className="hover:text-white font-bold flex items-center gap-1 cursor-pointer bg-white/10 px-2 py-0.5 rounded"
             >
-              <Lock className="w-3 h-3" /> Merchant Centre
+              <Lock className="w-3 h-3" /> Merchant Center
             </button>
           </div>
         </div>
@@ -2516,12 +2575,8 @@ const renderPopups = () => (
       {isRetailMode ? (
         <div className="bg-emerald-800 text-white text-[11px] sm:text-xs py-2 px-3 sm:px-6 flex flex-wrap items-center justify-between gap-2 border-b border-emerald-600 shadow-sm">
           <div className="flex items-center gap-2">
-            <span className="bg-white text-emerald-900 font-black text-[9px] px-2 py-0.5 rounded uppercase tracking-wider shadow-xs">
-              🛍️ Retail Mode Active
-            </span>
-            <span className="text-emerald-100 font-medium">
-              Single-piece ordering enabled &bull; No minimum purchase required.
-            </span>
+            <span className="bg-white text-emerald-900 font-black text-[9px] px-2 py-0.5 rounded uppercase tracking-wider shadow-xs">🛍️ Retail Storefront</span>
+            <span className="text-emerald-100 font-medium">Single-piece retail ordering enabled</span>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -4908,7 +4963,7 @@ const renderPopups = () => (
                             : 'text-slate-400 hover:text-white'
                         }`}
                       >
-                        <ShoppingBag className="w-3.5 h-3.5" /> Retail Per-Piece (No Min)
+                        <ShoppingBag className="w-3.5 h-3.5" /> Retail Storefront
                       </button>
                     </div>
                   </div>
@@ -4933,7 +4988,7 @@ const renderPopups = () => (
                             <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Retail Storefront Landing is ACTIVE
                           </p>
                           <p className="text-slate-300 text-[11px] mt-1 leading-relaxed">
-                            Public visitors land on the retail catalog with single-piece ordering and zero minimum spend.
+                            Public visitors land on the retail catalog with single-piece ordering.
                           </p>
                         </div>
                       )}
@@ -7806,7 +7861,7 @@ const renderPopups = () => (
                           onClick={() => toggleRetailMode(true)}
                           className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs px-3 py-1.5 rounded-lg cursor-pointer"
                         >
-                          Enable Retail Mode (No Minimum)
+                          Enable Retail Mode
                         </button>
                       </div>
                     </div>

@@ -16,7 +16,7 @@ import {
   Laptop, Smartphone, HelpCircle, ExternalLink, Sparkles, Box,
   ArrowUpDown, ArrowUp, ArrowDown, Ban, XCircle, BarChart3, Copy, Printer,
   TrendingUp, TrendingDown, DollarSign, PieChart, FileText, Receipt, ArrowUpRight, Percent, Coins, AlertTriangle
-, Star, Zap, Award, PanelLeftClose, PanelLeft, LayoutDashboard, Settings, Users, MessageSquare, Menu, ImageUp, QrCode } from 'lucide-react';
+, Star, Zap, Award, PanelLeftClose, PanelLeft, LayoutDashboard, Settings, Users, MessageSquare, Menu, ImageUp, QrCode, Info } from 'lucide-react';
 
 // Helper to detect 10ft+ long structural and pipe items (Angle bar, C-Purlins, GI Pipe, Rebar, etc.)
 export const isLongCargoItem = (item) => {
@@ -474,6 +474,7 @@ const renderPopups = () => (
   const [lotCopiedId, setLotCopiedId] = useState(null);
   const [manifestSearchQuery, setManifestSearchQuery] = useState('');
   const [manifestCategoryFilter, setManifestCategoryFilter] = useState('All');
+  const [isManifestMenuOpen, setIsManifestMenuOpen] = useState(false);
 
     // Batch Product Image File Handler
   const handleBatchImageUpload = async (e) => {
@@ -551,13 +552,18 @@ const renderPopups = () => (
         rawList = initialCatalog;
       }
     }
-    // Guarantee MNA-1103 (LUX QDE Med. Brown) always has authentic paint can image (not human hair color)
+    // Guarantee every item uses the latest verified image from initialCatalog (unless custom data:image/ uploaded in Admin)
+    const catalogImageMap = new Map(initialCatalog.map(c => [c.id, c.image]));
     return rawList.map(p => {
       if (p.id === 'MNA-1103' || p.name === 'LUX QDE Med. Brown') {
         return {
           ...p,
           image: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR1kVAYMpJTgWxNh5VMpl8dGuewXHpkZZzybncsM66Y3w&s=10'
         };
+      }
+      const verifiedImg = catalogImageMap.get(p.id);
+      if (verifiedImg && (!p.image || !p.image.startsWith('data:image/'))) {
+        return { ...p, image: verifiedImg };
       }
       return p;
     });
@@ -887,13 +893,16 @@ const renderPopups = () => (
       .then(data => {
         if (Array.isArray(data) && data.length > 0) {
           setProducts(prev => {
-            // Merge with existing admin edits if any, but ensure full SKU coverage
-            const map = new Map(data.map(p => [p.id, p]));
-            // Also preserve capital costs if available in initialCatalog or prev
+            // Merge with existing admin edits if any, but ensure full SKU coverage and verified catalog images
+            const catalogMap = new Map(initialCatalog.map(c => [c.id, c]));
+            // Also preserve capital costs and verified images from initialCatalog
             return data.map(item => {
-              const existing = prev.find(p => p.id === item.id) || initialCatalog.find(p => p.id === item.id);
+              const catItem = catalogMap.get(item.id);
+              const existing = prev.find(p => p.id === item.id) || catItem;
+              const customAdminImg = existing?.image && existing.image.startsWith('data:image/') ? existing.image : null;
               return {
                 ...item,
+                image: customAdminImg || catItem?.image || existing?.image || item.image,
                 capital: existing?.capital ?? item.capital ?? (Math.round((item.price * 0.78) * 100) / 100)
               };
             });
@@ -996,32 +1005,98 @@ const renderPopups = () => (
     return ['All', ...new Set(products.map(p => p.category))];
   }, [products]);
 
+  // Smart Multi-Token & Stemmed Search Matcher
+  const normalizeSearch = (str) => {
+    return (str || '')
+      .toLowerCase()
+      .replace(/[-_/,.]+/g, ' ')
+      .replace(/s+/g, ' ')
+      .trim();
+  };
+
+  const stemWord = (w) => {
+    if (!w) return '';
+    if (w.endsWith('ies') && w.length > 4) return w.slice(0, -3) + 'y';
+    if (w.endsWith('es') && w.length > 3) return w.slice(0, -2);
+    if (w.endsWith('s') && !w.endsWith('ss') && w.length > 2) return w.slice(0, -1);
+    return w;
+  };
+
+  const smartMatch = (p, query) => {
+    if (!query || !query.trim()) return true;
+    const rawQ = query.trim().toLowerCase();
+    
+    // Fast path: direct inclusion in name or SKU
+    if ((p.name || '').toLowerCase().includes(rawQ) || (p.id || '').toLowerCase().includes(rawQ)) {
+      return true;
+    }
+
+    const qNorm = normalizeSearch(query);
+    const qTokens = qNorm.split(' ').map(stemWord).filter(Boolean);
+    if (qTokens.length === 0) return true;
+
+    const nameNorm = normalizeSearch(p.name);
+    const nameTokens = nameNorm.split(' ').map(stemWord);
+
+    const allSearchable = normalizeSearch(
+      [p.name, p.id, p.category, p.description, p.unit].filter(Boolean).join(' ')
+    );
+    const allTokens = allSearchable.split(' ').map(stemWord);
+
+    return qTokens.every(token => {
+      if (token.length === 1) {
+        return nameTokens.some(nt => nt === token);
+      }
+      return allTokens.some(st => st.includes(token));
+    });
+  };
+
   // Filtered products for public views (excludes cancelled / inconsistency items)
   const filteredProducts = useMemo(() => {
+    const hasSearch = Boolean(searchQuery && searchQuery.trim());
+    const rawQ = hasSearch ? searchQuery.trim().toLowerCase() : '';
+    const qTokens = hasSearch ? normalizeSearch(searchQuery).split(' ').map(stemWord).filter(Boolean) : [];
     let list = products.filter(p => {
       if (p.isCancelled || p.status === 'cancelled') return false;
-      const matchCat = selectedCategory === 'All' || p.category === selectedCategory;
-      const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          p.id.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchSearch = smartMatch(p, searchQuery);
+      if (!matchSearch) return false;
+
+      // When searching actively, do not restrict by category unless user explicitly filtered
+      const matchCat = hasSearch && selectedCategory === 'All'
+        ? true
+        : (selectedCategory === 'All' || p.category === selectedCategory);
       const matchStock = catalogFilterInStock ? p.stock > 0 : true;
       const matchBrand = selectedBrandFilter ? p.name.toLowerCase().includes(selectedBrandFilter.toLowerCase()) : true;
 
       let matchQuick = true;
-      if (homeQuickFilter === 'deals') {
-        const disc = Number(p.discount_percent || 0);
-        matchQuick = disc >= 15 || storewideDiscount >= 15;
-      } else if (homeQuickFilter === 'under100') {
-        matchQuick = Number(p.price || 0) <= 100;
-      } else if (homeQuickFilter === 'new') {
-        matchQuick = p.id.startsWith('MNA-NT-');
-      } else if (homeQuickFilter === 'surplus') {
-        matchQuick = (p.description && /surplus|display|as-is/i.test(p.description)) || p.stock < 10;
+      if (!hasSearch) {
+        if (homeQuickFilter === 'deals') {
+          const disc = Number(p.discount_percent || 0);
+          matchQuick = disc >= 15 || storewideDiscount >= 15;
+        } else if (homeQuickFilter === 'under100') {
+          matchQuick = Number(p.price || 0) <= 100;
+        } else if (homeQuickFilter === 'new') {
+          matchQuick = p.id.startsWith('MNA-NT-');
+        } else if (homeQuickFilter === 'surplus') {
+          matchQuick = (p.description && /surplus|display|as-is/i.test(p.description)) || p.stock < 10;
+        }
       }
 
-      return matchCat && matchSearch && matchStock && matchBrand && matchQuick;
+      return matchCat && matchStock && matchBrand && matchQuick;
     });
 
-    if (homeQuickFilter === 'bestseller') {
+    if (hasSearch) {
+      const scoreProduct = (p) => {
+        const nameLow = (p.name || '').toLowerCase();
+        if (nameLow.startsWith(rawQ)) return 100;
+        if (nameLow.includes(rawQ)) return 80;
+        const nameNormTokens = normalizeSearch(p.name).split(' ').map(stemWord);
+        const allInName = qTokens.length > 0 && qTokens.every(qt => nameNormTokens.some(nt => nt.includes(qt)));
+        if (allInName) return 60;
+        return 10;
+      };
+      list = [...list].sort((a, b) => scoreProduct(b) - scoreProduct(a));
+    } else if (homeQuickFilter === 'bestseller') {
       list = [...list].sort((a, b) => (Number(b.sold || 0) - Number(a.sold || 0)));
     }
 
@@ -1846,8 +1921,12 @@ const renderPopups = () => (
     });
   };
 
-  // Dynamic Inventory Manifest PDF Generation with live, updated quantities every download
+  // Dynamic Inventory Manifest PDF Generation with live, updated quantities every download (Protected)
   const downloadManifestPDF = () => {
+    if (!isMerchantAuthenticated) {
+      alert("Commercial Data Protection: Bulk catalog and manifest downloads are restricted to authenticated warehouse dispatch administrators to protect inventory pricing. For contractor volume estimates, please contact our dispatch hotline at 0926 199 5703 or message our Facebook page.");
+      return;
+    }
     const activeProducts = products.filter(p => !p.isCancelled && p.status !== 'cancelled');
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const dateStr = new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -1940,8 +2019,12 @@ const renderPopups = () => (
     doc.save(`manna_hardware_inventory_manifest_${fileDate}.pdf`);
   };
 
-  // Download Full Inventory Manifest CSV for Contractors & Hardware Resellers (Updated: No liquidation)
+  // Download Full Inventory Manifest CSV for Contractors & Hardware Resellers (Protected)
   const downloadFullManifestCSV = () => {
+    if (!isMerchantAuthenticated) {
+      alert("Commercial Data Protection: Bulk catalog and spreadsheet exports are restricted to authenticated warehouse administrators. For commercial quotes, please call 0926 199 5703.");
+      return;
+    }
     const headers = ['SKU', 'Item Name', 'Category', 'Unit', 'Stock On Hand', 'Retail Price (PHP)', 'Tier 3 Wholesale 40% OFF (PHP)', 'Total Retail Valuation (PHP)'];
     const rows = products.map(p => {
       const stock = Math.max(0, Number(p.stock) || 0);
@@ -2384,6 +2467,10 @@ const renderPopups = () => (
   };
 
   const exportSelectedToCSV = () => {
+    if (!isMerchantAuthenticated) {
+      alert("Unauthorized: Catalog data export is restricted to authenticated store administrators.");
+      return;
+    }
     const itemsToExport = selectedItemIds.length > 0 
       ? products.filter(p => selectedItemIds.includes(p.id))
       : products;
@@ -2634,7 +2721,7 @@ const renderPopups = () => (
           <div className="flex items-center gap-3">
             {/* Desktop Brand Logo */}
             <div 
-              onClick={() => setActiveTab('home')} 
+              onClick={() => { setActiveTab('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
               className="hidden md:flex items-center gap-2 cursor-pointer shrink-0 mr-2"
             >
               <div className="w-9 h-9 rounded-lg bg-white text-[#EE4D2D] font-black flex items-center justify-center text-lg shadow-sm">
@@ -2647,23 +2734,64 @@ const renderPopups = () => (
             </div>
 
             {/* Search Input Container with Cmd+K ref & shortcut badge */}
-            <div className="flex-1 bg-white rounded-md h-9 sm:h-10 px-3 flex items-center gap-2 shadow-xs border border-transparent focus-within:border-amber-400">
-              <Search className="w-4 h-4 text-[#888888] shrink-0" />
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (searchQuery.trim()) {
+                  if (activeTab !== 'home' && activeTab !== 'catalog') {
+                    setActiveTab('home');
+                  }
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                  if (searchInputRef.current) {
+                    searchInputRef.current.blur();
+                  }
+                }
+              }}
+              className="flex-1 bg-white rounded-md h-9 sm:h-10 px-2 sm:px-3 flex items-center gap-1.5 sm:gap-2 shadow-xs border border-transparent focus-within:border-amber-400 relative"
+            >
+              <button type="submit" className="text-[#888888] hover:text-[#EE4D2D] shrink-0 cursor-pointer" title="Search">
+                <Search className="w-4 h-4 shrink-0" />
+              </button>
               <input
                 ref={searchInputRef}
                 type="text"
+                enterKeyHint="search"
                 placeholder="Search C-purlins, Island Paint, Screws, Makita..."
                 value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
+                onChange={e => {
+                  const val = e.target.value;
+                  setSearchQuery(val);
+                  setManifestSearchQuery(val);
+                  if (val.trim() && activeTab !== 'home' && activeTab !== 'catalog' && activeTab !== 'lots') {
+                    setActiveTab('home');
+                  }
+                }}
                 className="w-full text-xs sm:text-sm text-[#222222] placeholder-[#EE4D2D]/70 font-normal focus:outline-none"
               />
+              {searchQuery && (
+                <button 
+                  type="button"
+                  onClick={() => { setSearchQuery(''); setManifestSearchQuery(''); }}
+                  className="text-slate-400 hover:text-slate-700 p-0.5 rounded cursor-pointer shrink-0"
+                  title="Clear search"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+              {/* Search Arrow Action Button for Mobile & Desktop */}
+              <button
+                type="submit"
+                className="bg-[#EE4D2D] hover:bg-[#d73f20] active:scale-90 text-white h-6.5 sm:h-7 px-2 rounded flex items-center justify-center gap-1 shrink-0 shadow-xs cursor-pointer transition-all"
+                title="Search"
+                aria-label="Search"
+              >
+                <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span className="hidden sm:inline text-[11px] font-bold">Search</span>
+              </button>
               <span className="hidden sm:inline-block text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded font-mono border border-slate-200 shrink-0">
                 Ctrl+K
               </span>
-              <button className="text-[#888888] hover:text-[#555] shrink-0 cursor-pointer">
-                <Camera className="w-4 h-4" />
-              </button>
-            </div>
+            </form>
 
             {/* Cart Icon with Red/White Badge */}
             <button 
@@ -2700,7 +2828,7 @@ const renderPopups = () => (
           <div className="flex items-center justify-between gap-3 overflow-x-auto no-scrollbar pt-2.5 text-[11px] sm:text-xs font-medium text-white/95 border-b border-white/10 pb-1.5">
             <div className="flex items-center gap-4">
               <button
-                onClick={() => setActiveTab('home')}
+                onClick={() => { setActiveTab('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                 className={`whitespace-nowrap pb-0.5 cursor-pointer flex items-center gap-1 ${
                   activeTab === 'home' ? 'font-bold border-b-2 border-white' : 'opacity-85 hover:opacity-100'
                 }`}
@@ -2710,7 +2838,7 @@ const renderPopups = () => (
 
               {/* WHOLESALE CONTRACTOR LOTS (30-40% OFF) */}
               <button
-                onClick={() => setActiveTab('lots')}
+                onClick={() => { setActiveTab('lots'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                 className={`whitespace-nowrap px-2.5 py-0.5 rounded cursor-pointer flex items-center gap-1.5 font-black transition-all ${
                   activeTab === 'lots' 
                     ? 'bg-amber-400 text-slate-950 shadow-md ring-2 ring-white/80' 
@@ -2722,7 +2850,7 @@ const renderPopups = () => (
 
               {/* FULL CATALOG PUBLIC TAB (User Requested) */}
               <button
-                onClick={() => setActiveTab('catalog')}
+                onClick={() => { setActiveTab('catalog'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                 className={`whitespace-nowrap px-2.5 py-0.5 rounded cursor-pointer flex items-center gap-1.5 font-bold ${
                   activeTab === 'catalog' ? 'bg-white text-[#EE4D2D] shadow-xs' : 'bg-white/20 text-white hover:bg-white/30'
                 }`}
@@ -2758,8 +2886,91 @@ const renderPopups = () => (
               </button>
             </div>
 
-            {/* Desktop Merchant Dashboard Direct Gateway */}
-            <div className="hidden md:flex items-center gap-3">
+            {/* Desktop Merchant Dashboard Direct Gateway & Contact Links */}
+            <div className="hidden md:flex items-center gap-2">
+              <a
+                href="https://www.facebook.com/mannaHardwareTAC/"
+                target="_blank"
+                rel="noreferrer"
+                className="bg-[#1877F2] hover:bg-[#0d6efd] text-white px-2.5 py-0.5 rounded text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-xs"
+                title="Official Manna Hardware Facebook Page"
+              >
+                <MessageCircle className="w-3.5 h-3.5 fill-current" /> Facebook Page
+              </a>
+
+              {/* Interactive Manifest Dropdown */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsManifestMenuOpen(prev => !prev)}
+                  className="bg-amber-400 hover:bg-amber-300 text-slate-950 px-2.5 py-0.5 rounded text-[11px] font-black flex items-center gap-1 cursor-pointer transition-colors shadow-xs"
+                  title="View Itemized Warehouse Stock Manifests"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-slate-900" />
+                  <span>Manifest Dropdown</span>
+                  <ChevronDown className={`w-3 h-3 text-slate-900 transition-transform duration-200 ${isManifestMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {isManifestMenuOpen && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-40" 
+                      onClick={() => setIsManifestMenuOpen(false)} 
+                    />
+                    <div className="absolute right-0 mt-1.5 w-72 bg-white text-slate-900 rounded-xl shadow-2xl border border-slate-200 py-1.5 z-50 text-xs animate-in fade-in slide-in-from-top-1">
+                      <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-100 flex items-center justify-between">
+                        <span>Select Lot Manifest</span>
+                        <span className="text-[9px] text-amber-700 font-bold bg-amber-50 px-1.5 py-0.2 rounded">As-Is Cash</span>
+                      </div>
+                      <div className="max-h-64 overflow-y-auto py-1">
+                        {CONTRACTOR_LOTS.map(lot => (
+                          <button
+                            key={lot.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedLotModal(lot);
+                              setIsManifestMenuOpen(false);
+                            }}
+                            className="w-full text-left px-3 py-2 hover:bg-amber-50/80 flex items-center justify-between text-slate-700 hover:text-slate-950 transition-colors cursor-pointer group"
+                          >
+                            <div className="truncate pr-2">
+                              <p className="font-bold text-slate-900 text-xs truncate group-hover:text-amber-800">{lot.name}</p>
+                              <p className="text-[10px] text-slate-400">{lot.details.length} line items • {lot.discountPercent}% OFF</p>
+                            </div>
+                            <span className="text-[11px] font-mono font-black text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/60 shrink-0">
+                              ₱{lot.lotPrice.toLocaleString('en-PH')}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                      <div className="border-t border-slate-100 pt-1 mt-1 px-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveTab('catalog');
+                            setIsManifestMenuOpen(false);
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
+                          className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-100 flex items-center justify-between text-[#EE4D2D] font-black cursor-pointer text-xs"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <Layers className="w-3.5 h-3.5" /> Full Catalog ({products.length} Items)
+                          </span>
+                          <ArrowRight className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <button
+                onClick={() => setSupportModalOpen(true)}
+                className="bg-white/20 hover:bg-white/30 text-white px-2.5 py-0.5 rounded text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                title="Direct Dispatch Hotline"
+              >
+                <Phone className="w-3 h-3" /> Contact Us
+              </button>
               <button
                 onClick={() => setActiveTab('me')}
                 className="bg-black/25 hover:bg-black/35 text-white px-2.5 py-0.5 rounded text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
@@ -2787,11 +2998,69 @@ const renderPopups = () => (
       </header>
 
       {/* ==================== MAIN CONTENT CONTAINER (RESPONSIVE: MAX-W-7XL ON DESKTOP) ==================== */}
-      <div id="main-content" className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 mt-2 sm:mt-4">
+      <div id="main-content" className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 mt-2 sm:mt-4 pb-16 md:pb-6">
         
         {/* ==================== TAB 1: HOME FEED (RESPONSIVE 2-6 COLS) ==================== */}
         {activeTab === 'home' && (
           <main className="w-full space-y-4">
+
+            {/* Active Search Results Banner & Instant Grid (Top Priority) */}
+            {Boolean(searchQuery && searchQuery.trim()) && (
+              <div className="bg-white rounded-2xl p-4 sm:p-5 border-2 border-amber-400/80 shadow-md space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                  <div>
+                    <h2 className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2">
+                      <Search className="w-5 h-5 text-[#EE4D2D]" /> Search Results for "{searchQuery}"
+                    </h2>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Found <strong className="text-slate-900">{filteredProducts.length}</strong> matching hardware items in Tacloban inventory
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => { setSearchQuery(''); setManifestSearchQuery(''); }}
+                      className="text-xs text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                    >
+                      <X className="w-3.5 h-3.5" /> Clear Search
+                    </button>
+                    <button
+                      onClick={() => { setActiveTab('catalog'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                      className="text-xs bg-[#EE4D2D] hover:bg-[#d73f20] text-white px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                    >
+                      Full Catalog View &rarr;
+                    </button>
+                  </div>
+                </div>
+
+                {filteredProducts.length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3">
+                    {filteredProducts.map((item, idx) => (
+                      <ProductCard 
+                        key={item.id} 
+                        product={item} 
+                        onAddToCart={addToCart} 
+                        storewideDiscount={storewideDiscount} 
+                        isRetailMode={isRetailMode}
+                        cart={cart}
+                        isRightCol={idx % 2 === 1}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="py-12 text-center text-slate-500 space-y-2">
+                    <Package className="w-10 h-10 text-slate-300 mx-auto" />
+                    <p className="text-sm font-bold text-slate-800">No items found matching "{searchQuery}"</p>
+                    <p className="text-xs text-slate-400">Try searching for purlins, screws, angle bar, paint, or pipes.</p>
+                    <button
+                      onClick={() => { setSearchQuery(''); setManifestSearchQuery(''); }}
+                      className="mt-2 text-xs text-[#EE4D2D] font-bold underline cursor-pointer"
+                    >
+                      Clear search to browse all items
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* 1. HORIZONTAL STORIES / ITEM CIRCLES: DISPATCH NEAR YOU (NO FACES - AUTHENTIC ITEMS ONLY) */}
             <div className="bg-white rounded-2xl p-3 sm:p-4 border border-slate-200/90 shadow-2xs">
@@ -2836,7 +3105,7 @@ const renderPopups = () => (
                   { name: 'Angle Bars', cat: 'Structural & Building Materials', search: 'angle bar', img: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTJzVHyZ12Skv8mdJfdA16ZpAhOWE03o76OVgrOxW1ffA&s=10' },
                   { name: 'Brass Valves', cat: 'Plumbing & Fixtures', search: 'valve', img: '/images/brass_swing_valve_clean.jpg' },
                   { name: 'Rosco Faucets', brand: 'ROSCO', cat: 'Plumbing & Fixtures', img: '/images/gooseneck_faucet_clean.jpg' },
-                  { name: 'GI Pipes S-40', cat: 'Plumbing & Fixtures', search: 'gi pipe', img: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSMZpMBjpVDDLSyOrOm4Psyg9boBCTCQx0x9ZVXL7SXlA&s=10' },
+                  { name: 'GI Pipes S-40', cat: 'Plumbing & Fixtures', search: 'gi pipe', img: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTb2xbrIDcug5TiTWXFg_ouj3oP8x1AVb7M5rg3pwOsqg&s=10' },
                   { name: 'Floor Drains', cat: 'Plumbing & Fixtures', search: 'drain', img: '/images/floor_drain_clean.jpg' },
                   { name: 'Blind Rivets', brand: 'BLIND RIVET', cat: 'Hardware & Fasteners', img: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQRFZtrOeadPeOXo9jb5u54sIQVGBf5238GsLSpoKbC0g&s' },
                   { name: '2-Way Faucets', cat: 'Plumbing & Fixtures', img: '/images/two_way_faucet_clean.jpg' },
@@ -2923,7 +3192,7 @@ const renderPopups = () => (
                   {/* Proceed to Wholesale Primary CTA Button */}
                   <div className="pt-2 flex flex-wrap items-center gap-2">
                     <button
-                      onClick={() => setActiveTab('lots')}
+                      onClick={() => { setActiveTab('lots'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                       className="bg-[#EE4D2D] hover:bg-[#d73f20] text-white font-black text-xs sm:text-sm px-5 py-2.5 rounded-xl shadow-lg cursor-pointer transition-all flex items-center gap-2 active:scale-95 group"
                     >
                       <Package className="w-4 h-4 group-hover:rotate-6 transition-transform" />
@@ -3140,7 +3409,7 @@ const renderPopups = () => (
                     </span>
                   </div>
                   <button 
-                    onClick={() => setActiveTab('lots')} 
+                    onClick={() => { setActiveTab('lots'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
                     className="text-[11px] font-bold text-[#EE4D2D] hover:underline flex items-center gap-0.5 cursor-pointer"
                   >
                     <span>Wholesale Lots</span>
@@ -3322,12 +3591,30 @@ const renderPopups = () => (
               </div>
 
               <button
-                onClick={() => setActiveTab('lots')}
+                onClick={() => { setActiveTab('lots'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                 className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs sm:text-sm px-5 py-2.5 rounded-xl shadow-md cursor-pointer transition-all flex items-center gap-2 active:scale-95 shrink-0 group"
               >
                 <span>Proceed to Wholesale</span>
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </button>
+            </div>
+
+            {/* Subtle Online Photo Reference Disclaimer Banner */}
+            <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl p-2.5 sm:p-3 text-[11px] text-amber-950 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 shadow-2xs">
+              <div className="flex items-start sm:items-center gap-2">
+                <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5 sm:mt-0" />
+                <span>
+                  <strong>Photo Notice:</strong> Images displayed are sample reference photos sourced online. Actual warehouse inventory may differ slightly in lighting, packaging, or finish. Feel free to inspect inventory on an <em>As-Is, Where-Is</em> basis.
+                </span>
+              </div>
+              <a
+                href="https://m.me/mannaHardwareTAC?text=Good%20day!%20I%20would%20like%20to%20schedule%20an%20on-site%20inspection%20of%20hardware%20materials."
+                target="_blank"
+                rel="noreferrer"
+                className="text-[#0084FF] hover:underline font-bold text-[11px] shrink-0 inline-flex items-center gap-1"
+              >
+                Schedule Inspection &rarr;
+              </a>
             </div>
 
             {/* Responsive Products Grid: 2 cols mobile, 3-4 tablet, 5-6 desktop */}
@@ -3397,6 +3684,11 @@ const renderPopups = () => (
                     id: 'faq-4',
                     q: 'What is your return & damaged materials exchange policy?',
                     a: 'All structural materials (steel, roofing, screws, paint) undergo inspection prior to dispatch. Any transit-damaged materials will be replaced immediately free of charge upon delivery acknowledgement.'
+                  },
+                  {
+                    id: 'faq-5',
+                    q: 'Are product images exact photos of the liquidation inventory?',
+                    a: 'Product images displayed are high-resolution sample reference photos sourced online. Due to warehouse storage and commercial liquidation handling, actual items may differ slightly in lighting, surface patina, or packaging. Buyers and contractors are always welcome and encouraged to inspect physical stock on-site at our Tacloban depot on an As-Is, Where-Is basis before hauling or dispatch.'
                   }
                 ].map(faq => {
                   const isOpen = expandedFaq === faq.id;
@@ -3506,7 +3798,7 @@ const renderPopups = () => (
                     Commercial Warehouse Liquidation & Specialty Category Lots
                   </h1>
                   <p className="text-xs sm:text-sm text-slate-300 mt-2 leading-relaxed">
-                    Direct liquidation of Heavy-Duty (HD) and Premium hardware supplies and construction materials. Sold strictly on an <strong>As-Is, Where-Is</strong> basis—featuring warehouse surplus overstock and showroom display inventory priced at deep clearance discounts, verified 100% genuine, sound, and fully contractor-ready. Available in pre-packaged <strong>Specialty Category Lots</strong> or tiered bulk orders at <strong>20% to 40% below retail</strong>.
+                    Direct liquidation of Heavy-Duty (HD) and Premium hardware supplies and construction materials. Sold strictly on an <strong>As-Is, Where-Is</strong> basis—featuring warehouse surplus overstock and showroom display inventory priced at deep clearance discounts, verified 100% genuine, sound, and fully contractor-ready. Available in pre-packaged <strong>Specialty Category Lots</strong> or tiered bulk orders at <strong>20% to 40% below retail</strong>. Images shown are online sample reference photos; actual stock may differ slightly in lighting, packaging, or surface finish. Physical inspection is welcomed on-site before hauling.
                   </p>
                 </div>
 
@@ -3537,22 +3829,23 @@ const renderPopups = () => (
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3 mt-5">
-                  <button
-                    onClick={downloadManifestPDF}
-                    className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-black px-4 py-2 rounded-lg text-xs flex items-center gap-2 cursor-pointer shadow-sm transition-all active:scale-95"
-                    title="Generate and download complete manifest as PDF with live updated quantities"
-                  >
-                    <FileText className="w-4 h-4 text-slate-950" /> Download Complete Manifest (PDF)
-                  </button>
-                  <button
-                    onClick={downloadFullManifestCSV}
-                    className="bg-slate-800 hover:bg-slate-700 text-white font-bold px-3 py-2 rounded-lg text-xs flex items-center gap-1.5 cursor-pointer shadow-sm border border-slate-700 transition-all active:scale-95"
-                    title="Download raw spreadsheet data as CSV"
-                  >
-                    <Download className="w-3.5 h-3.5" /> Export CSV
-                  </button>
                   <a
-                    href="https://m.me/110311578465073?text=Good%20day%20Manna%20Hardware!%20I%20am%20interested%20in%20inspecting%20your%20commercial%20liquidation%20lots.%20Please%20send%20schedule%20and%20terms."
+                    href="tel:09261995703"
+                    className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-black px-4 py-2 rounded-lg text-xs flex items-center gap-2 cursor-pointer shadow-sm transition-all active:scale-95"
+                    title="Call dispatch team directly for project estimates"
+                  >
+                    <Phone className="w-4 h-4 text-slate-950" /> Request Project Quote (Hotline)
+                  </a>
+                  <a
+                    href="https://m.me/mannaHardwareTAC?text=Good%20day%20Manna%20Hardware!%20I%20am%20interested%20in%20inspecting%20your%20commercial%20liquidation%20lots.%20Please%20send%20schedule%20and%20terms."
+                    target="_blank"
+                    rel="noreferrer"
+                    className="bg-[#0084FF] hover:bg-[#0072de] text-white font-bold px-4 py-2 rounded-lg text-xs flex items-center gap-2 cursor-pointer shadow-sm transition-all active:scale-95"
+                  >
+                    <MessageCircle className="w-4 h-4 fill-current" /> Chat on Messenger
+                  </a>
+                  <a
+                    href="https://m.me/mannaHardwareTAC?text=Good%20day%20Manna%20Hardware!%20I%20am%20interested%20in%20inspecting%20your%20commercial%20liquidation%20lots.%20Please%20send%20schedule%20and%20terms."
                     target="_blank"
                     rel="noreferrer"
                     className="bg-[#0084FF] hover:bg-[#0072de] text-white font-bold px-4 py-2 rounded-lg text-xs flex items-center gap-2 cursor-pointer shadow-sm transition-all active:scale-95"
@@ -3560,7 +3853,7 @@ const renderPopups = () => (
                     <MessageCircle className="w-4 h-4 fill-current" /> Send to Messenger
                   </a>
                   <button
-                    onClick={() => setActiveTab('catalog')}
+                    onClick={() => { setActiveTab('catalog'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                     className="bg-white/10 hover:bg-white/20 text-white font-bold px-4 py-2 rounded-lg text-xs flex items-center gap-2 cursor-pointer border border-white/20 transition-all"
                   >
                     <Layers className="w-4 h-4" /> Browse Individual SKUs ({products.length})
@@ -3579,6 +3872,54 @@ const renderPopups = () => (
                   <p className="text-xs text-slate-500">
                     Pre-packaged lots priced for immediate contractor acquisition and retail store inventory replenishment.
                   </p>
+                </div>
+              </div>
+
+              {/* Manifest Dropdown Quick Selector */}
+              <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 mb-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-900 flex items-center justify-center shrink-0">
+                    <FileSpreadsheet className="w-4 h-4 text-amber-800" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black text-slate-900 uppercase tracking-wide">
+                      Instant Inventory Manifest Dropdown
+                    </h4>
+                    <p className="text-[11px] text-slate-600">
+                      Select any contractor lot or full warehouse stock to view exact line-item counts and prices.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="w-full md:w-80 shrink-0">
+                  <div className="relative">
+                    <select
+                      defaultValue=""
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (!val) return;
+                        if (val === 'full-catalog') {
+                          setActiveTab('catalog');
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        } else {
+                          const lot = CONTRACTOR_LOTS.find(l => l.id === val);
+                          if (lot) setSelectedLotModal(lot);
+                        }
+                      }}
+                      className="w-full bg-white border border-amber-300 hover:border-amber-500 text-slate-900 font-bold text-xs rounded-xl px-3 py-2.5 cursor-pointer shadow-xs focus:outline-none focus:ring-2 focus:ring-amber-400 transition-all appearance-none pr-8"
+                    >
+                      <option value="" disabled>-- Click Dropdown to Select Manifest --</option>
+                      {CONTRACTOR_LOTS.map(lot => (
+                        <option key={lot.id} value={lot.id}>
+                          {lot.name} ({lot.details.length} Items - ?{lot.lotPrice.toLocaleString('en-PH')})
+                        </option>
+                      ))}
+                      <option value="full-catalog">
+                        Full Warehouse Inventory Manifest (465 SKUs)
+                      </option>
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
                 </div>
                 <span className="text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full w-fit">
                   As-Is, Where-Is • Showroom Display & Surplus Liquidation (Cash Before Load)
@@ -3717,7 +4058,7 @@ const renderPopups = () => (
                               <FileSpreadsheet className="w-3.5 h-3.5 text-slate-600" /> Manifest
                             </button>
                             <a
-                              href={`https://m.me/110311578465073?text=${encodeURIComponent(`Hello Manna Hardware! I want to order / inquire about ${lot.name} (₱${lot.lotPrice.toLocaleString('en-PH')}). Please send payment and hauling details.`)}`}
+                              href={`https://m.me/mannaHardwareTAC?text=${encodeURIComponent(`Hello Manna Hardware! I want to order / inquire about ${lot.name} (₱${lot.lotPrice.toLocaleString('en-PH')}). Please send payment and hauling details.`)}`}
                               target="_blank"
                               rel="noreferrer"
                               className="bg-[#0084FF] hover:bg-[#0072de] text-white text-xs font-bold py-2 px-2.5 rounded-lg cursor-pointer transition-colors text-center shadow-xs flex items-center justify-center gap-1 active:scale-95"
@@ -3820,20 +4161,14 @@ const renderPopups = () => (
                       <Table className="w-3.5 h-3.5" /> Table
                     </button>
                   </div>
-                  <button
-                    onClick={downloadManifestPDF}
-                    className="bg-[#EE4D2D] hover:bg-[#d73f20] text-white text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer flex items-center gap-1.5 shadow-2xs transition-colors shrink-0"
-                    title="Download updated manifest as PDF"
+                  <a
+                    href="https://m.me/mannaHardwareTAC?text=Hello%20Manna%20Hardware!%20I%20would%20like%20to%20request%20a%20project%20estimate%20for%20warehouse%20materials."
+                    target="_blank"
+                    rel="noreferrer"
+                    className="bg-[#0084FF] hover:bg-[#0072de] text-white text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer flex items-center gap-1.5 shadow-2xs transition-colors shrink-0"
                   >
-                    <FileText className="w-3.5 h-3.5" /> Download Manifest (PDF)
-                  </button>
-                  <button
-                    onClick={downloadFullManifestCSV}
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer flex items-center gap-1.5 shadow-2xs transition-colors shrink-0"
-                    title="Export as CSV"
-                  >
-                    <Download className="w-3.5 h-3.5" /> Export CSV
-                  </button>
+                    <MessageCircle className="w-3.5 h-3.5 fill-current" /> Inquire Volume Hauling
+                  </a>
                 </div>
               </div>
 
@@ -3894,8 +4229,7 @@ const renderPopups = () => (
                       const matchCat = manifestCategoryFilter === 'All' || p.category === manifestCategoryFilter;
                       if (!matchCat) return false;
                       if (!manifestSearchQuery) return true;
-                      const q = manifestSearchQuery.toLowerCase();
-                      return (p.name || '').toLowerCase().includes(q) || (p.id || '').toLowerCase().includes(q);
+                      return smartMatch(p, manifestSearchQuery);
                     })
                     .slice(0, 150)
                     .map((item) => {
@@ -3937,7 +4271,7 @@ const renderPopups = () => (
                                 <ShoppingCart className="w-3 h-3" /> Add
                               </button>
                               <a
-                                href={`https://m.me/110311578465073?text=${encodeURIComponent(`Hello Manna Hardware! I want to inquire about manifest item: ${item.name} (${item.id}) - ₱${wholesale.toLocaleString('en-PH')}.`)}`}
+                                href={`https://m.me/mannaHardwareTAC?text=${encodeURIComponent(`Hello Manna Hardware! I want to inquire about manifest item: ${item.name} (${item.id}) - ₱${wholesale.toLocaleString('en-PH')}.`)}`}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="text-[11px] font-bold py-1.5 px-2 rounded-lg bg-[#0084FF] hover:bg-[#0072de] text-white flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
@@ -3991,8 +4325,7 @@ const renderPopups = () => (
                         const matchCat = manifestCategoryFilter === 'All' || p.category === manifestCategoryFilter;
                         if (!matchCat) return false;
                         if (!manifestSearchQuery) return true;
-                        const q = manifestSearchQuery.toLowerCase();
-                        return (p.name || '').toLowerCase().includes(q) || (p.id || '').toLowerCase().includes(q);
+                        return smartMatch(p, manifestSearchQuery);
                       })
                       .slice(0, 150)
                       .map((item) => {
@@ -4187,8 +4520,8 @@ const renderPopups = () => (
               <div className="mt-3.5 p-3 bg-amber-50/90 border border-amber-200 rounded-xl flex items-start gap-2.5 text-slate-700 w-full">
                 <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                 <div className="text-xs leading-relaxed">
-                  <span className="font-bold text-amber-950">Clearance & Liquidation Notice (As-Is, Where-Is):</span>{' '}
-                  All items are offered at deeply discounted, below-retail clearance prices because stock consists of genuine surplus, warehouse overstock, and showroom display units sold strictly <strong>As-Is, Where-Is</strong>. Every item is verified 100% authentic, structurally sound, fully functional, and ready for contractor and residential projects.
+                  <span className="font-bold text-amber-950">Clearance Notice & Sample Images (As-Is, Where-Is):</span>{' '}
+                  All items are offered at deeply discounted, below-retail clearance prices because stock consists of genuine surplus, warehouse overstock, and showroom display units sold strictly <strong>As-Is, Where-Is</strong>. Product images displayed are sample reference photos sourced online; actual warehouse inventory may differ slightly in lighting, packaging, surface patina, or finish. Every item is verified 100% authentic, structurally sound, and fully functional. Buyers and contractors are always welcome to inspect physical inventory on-site prior to hauling.
                 </div>
               </div>
 
@@ -4788,7 +5121,7 @@ const renderPopups = () => (
                           <div className="text-center py-4 bg-slate-50 rounded-lg">
                             <p className="text-xs text-slate-500 font-medium">No orders placed yet.</p>
                             <button
-                              onClick={() => setActiveTab('home')}
+                              onClick={() => { setActiveTab('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                               className="mt-2 text-xs text-[#EE4D2D] font-bold hover:underline cursor-pointer inline-flex items-center gap-1"
                             >
                               Browse Hardware Catalog <ArrowRight className="w-3 h-3" />
@@ -4878,6 +5211,26 @@ const renderPopups = () => (
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
+                    {/* Mobile Drawer Open Button (Visible only on < lg screens) */}
+                    <button
+                      type="button"
+                      onClick={() => setIsMobileSidebarOpen(true)}
+                      className="lg:hidden bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs"
+                      title="Open Navigation Menu Drawer"
+                    >
+                      <Menu className="w-4 h-4 text-orange-400" />
+                      <span>Menu</span>
+                    </button>
+
+                    {/* Batch Upload Images Button */}
+                    <button
+                      onClick={() => setBatchImageModal(true)}
+                      className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-3.5 py-2 rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs"
+                      title="Batch Upload Product Images by SKU or Name"
+                    >
+                      <ImageUp className="w-4 h-4" /> Batch Images
+                    </button>
+
                     {/* Add Item Button */}
                     <button
                       onClick={() => {
@@ -5047,7 +5400,7 @@ const renderPopups = () => (
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                   {/* Gross Revenue & Margin */}
                   <div 
-                    onClick={() => setDashboardTab('pnl')}
+                    onClick={() => { setDashboardTab('pnl'); setIsMobileSidebarOpen(false); }}
                     className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs cursor-pointer hover:border-emerald-400 transition-colors"
                   >
                     <div className="flex items-center justify-between text-slate-500 mb-1">
@@ -5065,7 +5418,7 @@ const renderPopups = () => (
 
                   {/* Inventory Valuation at Cost vs Retail */}
                   <div 
-                    onClick={() => setDashboardTab('analytics')}
+                    onClick={() => { setDashboardTab('analytics'); setIsMobileSidebarOpen(false); }}
                     className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs cursor-pointer hover:border-blue-400 transition-colors"
                   >
                     <div className="flex items-center justify-between text-slate-500 mb-1">
@@ -5080,7 +5433,7 @@ const renderPopups = () => (
 
                   {/* Orders & Fulfillment */}
                   <div 
-                    onClick={() => setDashboardTab('orders')}
+                    onClick={() => { setDashboardTab('orders'); setIsMobileSidebarOpen(false); }}
                     className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs cursor-pointer hover:border-[#EE4D2D] transition-colors"
                   >
                     <div className="flex items-center justify-between text-slate-500 mb-1">
@@ -5112,13 +5465,24 @@ const renderPopups = () => (
                 </div>
 
                 {/* 3. Side Tab Layout Container (Sidebar + Content Workspace) */}
-                <div className="flex flex-col lg:flex-row gap-5 items-start">
+                <div className="flex flex-col lg:flex-row gap-5 items-start relative">
                   
-                  {/* Left Side Navigation Sidebar (Premium Collapsible ProPanel Style) */}
+                  {/* Mobile Drawer Backdrop (Active on mobile < lg) */}
+                  {isMobileSidebarOpen && (
+                    <div 
+                      className="fixed inset-0 z-40 bg-slate-950/60 backdrop-blur-xs lg:hidden transition-opacity"
+                      onClick={() => setIsMobileSidebarOpen(false)}
+                    />
+                  )}
+
+                  {/* Left Side Navigation Sidebar (Responsive: Off-Canvas Drawer on mobile < lg, Sticky Collapsible ProPanel on desktop) */}
                   <aside 
-                    className={`transition-all duration-300 ease-in-out bg-white rounded-2xl border border-slate-200/80 shadow-md p-3 shrink-0 lg:sticky lg:top-20 flex flex-col justify-between ${
-                      isSidebarCollapsed ? 'w-full lg:w-20' : 'w-full lg:w-72'
-                    }`}
+                    className={`transition-all duration-300 ease-in-out bg-white rounded-2xl border border-slate-200/80 shadow-2xl lg:shadow-md p-3 shrink-0 lg:sticky lg:top-20 flex flex-col justify-between
+                      fixed top-0 bottom-0 left-0 z-50 w-72 max-w-[85vw] transform ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+                      lg:relative lg:translate-x-0 lg:z-10 ${
+                        isSidebarCollapsed ? 'lg:w-20' : 'lg:w-72'
+                      }
+                    `}
                   >
                     <div>
                       {/* Premium Header: Brand Badge & Collapse Toggle Icon */}
@@ -5177,7 +5541,7 @@ const renderPopups = () => (
                           <div className="space-y-1">
                             {/* Inventory & SKUs */}
                             <button
-                              onClick={() => setDashboardTab('inventory')}
+                              onClick={() => { setDashboardTab('inventory'); setIsMobileSidebarOpen(false); }}
                               className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer ${
                                 dashboardTab === 'inventory' 
                                   ? 'bg-[#EE4D2D] text-white shadow-sm shadow-orange-500/20' 
@@ -5200,7 +5564,7 @@ const renderPopups = () => (
 
                             {/* Box & Quote Retrieval */}
                             <button
-                              onClick={() => setDashboardTab('warehouse-boxes')}
+                              onClick={() => { setDashboardTab('warehouse-boxes'); setIsMobileSidebarOpen(false); }}
                               className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer ${
                                 dashboardTab === 'warehouse-boxes' 
                                   ? 'bg-[#EE4D2D] text-white shadow-sm shadow-orange-500/20' 
@@ -5223,7 +5587,7 @@ const renderPopups = () => (
 
                             {/* Stock Alerts & Deadstock */}
                             <button
-                              onClick={() => setDashboardTab('insights')}
+                              onClick={() => { setDashboardTab('insights'); setIsMobileSidebarOpen(false); }}
                               className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer ${
                                 dashboardTab === 'insights' 
                                   ? 'bg-[#EE4D2D] text-white shadow-sm shadow-orange-500/20' 
@@ -5255,7 +5619,7 @@ const renderPopups = () => (
 
                         {/* Orders & Fulfillment */}
                         <button
-                          onClick={() => setDashboardTab('orders')}
+                          onClick={() => { setDashboardTab('orders'); setIsMobileSidebarOpen(false); }}
                           className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer ${
                             dashboardTab === 'orders' 
                               ? 'bg-[#EE4D2D] text-white shadow-sm shadow-orange-500/20' 
@@ -5278,7 +5642,7 @@ const renderPopups = () => (
 
                         {/* Sales Log */}
                         <button
-                          onClick={() => setDashboardTab('sales-log')}
+                          onClick={() => { setDashboardTab('sales-log'); setIsMobileSidebarOpen(false); }}
                           className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer ${
                             dashboardTab === 'sales-log' 
                               ? 'bg-[#EE4D2D] text-white shadow-sm shadow-orange-500/20' 
@@ -5315,7 +5679,7 @@ const renderPopups = () => (
                           <div className="space-y-1">
                             {/* Cost & Valuation */}
                             <button
-                              onClick={() => setDashboardTab('valuation')}
+                              onClick={() => { setDashboardTab('valuation'); setIsMobileSidebarOpen(false); }}
                               className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer ${
                                 dashboardTab === 'valuation' 
                                   ? 'bg-slate-900 text-white shadow-md' 
@@ -5338,7 +5702,7 @@ const renderPopups = () => (
 
                             {/* P&L Statement */}
                             <button
-                              onClick={() => setDashboardTab('pnl')}
+                              onClick={() => { setDashboardTab('pnl'); setIsMobileSidebarOpen(false); }}
                               className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 transition-all cursor-pointer ${
                                 dashboardTab === 'pnl' 
                                   ? 'bg-[#EE4D2D] text-white shadow-sm shadow-orange-500/20' 
@@ -5352,7 +5716,7 @@ const renderPopups = () => (
 
                             {/* Charts & Trends */}
                             <button
-                              onClick={() => setDashboardTab('analytics')}
+                              onClick={() => { setDashboardTab('analytics'); setIsMobileSidebarOpen(false); }}
                               className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 transition-all cursor-pointer ${
                                 dashboardTab === 'analytics' 
                                   ? 'bg-[#EE4D2D] text-white shadow-sm shadow-orange-500/20' 
@@ -5366,7 +5730,7 @@ const renderPopups = () => (
 
                             {/* Discounts & Vouchers */}
                             <button
-                              onClick={() => setDashboardTab('promotions')}
+                              onClick={() => { setDashboardTab('promotions'); setIsMobileSidebarOpen(false); }}
                               className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer ${
                                 dashboardTab === 'promotions' 
                                   ? 'bg-[#EE4D2D] text-white shadow-sm shadow-orange-500/20' 
@@ -7851,7 +8215,7 @@ const renderPopups = () => (
                       <div className="flex items-center gap-3 pt-1">
                         <button
                           type="button"
-                          onClick={() => setActiveTab('lots')}
+                          onClick={() => { setActiveTab('lots'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                           className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs px-3 py-1.5 rounded-lg cursor-pointer"
                         >
                           Browse Wholesale Lots &rarr;
@@ -7870,7 +8234,7 @@ const renderPopups = () => (
                   <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-lg text-[11px] text-amber-950 leading-relaxed mb-3 flex items-start gap-2">
                         <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
                         <div>
-                          <strong>Clearance Terms (As-Is, Where-Is):</strong> Items are liquidated surplus, warehouse overstock, and showroom display inventory sold at deep below-retail clearance rates. All items are verified genuine, fully functional, and ready for immediate project installation.
+                          <strong>Clearance Terms (As-Is, Where-Is):</strong> Items are liquidated surplus, warehouse overstock, and showroom display inventory sold at deep below-retail clearance rates. Images shown are online sample reference photos; actual stock may vary slightly in lighting, packaging, or finish. Buyers are welcome to inspect physical inventory on-site on an As-Is, Where-Is basis before dispatch.
                         </div>
                       </div>
                     <button
@@ -7931,7 +8295,7 @@ const renderPopups = () => (
                 <Truck className="w-4 h-4" /> Track Order Status
               </button>
               <button
-                onClick={() => setActiveTab('home')}
+                onClick={() => { setActiveTab('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                 className="bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold px-5 py-2.5 rounded-lg cursor-pointer"
               >
                 Back to Shop
@@ -7944,7 +8308,7 @@ const renderPopups = () => (
 
       {/* ==================== COMMERCIAL HARDWARE FOOTER ==================== */}
       <footer className="bg-slate-950 text-slate-400 text-xs border-t border-slate-800 mt-auto no-print">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-12 pb-24 md:pb-12">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
             
             {/* Col 1: Brand & Clearance Summary */}
@@ -7961,6 +8325,16 @@ const renderPopups = () => (
               <div className="text-[11px] text-slate-500 space-y-1 pt-1">
                 <p>📍 Tacloban City, Leyte • Dispatch by Schedule</p>
                 <p>📞 Hotline: <span className="text-white font-mono font-bold">0926 199 5703</span></p>
+                <p>
+                  <a
+                    href="https://www.facebook.com/mannaHardwareTAC/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[#0084FF] hover:underline font-bold inline-flex items-center gap-1 mt-1"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5 fill-current" /> Facebook: MANNA Hardware - Tacloban
+                  </a>
+                </p>
               </div>
             </div>
 
@@ -7983,6 +8357,7 @@ const renderPopups = () => (
                 <li>• Cash Before Load (CBL) / Bank Wire</li>
                 <li>• Commercial Delivery Receipt (DR) issued</li>
                 <li>• Physical Pickup & Leyte Truck Dispatch</li>
+                <li>• Sample photos (actual stock may differ slightly; inspection welcome As-Is, Where-Is)</li>
               </ul>
             </div>
 
@@ -8019,7 +8394,7 @@ const renderPopups = () => (
           
           {/* Tab 1: Home */}
           <button
-            onClick={() => setActiveTab('home')}
+            onClick={() => { setActiveTab('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
             className={`flex flex-col items-center justify-center py-1 transition-colors cursor-pointer ${
               activeTab === 'home' ? 'text-[#EE4D2D] font-bold' : 'text-[#757575]'
             }`}
@@ -8030,7 +8405,7 @@ const renderPopups = () => (
 
           {/* Tab 2: Wholesale Lots */}
           <button
-            onClick={() => setActiveTab('lots')}
+            onClick={() => { setActiveTab('lots'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
             className={`flex flex-col items-center justify-center py-1 transition-colors cursor-pointer relative ${
               activeTab === 'lots' ? 'text-amber-600 font-black' : 'text-amber-700'
             }`}
@@ -8046,7 +8421,7 @@ const renderPopups = () => (
 
           {/* Tab 3: Full Catalog */}
           <button
-            onClick={() => setActiveTab('catalog')}
+            onClick={() => { setActiveTab('catalog'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
             className={`flex flex-col items-center justify-center py-1 transition-colors cursor-pointer ${
               activeTab === 'catalog' ? 'text-[#EE4D2D] font-bold' : 'text-[#757575]'
             }`}
@@ -8293,7 +8668,7 @@ const renderPopups = () => (
                 <div className="p-2.5 bg-amber-50/90 border border-amber-200/90 rounded-lg text-[10px] text-amber-950 leading-relaxed mb-2.5 flex items-start gap-1.5">
                   <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
                   <div>
-                    <strong>Clearance Notice (As-Is, Where-Is):</strong> Items are liquidation surplus, warehouse overstock, and showroom display units sold as-is at below-retail rates. Fully inspected, authentic, and 100% functional.
+                    <strong>Clearance Notice (As-Is, Where-Is):</strong> Items are liquidation surplus, warehouse overstock, and showroom display units sold as-is at below-retail rates. Photos are reference samples sourced online; actual items may vary slightly in lighting, packaging, or finish. On-site physical inspection is welcomed before loading.
                   </div>
                 </div>
                 <button
@@ -8319,7 +8694,7 @@ const renderPopups = () => (
                     : `Proceed to Checkout ${!currentUser ? '(Log In Required)' : ''}`}
                 </button>
                 <a
-                  href={`https://m.me/110311578465073?text=${encodeURIComponent(
+                  href={`https://m.me/mannaHardwareTAC?text=${encodeURIComponent(
                     `Hello Manna Hardware! I would like to place an order from my cart:\n\n${cart.map(i => `• ${i.name} (${i.quantity} ${i.unit || 'pc'}) - ₱${(i.price * i.quantity).toLocaleString('en-PH')}`).join('\n')}\n\nEstimated Subtotal: ₱${cartSubtotal.toLocaleString('en-PH')}\nDelivery / Pickup: Tacloban & Leyte`
                   )}`}
                   target="_blank"
@@ -8615,7 +8990,84 @@ const renderPopups = () => (
         </div>
       )}
 
-      {/* ==================== CUSTOMER AUTH MODAL ==================== */}
+            {/* ==================== MODAL: BATCH PRODUCT IMAGE UPLOADER ==================== */}
+      {batchImageModal && (
+        <div className="fixed inset-0 z-50 overflow-hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl p-6 border border-slate-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center font-bold">
+                  <ImageUp className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm sm:text-base text-slate-900">
+                    Batch Product Image Uploader
+                  </h3>
+                  <p className="text-[11px] text-slate-400">Match & replace images for any of the 934 SKUs in seconds</p>
+                </div>
+              </div>
+              <button onClick={() => setBatchImageModal(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-4 text-xs">
+              <div 
+                onClick={() => batchImageInputRef.current?.click()}
+                className="border-2 border-dashed border-purple-200 hover:border-purple-500 rounded-xl p-8 text-center bg-purple-50/40 hover:bg-purple-50/80 cursor-pointer transition-colors"
+              >
+                <ImageUp className="w-10 h-10 text-purple-400 mx-auto mb-2" />
+                <p className="font-bold text-slate-800 text-sm">Select or Drop Multiple Product Images</p>
+                <p className="text-slate-500 text-xs mt-1">Supports .jpg, .jpeg, .png, .webp (up to 100+ files at once)</p>
+                <input 
+                  type="file" 
+                  ref={batchImageInputRef}
+                  multiple 
+                  accept="image/*" 
+                  className="hidden" 
+                  onChange={handleBatchImageUpload}
+                />
+              </div>
+
+              <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl space-y-2">
+                <p className="font-bold text-slate-700 text-xs flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-purple-600" /> Automatic Matching Rules:
+                </p>
+                <ul className="list-disc list-inside space-y-1 text-slate-600 text-[11px]">
+                  <li><strong>By SKU:</strong> Name your image like <code className="bg-slate-200 px-1 py-0.5 rounded font-mono">MNA-1001.jpg</code> or <code className="bg-slate-200 px-1 py-0.5 rounded font-mono">MNA-1103.png</code>.</li>
+                  <li><strong>By Item Name:</strong> Name your image matching the product title (e.g. <code className="bg-slate-200 px-1 py-0.5 rounded font-mono">C-Purlins.jpg</code>, <code className="bg-slate-200 px-1 py-0.5 rounded font-mono">GI Pipe S-40.jpg</code>).</li>
+                  <li>Images are converted directly to clean responsive data URIs and assigned in real-time.</li>
+                </ul>
+              </div>
+
+              {batchImageLogs.length > 0 && (
+                <div className="border border-emerald-200 bg-emerald-50/50 p-3 rounded-xl max-h-40 overflow-y-auto space-y-1 font-mono text-[10px] text-emerald-800">
+                  <p className="font-bold text-emerald-900 font-sans text-xs mb-1">Upload Activity Log ({batchImageLogs.length}):</p>
+                  {batchImageLogs.map((log, i) => (
+                    <div key={i} className="flex items-center gap-1">
+                      <Check className="w-3 h-3 text-emerald-600 shrink-0" />
+                      <span>{log}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                <span className="text-[11px] text-slate-400">Remember to click 'Save All Discounts' to persist changes to the catalog database.</span>
+                <button
+                  type="button"
+                  onClick={() => setBatchImageModal(false)}
+                  className="px-4 py-2 bg-slate-900 text-white font-bold rounded-lg hover:bg-black cursor-pointer text-xs"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+{/* ==================== CUSTOMER AUTH MODAL ==================== */}
       {authModal && (
         <div className="fixed inset-0 z-50 overflow-hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-5 border border-slate-200">
@@ -8853,7 +9305,7 @@ const renderPopups = () => (
                 <p className="text-base font-black text-[#EE4D2D] font-mono">0926 199 5703 / (053) 888-2910</p>
                 <p className="text-[10px] text-slate-400">Calls & SMS Connected</p>
                 <a
-                  href="https://m.me/110311578465073"
+                  href="https://www.facebook.com/mannaHardwareTAC/"
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-1 text-[11px] font-bold text-[#0084FF] hover:underline mt-0.5"
@@ -8980,7 +9432,7 @@ const renderPopups = () => (
                       </span>
                     </div>
                     <p className="text-[11px] text-slate-300">
-                      Spot cash take-all buyout for all {lotItems.length} line items in this specialty lot.
+                      Spot cash take-all buyout for all {lotItems.length} line items. Reference photos; actual inventory sold As-Is, Where-Is (inspection welcomed).
                     </p>
                   </div>
 
@@ -9194,7 +9646,7 @@ const renderPopups = () => (
                     <Phone className="w-3.5 h-3.5" /> Call Dispatch: 0926 199 5703
                   </a>
                   <a
-                    href={`https://m.me/110311578465073?text=${encodeURIComponent(`Hello Manna Hardware! I am interested in reserving ${selectedLotModal.name} for ₱${selectedLotModal.lotPrice.toLocaleString('en-PH')}. Please confirm availability and hauling schedule.`)}`}
+                    href={`https://m.me/mannaHardwareTAC?text=${encodeURIComponent(`Hello Manna Hardware! I am interested in reserving ${selectedLotModal.name} for ₱${selectedLotModal.lotPrice.toLocaleString('en-PH')}. Please confirm availability and hauling schedule.`)}`}
                     target="_blank"
                     rel="noreferrer"
                     className="bg-[#0084FF] hover:bg-[#0072de] text-white font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all active:scale-95"
@@ -9328,7 +9780,7 @@ const renderPopups = () => (
                     <p className="text-xs text-slate-500 mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
                       <span><strong>Hotline:</strong> (053) 832-4911</span>
                       <span><strong>Mobile:</strong> 0926 199 5703</span>
-                      <span><a href="https://m.me/110311578465073" target="_blank" rel="noreferrer" className="text-[#0084FF] hover:underline font-bold inline-flex items-center gap-0.5"><MessageCircle className="w-3 h-3 fill-current" /> Messenger: MANNA Hardware</a></span>
+                      <span><a href="https://www.facebook.com/mannaHardwareTAC/" target="_blank" rel="noreferrer" className="text-[#0084FF] hover:underline font-bold inline-flex items-center gap-0.5"><MessageCircle className="w-3 h-3 fill-current" /> Messenger: MANNA Hardware</a></span>
                       <span><strong>Email:</strong> sales@mannahardware.ph</span>
                     </p>
                   </div>
@@ -9744,6 +10196,11 @@ function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = f
             <span>▶</span> 45.5K
           </div>
         )}
+
+        {/* Subtle Online Reference Photo Tag */}
+        <div className="absolute bottom-5 right-1 bg-black/60 backdrop-blur-xs text-[7px] text-white/90 px-1 py-0.2 rounded pointer-events-none select-none tracking-tight">
+          Sample Photo • As-Is
+        </div>
 
         {/* Commercial Dispatch Strip on Image bottom */}
         <div className="absolute bottom-0 left-0 right-0 bg-slate-900/90 text-amber-400 text-[8px] font-black px-1.5 py-0.5 flex items-center justify-between">

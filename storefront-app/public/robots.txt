@@ -1,5 +1,5 @@
 # ========================================================
-# MANNA HARDWARE - ANTI-SCRAPING & ROBOT DEFENSE DIRECTIVES
+# MY HARDWARE - ANTI-SCRAPING & ROBOT DEFENSE DIRECTIVES
 # ========================================================
 
 # General Search Engines (Google, Bing allowed for standard public indexing)
@@ -46,4 +46,4 @@ User-agent: PetalBot
 Disallow: /
 
 # Canonical Sitemap
-Sitemap: https://manna.mikabiz.space/sitemap.xml
+Sitemap: https://MYHardware.mikashop.online/sitemap.xml

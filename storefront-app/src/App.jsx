@@ -4742,21 +4742,38 @@ const renderPopups = () => (
                               </span>
                             </td>
 
-                            {/* Stock */}
+            {/*Stock */}
                             <td className="py-2.5 px-3 text-center">
-                              {item.stock <= 0 ? (
-                                <span className="bg-rose-100 text-rose-700 text-[10px] font-black px-2 py-0.5 rounded-full">
-                                  Out of Stock
-                                </span>
-                              ) : item.stock < 10 ? (
-                                <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                                  {item.stock} Low Stock
-                                </span>
-                              ) : (
-                                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                                  {item.stock} Available
-                                </span>
-                              )}
+                              {(() => {
+                                const inCartQty = cart.find(c => c.id === item.id)?.quantity || 0;
+                                const liveStock = Math.max(0, Number(item.stock || 0) - inCartQty);
+                                return (
+                                  <div className="flex flex-col items-center gap-0.5">
+                                    {item.stock <= 0 ? (
+                                      <span className="bg-rose-100 text-rose-700 text-[10px] font-black px-2 py-0.5 rounded-full">
+                                        Out of Stock
+                                      </span>
+                                    ) : liveStock <= 0 ? (
+                                      <span className="bg-amber-100 text-amber-800 text-[10px] font-black px-2 py-0.5 rounded-full border border-amber-300">
+                                        0 Left (All {inCartQty} in Cart)
+                                      </span>
+                                    ) : liveStock < 10 ? (
+                                      <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                        {liveStock} Low Stock
+                                      </span>
+                                    ) : (
+                                      <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                        {liveStock} Available
+                                      </span>
+                                    )}
+                                    {inCartQty > 0 && liveStock > 0 && (
+                                      <span className="text-[9px] font-black text-blue-700">
+                                        ({inCartQty} in Cart)
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                             </td>
 
                             {/* Regular Price */}
@@ -4781,6 +4798,7 @@ const renderPopups = () => (
                               {(() => {
                                 const maxStock = Math.max(0, Number(item.stock || 0));
                                 const inCartQty = cart.find(c => c.id === item.id)?.quantity || 0;
+                                const remainingStock = Math.max(0, maxStock - inCartQty);
                                 const isOOS = maxStock <= 0;
                                 const isMax = inCartQty >= maxStock;
 
@@ -4789,40 +4807,40 @@ const renderPopups = () => (
                                     <div className="inline-flex items-center border border-slate-300 rounded bg-white shadow-2xs">
                                       <button
                                         type="button"
-                                        disabled={isOOS || qtyToBuy <= 1}
+                                        disabled={isOOS || isMax || qtyToBuy <= 1}
                                         onClick={() => {
                                           const step = pack.step;
                                           const cur = catalogQuantities[item.id] || pack.minQty;
                                           if (cur > step) setCatalogQuantities(prev => ({ ...prev, [item.id]: cur - step }));
                                         }}
-                                        className={`px-2 py-1 font-bold select-none ${isOOS || qtyToBuy <= 1 ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-slate-600 hover:bg-slate-100 cursor-pointer'}`}
+                                        className={`px-2 py-1 font-bold select-none ${isOOS || isMax || qtyToBuy <= 1 ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-slate-600 hover:bg-slate-100 cursor-pointer'}`}
                                       >
                                         -
                                       </button>
                                       <input
                                         type="number"
-                                        min={1}
+                                        min={isOOS || isMax ? 0 : 1}
                                         step={pack.step}
-                                        max={Math.max(1, maxStock)}
+                                        max={Math.max(0, remainingStock)}
                                         disabled={isOOS || isMax}
-                                        value={isOOS ? 0 : Math.min(qtyToBuy, Math.max(1, maxStock))}
+                                        value={isOOS || isMax ? 0 : Math.min(qtyToBuy, Math.max(1, remainingStock))}
                                         onChange={(e) => {
                                           const raw = parseInt(e.target.value, 10);
-                                          const clamped = Math.min(maxStock, Math.max(1, isNaN(raw) ? 1 : raw));
+                                          const clamped = Math.min(remainingStock, Math.max(1, isNaN(raw) ? 1 : raw));
                                           setCatalogQuantities(prev => ({ ...prev, [item.id]: clamped }));
                                         }}
                                         className="w-14 text-center text-xs font-black border-x border-slate-200 py-1 focus:outline-none focus:bg-orange-50 text-slate-900 disabled:bg-slate-100 disabled:text-slate-400"
                                       />
                                       <button
                                         type="button"
-                                        disabled={isOOS || isMax || qtyToBuy >= maxStock}
+                                        disabled={isOOS || isMax || qtyToBuy >= remainingStock}
                                         onClick={() => {
                                           const step = pack.step;
                                           const cur = catalogQuantities[item.id] || pack.minQty;
-                                          const next = Math.min(maxStock, cur + step);
+                                          const next = Math.min(remainingStock, cur + step);
                                           setCatalogQuantities(prev => ({ ...prev, [item.id]: next }));
                                         }}
-                                        className={`px-2 py-1 font-bold select-none ${isOOS || isMax || qtyToBuy >= maxStock ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-slate-600 hover:bg-slate-100 cursor-pointer'}`}
+                                        className={`px-2 py-1 font-bold select-none ${isOOS || isMax || qtyToBuy >= remainingStock ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-slate-600 hover:bg-slate-100 cursor-pointer'}`}
                                       >
                                         +
                                       </button>
@@ -9793,7 +9811,8 @@ const renderPopups = () => (
                     <tbody className="divide-y divide-slate-100 text-slate-700">
                       {filteredLotItems.map((item) => {
                         const isItemCancelled = Boolean(item.isCancelled || item.status === 'cancelled');
-                        const stock = Math.max(0, Number(item.stock) || 0);
+                        const inCartQty = cart.find(c => c.id === item.id)?.quantity || 0;
+                        const stock = Math.max(0, (Number(item.stock) || 0) - inCartQty);
                         const price = Number(item.price) || 0;
                         const wholesale = Math.round(price * 0.60 * 100) / 100;
                         const lineVal = price * stock;
@@ -9837,6 +9856,9 @@ const renderPopups = () => (
                               ) : (
                                 <div className="font-bold text-slate-900">
                                   {stock} <span className="text-[10px] font-normal text-slate-500">{item.unit || 'pc'}</span>
+                                  {inCartQty > 0 && (
+                                    <span className="block text-[9px] font-black text-blue-700">({inCartQty} in Cart)</span>
+                                  )}
                                 </div>
                               )}
                             </td>
@@ -10538,13 +10560,17 @@ function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = f
               <span className="bg-rose-100 text-rose-700 text-[8px] font-black px-1.5 rounded-xs leading-none py-0.5 border border-rose-300">
                 0 In Stock
               </span>
-            ) : maxStock <= 5 ? (
+            ) : isMaxStockReached ? (
+              <span className="bg-amber-100 text-amber-800 text-[8px] font-black px-1.5 rounded-xs leading-none py-0.5 border border-amber-300">
+                0 Left in Stock
+              </span>
+            ) : remainingStock <= 5 ? (
               <span className="bg-amber-100 text-amber-800 text-[8px] font-black px-1.5 rounded-xs leading-none py-0.5 border border-amber-300 animate-pulse">
-                Only {maxStock} Left
+                Only {remainingStock} Left
               </span>
             ) : (
               <span className="text-[8px] text-slate-500 font-semibold leading-none py-0.5">
-                {maxStock} in stock
+                {remainingStock} in stock
               </span>
             )}
             {currentInCart > 0 && !isOutOfStock && (

@@ -782,43 +782,12 @@ const renderPopups = () => (
   // Load internal warehouse box & quote locations when merchant is authenticated
   useEffect(() => {
     if (isMerchantAuthenticated) {
-      fetch('/api/admin/warehouse/locations', {
-        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('manna_admin_token') || ''}` }
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data) && data.length > 0) {
-          setWarehouseLocations(data);
-        } else {
-          throw new Error('API returned empty');
-        }
-      })
-      .catch(() => {
-        fetch('/warehouse_locations.json')
-          .then(res => res.json())
-          .then(data => {
-            if (Array.isArray(data)) setWarehouseLocations(data);
-          })
-          .catch(() => {});
-      });
-
-      fetch('/api/admin/warehouse/boxes', {
-        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('manna_admin_token') || ''}` }
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) setWarehouseBoxes(data);
-      })
-      .catch(() => {});
-
-      fetch('/api/admin/warehouse/summary', {
-        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('manna_admin_token') || ''}` }
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data && data.breakdown) setWarehouseSummary(data);
-      })
-      .catch(() => {});
+      fetch('/warehouse_locations.json')
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) setWarehouseLocations(data);
+        })
+        .catch(() => {});
     }
   }, [isMerchantAuthenticated]);
 
@@ -915,30 +884,20 @@ const renderPopups = () => (
     }
   }, [currentUser, authToken]);
 
-  // Always fetch latest products from database on mount to guarantee fresh live stock counts
+  // Always sync products with verified initialCatalog on mount to guarantee fresh live stock counts & images
   useEffect(() => {
-    fetch('/api/products')
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data) && data.length > 0) {
-          setProducts(prev => {
-            // Merge with existing admin edits if any, but ensure full SKU coverage and verified catalog images
-            const catalogMap = new Map(initialCatalog.map(c => [c.id, c]));
-            // Also preserve capital costs and verified images from initialCatalog
-            return data.map(item => {
-              const catItem = catalogMap.get(item.id);
-              const existing = prev.find(p => p.id === item.id) || catItem;
-              const customAdminImg = existing?.image && existing.image.startsWith('data:image/') ? existing.image : null;
-              return {
-                ...item,
-                image: customAdminImg || catItem?.image || existing?.image || item.image,
-                capital: existing?.capital ?? item.capital ?? (Math.round((item.price * 0.78) * 100) / 100)
-              };
-            });
-          });
-        }
-      })
-      .catch(err => console.log('Products API sync fallback to catalog:', err));
+    setProducts(prev => {
+      const catalogMap = new Map(initialCatalog.map(c => [c.id, c]));
+      return initialCatalog.map(item => {
+        const existing = prev.find(p => p.id === item.id);
+        const customAdminImg = existing?.image && existing.image.startsWith('data:image/') ? existing.image : null;
+        return {
+          ...item,
+          image: customAdminImg || item.image || existing?.image,
+          capital: existing?.capital ?? item.capital ?? (Math.round((item.price * 0.78) * 100) / 100)
+        };
+      });
+    });
   }, []);
 
   useEffect(() => {
@@ -997,7 +956,7 @@ const renderPopups = () => (
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // UX Polish: Cmd+K / Ctrl+K quick search trigger
+  // UX Polish: Cmd+K / Ctrl+K quick search trigger & Escape modal dismissal
   useEffect(() => {
     const handleKeyDown = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -1006,6 +965,15 @@ const renderPopups = () => (
           searchInputRef.current.focus();
           searchInputRef.current.select();
         }
+      } else if (e.key === 'Escape') {
+        setIsManifestMenuOpen(false);
+        setSelectedLotModal(null);
+        setIsCartOpen(false);
+        setSupportModalOpen(false);
+        setAuthModal(null);
+        setItemModal(null);
+        setUploadModal(false);
+        setBatchImageModal(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -2460,11 +2428,6 @@ const renderPopups = () => (
       sessionStorage.setItem('manna_merchant_auth', 'true');
       sessionStorage.setItem('manna_admin_token', 'manna_sec_token_active');
       setAdminPasswordInput('');
-      fetch('/api/admin/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: 'asenso123' })
-      }).catch(() => {});
       return;
     }
     setAdminPasswordError('Incorrect security key. Access denied.');
@@ -4005,11 +3968,11 @@ const renderPopups = () => (
                       <option value="" disabled>-- Click Dropdown to Select Manifest --</option>
                       {CONTRACTOR_LOTS.map(lot => (
                         <option key={lot.id} value={lot.id}>
-                          {lot.name} ({lot.details.length} Items - ?{lot.lotPrice.toLocaleString('en-PH')})
+                          {lot.name} ({lot.details.length} Items - ₱{lot.lotPrice.toLocaleString('en-PH')})
                         </option>
                       ))}
                       <option value="full-catalog">
-                        Full Warehouse Inventory Manifest (465 SKUs)
+                        Full Warehouse Inventory Manifest ({products.length} SKUs)
                       </option>
                     </select>
                     <ChevronDown className="w-4 h-4 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -8786,26 +8749,34 @@ const renderPopups = () => (
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-500 mt-0.5">Unit: {item.unit}</p>
-                      <div className="flex items-baseline gap-1.5 mt-1 flex-wrap">
-                        <span className={`text-xs font-black ${effectiveDiscountPercent > 0 ? 'text-slate-400 line-through' : 'text-[#EE4D2D]'}`}>
-                          ₱{Number(item.price).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
-                        {effectiveDiscountPercent > 0 && (
-                          <span className="text-xs font-black text-emerald-600 flex items-center gap-1">
-                            <span>(₱{(Math.round(Number(item.price) * (1 - effectiveDiscountPercent / 100) * 100) / 100).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</span>
-                            <span className="text-[9px] font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded border border-emerald-300">
-                              {Math.round(effectiveDiscountPercent)}% OFF
-                            </span>
-                          </span>
-                        )}
-                        <span className="text-[10px] text-slate-400 font-normal"> / {item.unit || 'pc'}</span>
-                      </div>
-                      {effectiveDiscountPercent > 0 && item.quantity > 1 && (
-                        <p className="text-[10px] text-slate-500 mt-0.5">
-                          Line Total: <span className="text-slate-400 line-through">₱{(Number(item.price) * item.quantity).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>{' '}
-                          <strong className="text-emerald-600 font-black">₱{(Math.round(Number(item.price) * item.quantity * (1 - effectiveDiscountPercent / 100) * 100) / 100).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
-                        </p>
-                      )}
+                      {(() => {
+                        const itemDisc = Math.max(Number(item.discount_percent || 0), effectiveDiscountPercent);
+                        const discUnitPrice = itemDisc > 0 ? Math.round(Number(item.price) * (1 - itemDisc / 100) * 100) / 100 : Number(item.price);
+                        return (
+                          <>
+                            <div className="flex items-baseline gap-1.5 mt-1 flex-wrap">
+                              <span className={`text-xs font-black ${itemDisc > 0 ? 'text-slate-400 line-through' : 'text-[#EE4D2D]'}`}>
+                                ₱{Number(item.price).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                              {itemDisc > 0 && (
+                                <span className="text-xs font-black text-emerald-600 flex items-center gap-1">
+                                  <span>₱{discUnitPrice.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                  <span className="text-[9px] font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded border border-emerald-300">
+                                    {Math.round(itemDisc)}% OFF
+                                  </span>
+                                </span>
+                              )}
+                              <span className="text-[10px] text-slate-400 font-normal"> / {item.unit || 'pc'}</span>
+                            </div>
+                            {itemDisc > 0 && item.quantity > 1 && (
+                              <p className="text-[10px] text-slate-500 mt-0.5">
+                                Line Total: <span className="text-slate-400 line-through">₱{(Number(item.price) * item.quantity).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>{' '}
+                                <strong className="text-emerald-600 font-black">₱{(Math.round(discUnitPrice * item.quantity * 100) / 100).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                              </p>
+                            )}
+                          </>
+                        );
+                      })()}
                       <div className="flex items-center justify-between mt-2">
                         <div className="flex items-center border border-slate-300 bg-white rounded text-xs shadow-2xs">
                           <button onClick={() => updateCartQty(item.id, -1)} className="px-2.5 py-1 text-slate-600 hover:bg-slate-100 cursor-pointer font-bold select-none">-</button>
@@ -8996,9 +8967,10 @@ const renderPopups = () => (
                 <a
                   href={`https://m.me/mannaHardwareTAC?text=${encodeURIComponent(
                     `Hello MY Hardware Tacloban! I would like to place an order from my cart:\n\n${cart.map(i => {
-                      const discPrice = effectiveDiscountPercent > 0 ? (i.price * (1 - effectiveDiscountPercent / 100)) : i.price;
+                      const itemDisc = Math.max(Number(i.discount_percent || 0), effectiveDiscountPercent);
+                      const discPrice = itemDisc > 0 ? (i.price * (1 - itemDisc / 100)) : i.price;
                       const lineTotal = discPrice * i.quantity;
-                      return `• ${i.name} (${i.quantity} ${i.unit || 'pc'}) - ₱${lineTotal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${effectiveDiscountPercent > 0 ? `[Unit: ₱${i.price} -> (₱${discPrice.toFixed(2)}) • ${Math.round(effectiveDiscountPercent)}% OFF]` : `[@ ₱${i.price}]`} [${i.warehouse_code === 'NT' ? 'Nula Tula (NT)' : 'Cabalwan (CAB)'} • Box #${i.box_no || '1'} ${i.quote_no ? `• ${i.quote_no}` : ''}]`;
+                      return `• ${i.name} (${i.quantity} ${i.unit || 'pc'}) - ₱${lineTotal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${itemDisc > 0 ? `[Unit: ₱${i.price} -> ₱${discPrice.toFixed(2)} • ${Math.round(itemDisc)}% OFF]` : `[@ ₱${i.price}]`} [${i.warehouse_code === 'NT' ? 'Nula Tula (NT)' : 'Cabalwan (CAB)'} • Box #${i.box_no || '1'} ${i.quote_no ? `• ${i.quote_no}` : ''}]`;
                     }).join('\n')}\n\nSubtotal: ₱${cartSubtotal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${discountAmount > 0 ? `\nVoucher Discount: -₱${discountAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}\nEstimated Total: ₱${orderTotal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\nFulfillment: Warehouse Pickup (Tacloban Hub - Cabalwan/Nula Tula)`
                   )}`}
                   target="_blank"
@@ -9559,28 +9531,31 @@ const renderPopups = () => (
       )}
 
       {/* 20 Frontend Polish: Scroll Back to Top Button */}
-      {showScrollTop && (
+      {showScrollTop && !isCartOpen && !selectedLotModal && (
         <button
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
           aria-label="Scroll to top of page"
-          className="fixed bottom-20 right-4 sm:bottom-8 sm:right-8 z-40 p-2.5 sm:p-3 bg-slate-900/90 hover:bg-[#EE4D2D] text-white rounded-full shadow-2xl backdrop-blur-md transition-all active:scale-90 cursor-pointer no-print"
+          className="fixed bottom-28 right-3.5 sm:bottom-8 sm:right-8 z-30 p-2.5 sm:p-3 bg-slate-900/90 hover:bg-[#EE4D2D] text-white rounded-full shadow-xl border border-white/20 backdrop-blur-md transition-all active:scale-90 cursor-pointer no-print"
           title="Back to top"
         >
-          <ArrowUp className="w-5 h-5" />
+          <ArrowUp className="w-4 h-4 sm:w-5 sm:h-5" />
         </button>
       )}
 
-      {/* 20 Frontend Polish: Floating Support Hotline CTA Button */}
-      <div className="fixed bottom-20 left-4 sm:bottom-8 sm:left-8 z-40 no-print">
-        <button
-          onClick={() => setSupportModalOpen(true)}
-          className="bg-[#EE4D2D] hover:bg-[#d73f20] text-white px-3.5 py-2.5 rounded-full shadow-2xl flex items-center gap-2 text-xs font-bold transition-all active:scale-95 cursor-pointer"
-          title="Direct Hardware Dispatch Hotline"
-        >
-          <Phone className="w-4 h-4 animate-bounce" />
-          <span className="hidden sm:inline">Dispatch Hotline</span>
-        </button>
-      </div>
+      {/* 20 Frontend Polish: Floating Support Hotline CTA Button (Hidden on Merchant Dashboard & when Cart/Modals open) */}
+      {activeTab !== 'me' && !isCartOpen && !selectedLotModal && (
+        <div className="fixed bottom-16 right-3.5 sm:bottom-6 sm:left-6 sm:right-auto z-30 no-print">
+          <button
+            onClick={() => setSupportModalOpen(true)}
+            className="bg-[#EE4D2D]/95 hover:bg-[#d73f20] text-white p-2.5 sm:px-3.5 sm:py-2 rounded-full shadow-lg border border-white/25 flex items-center gap-1.5 text-xs font-bold transition-all active:scale-95 cursor-pointer backdrop-blur-xs"
+            title="Direct Hardware Dispatch Hotline"
+            aria-label="Open Direct Hardware Dispatch Hotline"
+          >
+            <Phone className="w-4 h-4" />
+            <span className="hidden sm:inline">Dispatch Hotline</span>
+          </button>
+        </div>
+      )}
 
       {/* Floating Support Modal */}
       {supportModalOpen && (

@@ -6,7 +6,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import QRCode from 'qrcode';
 import { 
-  Search, Camera, ShoppingCart, MessageCircle, Home, ShoppingBag, 
+  Warehouse, Search, Camera, ShoppingCart, MessageCircle, Home, ShoppingBag, 
   Tv, Bell, User, Truck, MapPin, MoreHorizontal, ShieldCheck, 
   Plus, Minus, Trash2, ArrowRight, X, AlertCircle, Lock, KeyRound, 
   Eye, EyeOff, LogIn, UserPlus, LogOut, Check, RefreshCw, Flame, Tag,
@@ -44,6 +44,14 @@ export const TACLOBAN_DELIVERY_ZONES = [
   { label: 'Babatngon, Leyte', km: 22 },
   { label: 'Basey, Samar (via San Juanico Bridge)', km: 28 },
   { label: 'Custom Distance (Manual Km)', km: 0 }
+];
+
+// Automatic Volume Discount Tiers (applied automatically as cart total increases)
+export const VOLUME_TIERS = [
+  { minSpend: 100000, percent: 40, label: '40% Reseller Commercial Tier', shortLabel: '40% OFF' },
+  { minSpend: 50000,  percent: 35, label: '35% Builder Contractor Tier', shortLabel: '35% OFF' },
+  { minSpend: 25000,  percent: 20, label: '20% Contractor Wholesale Tier', shortLabel: '20% OFF' },
+  { minSpend: 10000,  percent: 10, label: '10% Volume Builder Tier', shortLabel: '10% OFF' },
 ];
 
 // ==================== B2B COMMERCIAL LIQUIDATION & CONTRACTOR LOTS ====================
@@ -423,7 +431,7 @@ const renderPopups = () => (
   const copyRetailOutreachScript = () => {
     if (typeof window !== 'undefined') {
       const retailUrl = `${window.location.origin}${window.location.pathname}?mode=retail`;
-      const script = `Good day! Here is your exclusive direct access link to purchase hardware supplies per piece: ${retailUrl} - Manna Hardware Warehouse (Same-day dispatch in Tacloban & Leyte).`;
+      const script = `Good day! Here is your exclusive direct access link to purchase hardware supplies per piece: ${retailUrl} - MY Hardware Warehouse (Same-day dispatch in Tacloban & Leyte).`;
       navigator.clipboard.writeText(script).then(() => {
         setCopiedScript(true);
         setTimeout(() => setCopiedScript(false), 4000);
@@ -538,10 +546,12 @@ const renderPopups = () => (
   const [showAdminPassword, setShowAdminPassword] = useState(false);
 
   // ==================== CATALOG & INVENTORY ====================
+  const CATALOG_BUILD_VERSION = 'v2.7_no_emojis_clean_pricing';
   const [products, setProducts] = useState(() => {
+    const savedVersion = localStorage.getItem('manna_catalog_version');
     const saved = localStorage.getItem('manna_products');
     let rawList = initialCatalog;
-    if (saved) {
+    if (saved && savedVersion === CATALOG_BUILD_VERSION) {
       try {
         const parsed = JSON.parse(saved);
         // If saved list has older/fewer items than updated catalog (e.g. 465 vs 934), use full catalog
@@ -551,21 +561,39 @@ const renderPopups = () => (
       } catch (e) {
         rawList = initialCatalog;
       }
+    } else {
+      localStorage.setItem('manna_catalog_version', CATALOG_BUILD_VERSION);
     }
-    // Guarantee every item uses the latest verified image from initialCatalog (unless custom data:image/ uploaded in Admin)
-    const catalogImageMap = new Map(initialCatalog.map(c => [c.id, c.image]));
+    // Guarantee every item uses verified warehouse, box_no, quote_no, and image from initialCatalog
+    const catalogMetaMap = new Map(initialCatalog.map(c => [c.id, c]));
     return rawList.map(p => {
-      if (p.id === 'MNA-1103' || p.name === 'LUX QDE Med. Brown') {
-        return {
-          ...p,
-          image: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR1kVAYMpJTgWxNh5VMpl8dGuewXHpkZZzybncsM66Y3w&s=10'
-        };
+      const canonical = catalogMetaMap.get(p.id) || {};
+      const isNT = (p.id && p.id.startsWith('MNA-NT-')) || (canonical.id && canonical.id.startsWith('MNA-NT-'));
+      const boxMatch = (p.id || canonical.id || '').match(/^MNA-NT-(\d+)-/);
+      const defaultBox = boxMatch ? String(Number(boxMatch[1])) : '1';
+      
+      const merged = {
+        ...p,
+        warehouse: canonical.warehouse || p.warehouse || (isNT ? 'Nula Tula Depot' : 'Cabalwan Depot'),
+        warehouse_code: canonical.warehouse_code || p.warehouse_code || (isNT ? 'NT' : 'CAB'),
+        box_no: canonical.box_no || p.box_no || defaultBox,
+        quote_no: canonical.quote_no || p.quote_no || `Quote #${defaultBox.padStart(2, '0')}`,
+        location_code: canonical.location_code || p.location_code || (isNT ? `NT-B${defaultBox.padStart(2, '0')}` : `CAB-B${defaultBox.padStart(2, '0')}`),
+        source_file: canonical.source_file || p.source_file
+      };
+
+      const isPurlin = /purlin/i.test(p.name || '') || /purlin/i.test(canonical.name || '') ||
+                       /purlin/i.test(p.description || '') || /purlin/i.test(canonical.description || '') ||
+                       p.id === 'MNA-1001' || p.id === 'MNA-NT-01-0017' || p.id === 'MNA-NT-01-0016' || p.id === 'MNA-NT-01-0018';
+
+      if (isPurlin) {
+        merged.image = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRJ1lDF-ht6yaqParkahCFb91OYZoNf7fsHZoLZhP8q7g&s=10';
+      } else if (p.id === 'MNA-1103' || p.name === 'LUX QDE Med. Brown') {
+        merged.image = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR1kVAYMpJTgWxNh5VMpl8dGuewXHpkZZzybncsM66Y3w&s=10';
+      } else if (canonical.image && (!p.image || !p.image.startsWith('data:image/'))) {
+        merged.image = canonical.image;
       }
-      const verifiedImg = catalogImageMap.get(p.id);
-      if (verifiedImg && (!p.image || !p.image.startsWith('data:image/'))) {
-        return { ...p, image: verifiedImg };
-      }
-      return p;
+      return merged;
     });
   });
 
@@ -583,7 +611,7 @@ const renderPopups = () => (
       { code: 'bulk25', type: 'percentage', value: 20, minSpend: 25000, active: true, description: '20% Contractor Tier 1 Discount (Min. ₱25,000 spend)' },
       { code: 'builder', type: 'percentage', value: 30, minSpend: 50000, active: true, description: '30% Builder Tier 2 Discount (Min. ₱50,000 spend)' },
       { code: 'hardware', type: 'percentage', value: 40, minSpend: 100000, active: true, description: '40% Hardware Reseller Tier 3 Discount (Min. ₱100,000 spend)' },
-      { code: 'MANNA10', type: 'percentage', value: 10, minSpend: 1000, active: true, description: '10% OFF Min. Spend ₱1k' },
+      { code: 'MY10', type: 'percentage', value: 10, minSpend: 1000, active: true, description: '10% OFF Min. Spend ₱1k' },
       { code: 'HARDWARE500', type: 'flat', value: 500, minSpend: 5000, active: true, description: '₱500 Flat Voucher' }
     ];
     const saved = localStorage.getItem('manna_discounts');
@@ -622,6 +650,7 @@ const renderPopups = () => (
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [catalogFilterInStock, setCatalogFilterInStock] = useState(false);
+  const [selectedWarehouseFilter, setSelectedWarehouseFilter] = useState('all'); // 'all' | 'NT' | 'CAB'
   const [catalogViewMode, setCatalogViewMode] = useState(() => (typeof window !== 'undefined' && window.innerWidth < 768 ? 'cards' : 'table'));
   const [manifestViewMode, setManifestViewMode] = useState(() => (typeof window !== 'undefined' && window.innerWidth < 768 ? 'cards' : 'table'));
   const [expandedLots, setExpandedLots] = useState({});
@@ -1026,8 +1055,17 @@ const renderPopups = () => (
     if (!query || !query.trim()) return true;
     const rawQ = query.trim().toLowerCase();
     
-    // Fast path: direct inclusion in name or SKU
-    if ((p.name || '').toLowerCase().includes(rawQ) || (p.id || '').toLowerCase().includes(rawQ)) {
+    // Fast path: direct inclusion in name, SKU, warehouse, box, or quote
+    const pBox = p.box_no ? String(p.box_no) : '';
+    if (
+      (p.name || '').toLowerCase().includes(rawQ) ||
+      (p.id || '').toLowerCase().includes(rawQ) ||
+      (p.warehouse || '').toLowerCase().includes(rawQ) ||
+      (p.warehouse_code || '').toLowerCase() === rawQ ||
+      (p.location_code || '').toLowerCase().includes(rawQ) ||
+      (pBox && (`box ${pBox}`.includes(rawQ) || `box#${pBox}`.includes(rawQ) || `box ${pBox.padStart(2, '0')}`.includes(rawQ))) ||
+      (p.quote_no || '').toLowerCase().includes(rawQ)
+    ) {
       return true;
     }
 
@@ -1039,7 +1077,19 @@ const renderPopups = () => (
     const nameTokens = nameNorm.split(' ').map(stemWord);
 
     const allSearchable = normalizeSearch(
-      [p.name, p.id, p.category, p.description, p.unit].filter(Boolean).join(' ')
+      [
+        p.name, 
+        p.id, 
+        p.category, 
+        p.description, 
+        p.unit,
+        p.warehouse,
+        p.warehouse_code,
+        p.location_code,
+        pBox ? `box ${pBox}` : '',
+        pBox ? `box ${pBox.padStart(2, '0')}` : '',
+        p.quote_no
+      ].filter(Boolean).join(' ')
     );
     const allTokens = allSearchable.split(' ').map(stemWord);
 
@@ -1066,6 +1116,7 @@ const renderPopups = () => (
         ? true
         : (selectedCategory === 'All' || p.category === selectedCategory);
       const matchStock = catalogFilterInStock ? p.stock > 0 : true;
+      const matchWarehouse = selectedWarehouseFilter === 'all' || p.warehouse_code === selectedWarehouseFilter;
       const matchBrand = selectedBrandFilter ? p.name.toLowerCase().includes(selectedBrandFilter.toLowerCase()) : true;
 
       let matchQuick = true;
@@ -1082,7 +1133,7 @@ const renderPopups = () => (
         }
       }
 
-      return matchCat && matchStock && matchBrand && matchQuick;
+      return matchCat && matchStock && matchBrand && matchQuick && matchWarehouse;
     });
 
     if (hasSearch) {
@@ -1101,7 +1152,7 @@ const renderPopups = () => (
     }
 
     return list;
-  }, [products, selectedCategory, searchQuery, catalogFilterInStock, selectedBrandFilter, homeQuickFilter, storewideDiscount]);
+  }, [products, selectedCategory, searchQuery, catalogFilterInStock, selectedWarehouseFilter, selectedBrandFilter, homeQuickFilter, storewideDiscount]);
 
   // Dual column masonry for Home view
   const leftColumnItems = useMemo(() => {
@@ -1121,15 +1172,57 @@ const renderPopups = () => (
     }, 0);
   }, [cart]);
 
+  // Automatic Volume Tiered Pricing Detection
+  const activeVolumeTier = useMemo(() => {
+    for (const tier of VOLUME_TIERS) {
+      if (cartSubtotal >= tier.minSpend) {
+        return tier;
+      }
+    }
+    return null;
+  }, [cartSubtotal]);
+
+  const nextVolumeTier = useMemo(() => {
+    const ascTiers = [...VOLUME_TIERS].sort((a, b) => a.minSpend - b.minSpend);
+    for (const tier of ascTiers) {
+      if (cartSubtotal < tier.minSpend) {
+        return {
+          ...tier,
+          deficit: tier.minSpend - cartSubtotal,
+          progress: Math.min(100, Math.round((cartSubtotal / tier.minSpend) * 100))
+        };
+      }
+    }
+    return null; // Top tier reached
+  }, [cartSubtotal]);
+
   const discountAmount = useMemo(() => {
     let disc = 0;
-    if (appliedPromo && cartSubtotal >= (appliedPromo.minSpend || 0)) {
-      if (appliedPromo.type === 'percentage') disc += (cartSubtotal * (appliedPromo.value / 100));
-      else disc += appliedPromo.value;
+    // 1. Automatic Volume Tiered Discount
+    if (activeVolumeTier) {
+      disc = cartSubtotal * (activeVolumeTier.percent / 100);
     }
-    if (storewideDiscount > 0) disc += (cartSubtotal * (storewideDiscount / 100));
-    return Math.min(disc, cartSubtotal);
-  }, [cartSubtotal, appliedPromo, storewideDiscount]);
+    // 2. Custom promo code voucher if applied and yields higher discount
+    if (appliedPromo && cartSubtotal >= (appliedPromo.minSpend || 0)) {
+      let promoDisc = 0;
+      if (appliedPromo.type === 'percentage') {
+        promoDisc = cartSubtotal * (appliedPromo.value / 100);
+      } else {
+        promoDisc = appliedPromo.value;
+      }
+      if (promoDisc > disc) disc = promoDisc;
+    }
+    // 3. Storewide discount
+    if (storewideDiscount > 0) {
+      disc = Math.max(disc, cartSubtotal * (storewideDiscount / 100));
+    }
+    return Math.round(Math.min(disc, cartSubtotal) * 100) / 100;
+  }, [cartSubtotal, activeVolumeTier, appliedPromo, storewideDiscount]);
+
+  const effectiveDiscountPercent = useMemo(() => {
+    if (cartSubtotal <= 0 || discountAmount <= 0) return 0;
+    return Math.round((discountAmount / cartSubtotal) * 1000) / 10;
+  }, [cartSubtotal, discountAmount]);
 
   // Proactively deactivate promo code if cart subtotal drops below required spend
   useEffect(() => {
@@ -1156,36 +1249,23 @@ const renderPopups = () => (
     return Math.max(1, Number(customer.distanceKm || 8));
   }, [customer.distanceKm]);
 
-  const longCargoFee = useMemo(() => {
-    return hasLongCargo ? (deliveryDistanceKm * 50) : 0;
-  }, [hasLongCargo, deliveryDistanceKm]);
 
-  const baseShippingFee = useMemo(() => {
-    return cartSubtotal >= 3000 || cart.length === 0 ? 0 : 150;
-  }, [cartSubtotal, cart.length]);
 
-  const shippingFee = useMemo(() => {
-    if (cart.length === 0) return 0;
-    return baseShippingFee + longCargoFee;
-  }, [cart.length, baseShippingFee, longCargoFee]);
+  // Warehouse Pickup / Self-Haul prioritized and FREE for big & heavy materials
+  const baseShippingFee = 0;
+  const longCargoFee = 0;
+  const shippingFee = 0;
+  const orderTotal = Math.max(0, Math.round((cartSubtotal - discountAmount) * 100) / 100);
 
-  const orderTotal = Math.max(0, cartSubtotal - discountAmount + shippingFee);
-
-  // Wholesale Clearance Minimum Order Enforcement (₱15,000 for mix-and-match; bypassed for Whole Lots or Retail Mode)
-  const WHOLESALE_MIN_ORDER = 15000;
+  // Frictionless ordering: automatic volume tiered pricing applies up to 40% OFF
+  // Checkout is never blocked by a rigid minimum spend
+  const WHOLESALE_MIN_ORDER = 0;
   const hasWholeLotInCart = useMemo(() => {
     return cart.some(item => item.isWholeLot);
   }, [cart]);
 
-  const isWholesaleMinMet = useMemo(() => {
-    if (isRetailMode) return true; // Retail mode has no minimum spend requirement
-    if (hasWholeLotInCart) return true; // Whole lots always satisfy qualification
-    return cartSubtotal >= WHOLESALE_MIN_ORDER;
-  }, [isRetailMode, hasWholeLotInCart, cartSubtotal]);
-
-  const wholesaleDeficit = useMemo(() => {
-    return Math.max(0, WHOLESALE_MIN_ORDER - cartSubtotal);
-  }, [cartSubtotal]);
+  const isWholesaleMinMet = true;
+  const wholesaleDeficit = 0;
 
   // Sort helper function for indicators
   const renderSortIndicator = (field, currentField, currentOrder) => {
@@ -1466,7 +1546,7 @@ const renderPopups = () => (
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `manna_sales_log_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `my_hardware_sales_log_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1610,7 +1690,7 @@ const renderPopups = () => (
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `manna_inventory_cost_and_potential_report_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `my_hardware_inventory_cost_and_potential_report_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1916,7 +1996,7 @@ const renderPopups = () => (
     setAppliedPromo(found);
     const savings = found.type === 'percentage' ? (cartSubtotal * (found.value / 100)) : found.value;
     setPromoMessage({ 
-      text: `🎉 Code "${clean.toUpperCase()}" ACTIVATED! ${found.value}% wholesale discount applied (-₱${savings.toLocaleString('en-PH', { minimumFractionDigits: 2 })} savings).`, 
+      text: `Code "${clean.toUpperCase()}" ACTIVATED! ${found.value}% wholesale discount applied (-₱${savings.toLocaleString('en-PH', { minimumFractionDigits: 2 })} savings).`, 
       type: 'success' 
     });
   };
@@ -1941,7 +2021,7 @@ const renderPopups = () => (
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text('MANNA BUILDING SUPPLY', 14, 11);
+    doc.text('MY HARDWARE', 14, 11);
 
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
@@ -2009,14 +2089,14 @@ const renderPopups = () => (
         doc.setFontSize(7);
         doc.setTextColor(148, 163, 184);
         doc.text(
-          `Page ${data.pageNumber} of ${pageCount} • Manna Hardware Commercial Inventory Manifest • Tacloban City, Leyte • As-Is, Where-Is Commercial Terms`,
+          `Page ${data.pageNumber} of ${pageCount} • MY Hardware Commercial Inventory Manifest • Tacloban City, Leyte • As-Is, Where-Is Commercial Terms`,
           14,
           290
         );
       }
     });
 
-    doc.save(`manna_hardware_inventory_manifest_${fileDate}.pdf`);
+    doc.save(`my_hardware_inventory_manifest_${fileDate}.pdf`);
   };
 
   // Download Full Inventory Manifest CSV for Contractors & Hardware Resellers (Protected)
@@ -2049,7 +2129,7 @@ const renderPopups = () => (
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `manna_hardware_inventory_manifest_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `my_hardware_inventory_manifest_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -2240,7 +2320,7 @@ const renderPopups = () => (
       setIsCartOpen(false);
       fetchUserOrders();
     } catch (err) {
-      setCheckoutError('Unable to connect to Manna backend server. Please make sure the backend is active.');
+      setCheckoutError('Unable to connect to MY Hardware backend server. Please make sure the backend is active.');
     } finally {
       setIsSubmittingCheckout(false);
     }
@@ -2302,7 +2382,7 @@ const renderPopups = () => (
         setActiveTab('checkout');
       }
     } catch (err) {
-      setAuthError('Connection error to Manna server. Please try again.');
+      setAuthError('Connection error to MY Hardware server. Please try again.');
     }
   };
 
@@ -2353,7 +2433,7 @@ const renderPopups = () => (
         setActiveTab('checkout');
       }
     } catch (err) {
-      setAuthError('Connection error to Manna server. Please try again.');
+      setAuthError('Connection error to MY Hardware server. Please try again.');
     }
   };
 
@@ -2492,7 +2572,7 @@ const renderPopups = () => (
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `manna_catalog_export_${Date.now()}.csv`);
+    link.setAttribute('download', `my_hardware_catalog_export_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -2565,7 +2645,7 @@ const renderPopups = () => (
   const confirmImport = () => {
     if (importPreview.length === 0) return;
     setProducts(prev => [...importPreview, ...prev]);
-    alert(`Successfully imported ${importPreview.length} products into Manna Catalog!`);
+    alert(`Successfully imported ${importPreview.length} products into MY Hardware Catalog!`);
     setImportPreview([]);
     setUploadModal(false);
   };
@@ -2658,49 +2738,24 @@ const renderPopups = () => (
         </div>
       </div>
 
-      {/* ==================== 1.5 WHOLESALE CLEARANCE & PRIVATE RETAIL GATEWAY BAR ==================== */}
-      {isRetailMode ? (
-        <div className="bg-emerald-800 text-white text-[11px] sm:text-xs py-2 px-3 sm:px-6 flex flex-wrap items-center justify-between gap-2 border-b border-emerald-600 shadow-sm">
-          <div className="flex items-center gap-2">
-            <span className="bg-white text-emerald-900 font-black text-[9px] px-2 py-0.5 rounded uppercase tracking-wider shadow-xs">🛍️ Retail Storefront</span>
-            <span className="text-emerald-100 font-medium">Single-piece retail ordering enabled</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => toggleRetailMode(false)}
-              className="bg-emerald-950 hover:bg-black text-amber-300 font-bold px-3 py-1 rounded text-[10px] sm:text-xs cursor-pointer transition-colors shadow-xs flex items-center gap-1"
-            >
-              <Flame className="w-3 h-3 text-red-500 animate-pulse" /> Switch to Wholesale Clearance (₱15k Min) &rarr;
-            </button>
-          </div>
+      {/* ==================== 1.5 VOLUME TIER & LIQUIDATION GATEWAY BAR ==================== */}
+      <div className="bg-emerald-900 text-white text-[11px] sm:text-xs py-2 px-3 sm:px-6 flex flex-wrap items-center justify-between gap-2 border-b border-emerald-700 shadow-sm">
+        <div className="flex items-center gap-2">
+          <span className="bg-white text-emerald-900 font-black text-[9px] px-2 py-0.5 rounded uppercase tracking-wider shadow-xs">Direct Warehouse Pricing</span>
+          <span className="text-emerald-100 font-medium">Single pieces to bulk truckloads &bull; Automatic volume tiers up to 40% OFF</span>
         </div>
-      ) : (
-        <div className="bg-slate-950 text-amber-300 text-[11px] sm:text-xs py-2 px-3 sm:px-6 flex flex-wrap items-center justify-between gap-2 border-b border-amber-500/30 shadow-md">
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-            <span className="bg-amber-400 text-slate-950 font-black text-[9px] px-2 py-0.5 rounded uppercase tracking-wider shadow-xs shrink-0">
-              ⚡ Wholesale Clearance
-            </span>
-            <span className="text-white font-medium shrink-0">
-              Minimum mix-and-match order: <strong className="text-amber-400 font-bold">₱15,000</strong> &bull; Or buy any <strong className="text-amber-400 font-bold">Specialty Lot</strong> for 1-click clearance.
-            </span>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={copyRetailLink}
-              className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-black px-2.5 py-1 rounded text-[10px] sm:text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
-              title="Copy private link for customers who want to purchase per piece without ₱15,000 minimum"
-            >
-              <Copy className="w-3 h-3" /> {copiedRetailLink ? '✓ Copied Link!' : 'Copy Private Retail Link'}
-            </button>
-            <button
-              onClick={() => toggleRetailMode(true)}
-              className="text-slate-300 hover:text-white text-[10px] sm:text-[11px] underline cursor-pointer ml-1"
-            >
-              Preview Single-Pc Mode
-            </button>
-          </div>
+        <div className="flex items-center gap-3">
+          <span className="text-amber-300 font-bold text-[10px] sm:text-xs flex items-center gap-1">
+            <Sparkles className="w-3.5 h-3.5 text-amber-300" /> Auto Tiers: 10% @ ₱10k &bull; 20% @ ₱25k &bull; 35% @ ₱50k &bull; 40% @ ₱100k
+          </span>
+          <button
+            onClick={() => { setActiveTab('lots'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-black px-2.5 py-0.5 rounded text-[10px] sm:text-xs cursor-pointer transition-colors shadow-xs"
+          >
+            Wholesale Lots &rarr;
+          </button>
         </div>
-      )}
+      </div>
 
       {/* Floating notification when private retail link copied */}
       {copiedRetailLink && (
@@ -2713,23 +2768,27 @@ const renderPopups = () => (
         </div>
       )}
 
-      {/* ==================== 2. MANNA HARDWARE MAIN HEADER (#EE4D2D) ==================== */}
+      {/* ==================== 2. MY HARDWARE MAIN HEADER (#EE4D2D) ==================== */}
       <header className="sticky top-0 z-40 bg-[#EE4D2D] text-white shadow-md w-full backdrop-blur-md">
         <div className="max-w-7xl mx-auto pt-2 pb-2.5 px-3 sm:px-6 lg:px-8">
           
           {/* Main Search Row */}
-          <div className="flex items-center gap-3">
-            {/* Desktop Brand Logo */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Mobile & Desktop Brand Logo */}
             <div 
               onClick={() => { setActiveTab('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
-              className="hidden md:flex items-center gap-2 cursor-pointer shrink-0 mr-2"
+              className="flex items-center gap-1.5 sm:gap-2 cursor-pointer shrink-0 mr-0.5 sm:mr-2"
             >
-              <div className="w-9 h-9 rounded-lg bg-white text-[#EE4D2D] font-black flex items-center justify-center text-lg shadow-sm">
-                M
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-white text-[#EE4D2D] font-black flex items-center justify-center text-xs sm:text-sm shadow-sm">
+                MY
               </div>
-              <div>
-                <h1 className="text-base font-black leading-tight tracking-tight text-white">MANNA</h1>
+              <div className="hidden sm:block">
+                <h1 className="text-base font-black leading-tight tracking-tight text-white">MY HARDWARE</h1>
                 <p className="text-[9px] uppercase tracking-wider text-orange-100 font-semibold leading-none">Building Supply</p>
+              </div>
+              <div className="sm:hidden">
+                <h1 className="text-[11px] font-black leading-none tracking-tight text-white">MY</h1>
+                <p className="text-[8px] uppercase tracking-tighter text-orange-100 font-bold leading-none mt-0.5">HARDWARE</p>
               </div>
             </div>
 
@@ -2893,7 +2952,7 @@ const renderPopups = () => (
                 target="_blank"
                 rel="noreferrer"
                 className="bg-[#1877F2] hover:bg-[#0d6efd] text-white px-2.5 py-0.5 rounded text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-xs"
-                title="Official Manna Hardware Facebook Page"
+                title="Official MY Hardware Facebook Page"
               >
                 <MessageCircle className="w-3.5 h-3.5 fill-current" /> Facebook Page
               </a>
@@ -3333,7 +3392,7 @@ const renderPopups = () => (
                     <div className="relative aspect-square w-full rounded-lg overflow-hidden bg-white mb-1.5 flex items-center justify-center">
                       <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRJ1lDF-ht6yaqParkahCFb91OYZoNf7fsHZoLZhP8q7g&s=10" alt="C-Purlins Steel" className="w-full h-full object-cover p-1 group-hover:scale-105 transition-transform" />
                       <span className="absolute bottom-1 left-1 bg-slate-900 text-amber-400 text-[8.5px] font-black px-1.5 py-0.2 rounded shadow-xs">
-                        🏗️ STRUCTURAL -28%
+                        STRUCTURAL -28%
                       </span>
                     </div>
                     <div className="text-[11px] font-bold text-slate-800 line-clamp-1">C-Purlins 2x4 1.2mm HD</div>
@@ -3368,7 +3427,7 @@ const renderPopups = () => (
                     <div className="relative aspect-square w-full rounded-lg overflow-hidden bg-white mb-1.5 flex items-center justify-center">
                       <img src="/images/brass_swing_valve_clean.jpg" alt="Brass Valve" className="w-full h-full object-contain p-1 group-hover:scale-105 transition-transform" />
                       <span className="absolute bottom-1 left-1 bg-sky-700 text-white text-[8.5px] font-black px-1.5 py-0.2 rounded shadow-xs">
-                        🚰 PLUMBING -35%
+                        PLUMBING -35%
                       </span>
                     </div>
                     <div className="text-[11px] font-bold text-slate-800 line-clamp-1">Brass Swing Valve 1/2 HD</div>
@@ -3424,7 +3483,7 @@ const renderPopups = () => (
                     <div className="relative aspect-square w-full rounded-lg overflow-hidden bg-white mb-1.5 flex items-center justify-center">
                       <img src="/images/gooseneck_faucet_clean.jpg" alt="Rosco Faucet" className="w-full h-full object-contain p-1 group-hover:scale-105 transition-transform" />
                       <span className="absolute bottom-1 left-1 bg-amber-500 text-slate-950 text-[8.5px] font-black px-1.5 py-0.2 rounded shadow-xs">
-                        🚰 SURPLUS PLUMBING
+                        SURPLUS PLUMBING
                       </span>
                     </div>
                     <div className="text-[11px] font-bold text-slate-800 line-clamp-1">Rosco Gooseneck Basin Faucet</div>
@@ -3459,7 +3518,7 @@ const renderPopups = () => (
                     <div className="relative aspect-square w-full rounded-lg overflow-hidden bg-white mb-1.5 flex items-center justify-center">
                       <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTJzVHyZ12Skv8mdJfdA16ZpAhOWE03o76OVgrOxW1ffA&s=10" alt="Angle Bar" className="w-full h-full object-cover p-1 group-hover:scale-105 transition-transform" />
                       <span className="absolute bottom-1 left-1 bg-slate-900 text-amber-400 text-[8.5px] font-black px-1.5 py-0.2 rounded shadow-xs">
-                        🏗️ STRUCTURAL STEEL
+                        STRUCTURAL STEEL
                       </span>
                     </div>
                     <div className="text-[11px] font-bold text-slate-800 line-clamp-1">6mm x 2-1/2 Angle Bar</div>
@@ -3522,10 +3581,10 @@ const renderPopups = () => (
                         : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                     }`}
                   >
-                    {cat === 'Structural & Building Materials' ? '🏗️ Structural Steel' :
-                     cat === 'Plumbing & Fixtures' ? '🚰 Plumbing & Fixtures' :
-                     cat === 'Hardware & Fasteners' ? '🔩 Fasteners & Tools' :
-                     cat === 'Electrical & Lighting' ? '⚡ Electrical' : '🎨 Paints & Coatings'}
+                    {cat === 'Structural & Building Materials' ? 'Structural Steel' :
+                     cat === 'Plumbing & Fixtures' ? 'Plumbing & Fixtures' :
+                     cat === 'Hardware & Fasteners' ? 'Fasteners & Tools' :
+                     cat === 'Electrical & Lighting' ? 'Electrical' : 'Paints & Coatings'}
                   </button>
                 ))}
               </div>
@@ -3718,7 +3777,7 @@ const renderPopups = () => (
                 <span className="text-[10px] font-black uppercase tracking-widest text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded">
                   Tacloban Builders Club
                 </span>
-                <h3 className="text-base sm:text-lg font-black mt-2">Join the Manna Contractor Dispatch Network</h3>
+                <h3 className="text-base sm:text-lg font-black mt-2">Join the MY Hardware Contractor Dispatch Network</h3>
                 <p className="text-xs text-slate-300 mt-1 mb-4">
                   Get weekly wholesale price bulletins, flash vouchers, and priority warehouse dispatch across Region VIII.
                 </p>
@@ -3726,7 +3785,7 @@ const renderPopups = () => (
                 {newsletterSuccess ? (
                   <div className="bg-emerald-950/80 border border-emerald-500/50 text-emerald-200 p-3 rounded-xl text-xs font-bold flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>Salamat! You are now subscribed to Manna Contractor Bulletins.</span>
+                    <span>Salamat! You are now subscribed to MY Hardware Contractor Bulletins.</span>
                   </div>
                 ) : (
                   <form 
@@ -3785,8 +3844,8 @@ const renderPopups = () => (
                   <span className="bg-amber-500 text-slate-950 text-[11px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
                     <Flame className="w-3.5 h-3.5 text-red-600 animate-pulse" /> Commercial Warehouse Clearance
                   </span>
-                  <span className="bg-white/10 text-white/90 text-[11px] font-medium px-2.5 py-0.5 rounded-full border border-white/15">
-                    📍 Tacloban City, Leyte (Dispatch & Pickup by Schedule)
+                  <span className="bg-white/10 text-white/90 text-[11px] font-medium px-2.5 py-0.5 rounded-full border border-white/15 flex items-center gap-1">
+                    <MapPin className="w-3 h-3 text-amber-400" /> Tacloban City, Leyte (Dispatch & Pickup by Schedule)
                   </span>
                   <span className="bg-emerald-500/20 text-emerald-300 text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-emerald-500/30">
                     Direct B2B Dispatch • First-Pay First-Release
@@ -3837,7 +3896,7 @@ const renderPopups = () => (
                     <Phone className="w-4 h-4 text-slate-950" /> Request Project Quote (Hotline)
                   </a>
                   <a
-                    href="https://m.me/mannaHardwareTAC?text=Good%20day%20Manna%20Hardware!%20I%20am%20interested%20in%20inspecting%20your%20commercial%20liquidation%20lots.%20Please%20send%20schedule%20and%20terms."
+                    href="https://m.me/mannaHardwareTAC?text=Good%20day%20MY%20Hardware!%20I%20am%20interested%20in%20inspecting%20your%20commercial%20liquidation%20lots.%20Please%20send%20schedule%20and%20terms."
                     target="_blank"
                     rel="noreferrer"
                     className="bg-[#0084FF] hover:bg-[#0072de] text-white font-bold px-4 py-2 rounded-lg text-xs flex items-center gap-2 cursor-pointer shadow-sm transition-all active:scale-95"
@@ -3845,7 +3904,7 @@ const renderPopups = () => (
                     <MessageCircle className="w-4 h-4 fill-current" /> Chat on Messenger
                   </a>
                   <a
-                    href="https://m.me/mannaHardwareTAC?text=Good%20day%20Manna%20Hardware!%20I%20am%20interested%20in%20inspecting%20your%20commercial%20liquidation%20lots.%20Please%20send%20schedule%20and%20terms."
+                    href="https://m.me/mannaHardwareTAC?text=Good%20day%20MY%20Hardware!%20I%20am%20interested%20in%20inspecting%20your%20commercial%20liquidation%20lots.%20Please%20send%20schedule%20and%20terms."
                     target="_blank"
                     rel="noreferrer"
                     className="bg-[#0084FF] hover:bg-[#0072de] text-white font-bold px-4 py-2 rounded-lg text-xs flex items-center gap-2 cursor-pointer shadow-sm transition-all active:scale-95"
@@ -4058,7 +4117,7 @@ const renderPopups = () => (
                               <FileSpreadsheet className="w-3.5 h-3.5 text-slate-600" /> Manifest
                             </button>
                             <a
-                              href={`https://m.me/mannaHardwareTAC?text=${encodeURIComponent(`Hello Manna Hardware! I want to order / inquire about ${lot.name} (₱${lot.lotPrice.toLocaleString('en-PH')}). Please send payment and hauling details.`)}`}
+                              href={`https://m.me/mannaHardwareTAC?text=${encodeURIComponent(`Hello MY Hardware! I want to order / inquire about ${lot.name} (₱${lot.lotPrice.toLocaleString('en-PH')}). Please send payment and hauling details.`)}`}
                               target="_blank"
                               rel="noreferrer"
                               className="bg-[#0084FF] hover:bg-[#0072de] text-white text-xs font-bold py-2 px-2.5 rounded-lg cursor-pointer transition-colors text-center shadow-xs flex items-center justify-center gap-1 active:scale-95"
@@ -4162,7 +4221,7 @@ const renderPopups = () => (
                     </button>
                   </div>
                   <a
-                    href="https://m.me/mannaHardwareTAC?text=Hello%20Manna%20Hardware!%20I%20would%20like%20to%20request%20a%20project%20estimate%20for%20warehouse%20materials."
+                    href="https://m.me/mannaHardwareTAC?text=Hello%20MY%20Hardware!%20I%20would%20like%20to%20request%20a%20project%20estimate%20for%20warehouse%20materials."
                     target="_blank"
                     rel="noreferrer"
                     className="bg-[#0084FF] hover:bg-[#0072de] text-white text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer flex items-center gap-1.5 shadow-2xs transition-colors shrink-0"
@@ -4271,7 +4330,7 @@ const renderPopups = () => (
                                 <ShoppingCart className="w-3 h-3" /> Add
                               </button>
                               <a
-                                href={`https://m.me/mannaHardwareTAC?text=${encodeURIComponent(`Hello Manna Hardware! I want to inquire about manifest item: ${item.name} (${item.id}) - ₱${wholesale.toLocaleString('en-PH')}.`)}`}
+                                href={`https://m.me/mannaHardwareTAC?text=${encodeURIComponent(`Hello MY Hardware! I want to inquire about manifest item: ${item.name} (${item.id}) - ₱${wholesale.toLocaleString('en-PH')}.`)}`}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="text-[11px] font-bold py-1.5 px-2 rounded-lg bg-[#0084FF] hover:bg-[#0072de] text-white flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
@@ -4287,7 +4346,7 @@ const renderPopups = () => (
               ) : (
                 <div className="overflow-x-auto border border-slate-200 rounded-xl max-h-[500px] overflow-y-auto">
                   <p className="sm:hidden text-[10px] text-slate-500 bg-amber-50 px-3 py-1 border-b border-amber-200">
-                    👈 Swipe left/right to view all columns 👉
+                    Scroll horizontally to view all columns
                   </p>
                   <table className="w-full text-left text-xs border-collapse min-w-[760px]">
                   <thead className="bg-slate-100 text-slate-700 font-bold sticky top-0 z-10 border-b border-slate-200 text-[11px]">
@@ -4502,6 +4561,50 @@ const renderPopups = () => (
                 </div>
               </div>
 
+              {/* Warehouse Depot Quick Filters */}
+              <div className="flex flex-wrap items-center gap-1.5 pt-2 pb-1 border-b border-slate-100">
+                <span className="text-[11px] font-black text-slate-600 uppercase tracking-wide mr-1 flex items-center gap-1">
+                  <Warehouse className="w-3.5 h-3.5 text-slate-500" /> Depot:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedWarehouseFilter('all')}
+                  className={`px-2.5 py-1 rounded text-xs font-bold transition-all cursor-pointer ${
+                    selectedWarehouseFilter === 'all'
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  All Depots ({products.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedWarehouseFilter('NT')}
+                  className={`px-2.5 py-1 rounded text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                    selectedWarehouseFilter === 'NT'
+                      ? 'bg-purple-700 text-white shadow-xs'
+                      : 'bg-purple-50 text-purple-800 hover:bg-purple-100 border border-purple-200'
+                  }`}
+                >
+                  <MapPin className="w-3 h-3" />
+                  <span>Nula Tula (NT)</span>
+                  <span className="text-[10px] opacity-80">({products.filter(p => p.warehouse_code === 'NT').length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedWarehouseFilter('CAB')}
+                  className={`px-2.5 py-1 rounded text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                    selectedWarehouseFilter === 'CAB'
+                      ? 'bg-blue-700 text-white shadow-xs'
+                      : 'bg-blue-50 text-blue-800 hover:bg-blue-100 border border-blue-200'
+                  }`}
+                >
+                  <MapPin className="w-3 h-3" />
+                  <span>Cabalwan (CAB)</span>
+                  <span className="text-[10px] opacity-80">({products.filter(p => p.warehouse_code === 'CAB').length})</span>
+                </button>
+              </div>
+
               {/* Filters row */}
               <div className="flex flex-wrap items-center justify-between gap-3 mt-3">
                 <div className="flex items-center gap-4 text-xs">
@@ -4543,7 +4646,7 @@ const renderPopups = () => (
               <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
                 <div className="overflow-x-auto">
                   <p className="sm:hidden text-[10px] text-slate-500 bg-amber-50 px-3 py-1 border-b border-amber-200">
-                    👈 Swipe left/right to view all columns 👉
+                    Scroll horizontally to view all columns
                   </p>
                   <table className="w-full text-left text-xs border-collapse min-w-[760px]">
                     <thead>
@@ -4595,9 +4698,21 @@ const renderPopups = () => (
                               />
                             </td>
 
-                            {/* SKU */}
-                            <td className="py-2.5 px-3 font-mono font-bold text-slate-700">
-                              {item.id}
+                            {/* SKU & Warehouse Box Location */}
+                            <td className="py-2.5 px-3">
+                              <span className="font-mono font-bold text-slate-800 text-[11px] block">{item.id}</span>
+                              <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                                <span className={`text-[8.5px] font-bold px-1.5 py-0.2 rounded border ${
+                                  item.warehouse_code === 'NT'
+                                    ? 'bg-purple-50 text-purple-800 border-purple-200'
+                                    : 'bg-blue-50 text-blue-800 border-blue-200'
+                                }`}>
+                                  {item.warehouse_code === 'NT' ? 'NT (Nula Tula)' : 'CAB (Cabalwan)'}
+                                </span>
+                                <span className="text-[8.5px] font-mono font-bold bg-slate-100 text-slate-700 px-1 py-0.2 rounded border border-slate-200">
+                                  Box #{item.box_no || '1'}
+                                </span>
+                              </div>
                             </td>
 
                             {/* Name */}
@@ -4606,7 +4721,7 @@ const renderPopups = () => (
                                 <span className="font-bold text-slate-900 leading-snug">{item.name}</span>
                                 {isLongCargoItem(item) && (
                                   <span className="inline-flex items-center gap-0.5 text-[9px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.5 rounded border border-amber-300">
-                                    <Truck className="w-2.5 h-2.5 text-amber-700" /> 10ft+ (₱50/km)
+                                    <Warehouse className="w-2.5 h-2.5 text-amber-700" /> Self-Haul Priority
                                   </span>
                                 )}
                               </div>
@@ -4867,7 +4982,7 @@ const renderPopups = () => (
                       { step: 'Order Placed', desc: 'Hardware order verified in warehouse database' },
                       { step: 'Processing', desc: 'Materials allocated from Tacloban stock' },
                       { step: 'Packed', desc: 'Commercial bundling and safety inspection complete' },
-                      { step: 'Out for Delivery', desc: 'Dispatched with Manna logistics fleet vehicle' },
+                      { step: 'Out for Delivery', desc: 'Dispatched with MY Hardware logistics fleet vehicle' },
                       { step: 'Delivered', desc: 'Delivered to site and signed by receiver' }
                     ].map((s, idx) => {
                       const statusOrder = ['Order Placed', 'Processing', 'Packed', 'Out for Delivery', 'Delivered'];
@@ -4958,7 +5073,7 @@ const renderPopups = () => (
                 <span className="text-[10px] uppercase font-black tracking-widest bg-white/20 px-2 py-0.5 rounded">
                   Official Hardware Mall
                 </span>
-                <h2 className="text-lg font-black mt-1">Manna Mall Tacloban</h2>
+                <h2 className="text-lg font-black mt-1">MY Hardware Mall Tacloban</h2>
                 <p className="text-xs text-white/90">100% Genuine Boysen, Island, Makita, Dewalt & Amerilock</p>
               </div>
               <ShieldCheck className="w-12 h-12 text-white/80" />
@@ -4999,8 +5114,8 @@ const renderPopups = () => (
         {activeTab === 'notifications' && (
           <main className="max-w-2xl mx-auto w-full space-y-3">
             <div className="bg-white p-4 rounded-xl border border-slate-200 flex items-center gap-3.5 shadow-2xs">
-              <div className="w-11 h-11 rounded-full bg-orange-100 text-[#EE4D2D] flex items-center justify-center text-lg">
-                🏷️
+              <div className="w-11 h-11 rounded-full bg-orange-100 flex items-center justify-center">
+                <Tag className="w-5 h-5 text-[#EE4D2D]" />
               </div>
               <div className="flex-1 text-xs">
                 <p className="font-bold text-slate-900 text-sm">Wholesale Code "hardware" (40% OFF)</p>
@@ -5009,8 +5124,8 @@ const renderPopups = () => (
             </div>
 
             <div className="bg-white p-4 rounded-xl border border-slate-200 flex items-center gap-3.5 shadow-2xs">
-              <div className="w-11 h-11 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-lg">
-                🏗️
+              <div className="w-11 h-11 rounded-full bg-blue-100 flex items-center justify-center">
+                <Layers className="w-5 h-5 text-blue-600" />
               </div>
               <div className="flex-1 text-xs">
                 <p className="font-bold text-slate-900 text-sm">Contractor Special "builder" (35% OFF)</p>
@@ -5489,12 +5604,12 @@ const renderPopups = () => (
                       <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-100 px-1.5">
                         {!isSidebarCollapsed ? (
                           <div className="flex items-center gap-2.5">
-                            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#EE4D2D] to-orange-500 text-white flex items-center justify-center font-black text-base shadow-sm ring-2 ring-orange-100">
-                              M
+                            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#EE4D2D] to-orange-500 text-white flex items-center justify-center font-black text-sm shadow-sm ring-2 ring-orange-100">
+                              MY
                             </div>
                             <div>
                               <div className="flex items-center gap-1.5">
-                                <span className="font-black text-slate-900 text-sm tracking-tight">MANNA PRO</span>
+                                <span className="font-black text-slate-900 text-sm tracking-tight">MY HARDWARE PRO</span>
                                 <span className="text-[9px] bg-orange-100 text-[#EE4D2D] font-extrabold px-1.5 py-0.2 rounded-full uppercase tracking-wider">
                                   HQ
                                 </span>
@@ -5504,8 +5619,8 @@ const renderPopups = () => (
                           </div>
                         ) : (
                           <div className="mx-auto">
-                            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#EE4D2D] to-orange-500 text-white flex items-center justify-center font-black text-base shadow-sm ring-2 ring-orange-100">
-                              M
+                            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#EE4D2D] to-orange-500 text-white flex items-center justify-center font-black text-sm shadow-sm ring-2 ring-orange-100">
+                              MY
                             </div>
                           </div>
                         )}
@@ -6208,8 +6323,8 @@ const renderPopups = () => (
                           <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
                             <FileSpreadsheet className="w-5 h-5 text-[#1E3A8A]" /> Owner's Inventory Cost &amp; Potential Report
                           </h3>
-                          <span className="text-[10px] bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded-full border border-amber-200">
-                            🔒 Confidential • Owner Only
+                          <span className="text-[10px] bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded-full border border-amber-200 flex items-center gap-1">
+                            <Lock className="w-2.5 h-2.5" /> Confidential • Owner Only
                           </span>
                         </div>
                         <p className="text-xs text-slate-500 mt-1">
@@ -6255,7 +6370,7 @@ const renderPopups = () => (
                             <div key={idx} className="bg-white/5 border border-white/10 rounded-lg p-3 space-y-1">
                               <div className="flex items-center justify-between">
                                 <span className="font-bold text-xs text-amber-300">
-                                  {wh.warehouse.includes('Tacloban') ? '📍 ' + wh.warehouse + ' (Cabalwan)' : '📦 ' + wh.warehouse}
+                                  {wh.warehouse.includes('Tacloban') ? wh.warehouse + ' (Cabalwan)' : wh.warehouse}
                                 </span>
                                 <span className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded text-slate-300 font-mono">
                                   {wh.total_boxes} Boxes
@@ -7507,7 +7622,7 @@ const renderPopups = () => (
                             : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                         }`}
                       >
-                        <Search className="w-3.5 h-3.5" /> 🔍 Search Item to Find Box
+                        <Search className="w-3.5 h-3.5" /> Search Item to Find Box
                       </button>
 
                       <button
@@ -7518,7 +7633,7 @@ const renderPopups = () => (
                             : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                         }`}
                       >
-                        <Layers className="w-3.5 h-3.5" /> 🗃️ View by Box Number ({warehouseBoxes.length || 38})
+                        <Layers className="w-3.5 h-3.5" /> View by Box Number ({warehouseBoxes.length || 38})
                       </button>
 
                       <button
@@ -7529,7 +7644,7 @@ const renderPopups = () => (
                             : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                         }`}
                       >
-                        <PlusCircle className="w-3.5 h-3.5" /> 📥 Ingest Another Warehouse (New Inflow)
+                        <PlusCircle className="w-3.5 h-3.5" /> Ingest Another Warehouse (New Inflow)
                       </button>
                     </div>
 
@@ -7569,7 +7684,7 @@ const renderPopups = () => (
                             <thead className="bg-slate-900 text-white font-bold text-[11px] sticky top-0 uppercase tracking-wider">
                               <tr>
                                 <th className="py-2.5 px-3">Item Description</th>
-                                <th className="py-2.5 px-3 bg-amber-400 text-slate-950 text-center font-black">📦 Physical Box #</th>
+                                <th className="py-2.5 px-3 bg-amber-400 text-slate-950 text-center font-black">Physical Box #</th>
                                 <th className="py-2.5 px-3 text-center">Quote #</th>
                                 <th className="py-2.5 px-3">Warehouse Origin</th>
                                 <th className="py-2.5 px-3 text-center">Qty in Box</th>
@@ -7992,6 +8107,165 @@ const renderPopups = () => (
                 )}
 
                 <form onSubmit={handleCheckoutSubmit} className="mt-4 space-y-3.5">
+                {/* 1. Review Items with Live Adjustable Quantities on Mobile Checkout */}
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 sm:p-4 space-y-3 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-black uppercase text-slate-800 flex items-center gap-1.5">
+                      <Package className="w-4 h-4 text-[#EE4D2D]" /> Order Items ({cart.reduce((s, i) => s + i.quantity, 0)})
+                    </h3>
+                    <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      Live Adjustable
+                    </span>
+                  </div>
+
+                  {cart.length === 0 ? (
+                    <div className="text-center py-6 text-slate-500 space-y-2">
+                      <ShoppingCart className="w-8 h-8 text-slate-300 mx-auto" />
+                      <p className="text-xs font-bold text-slate-700">Your cart is empty.</p>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('home')}
+                        className="text-xs text-[#EE4D2D] font-bold underline cursor-pointer"
+                      >
+                        Browse items in catalog &rarr;
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                      {cart.map(item => (
+                        <div key={item.id} className="bg-white p-2.5 rounded-lg border border-slate-200 flex items-center gap-2.5 shadow-2xs">
+                          <img
+                            src={item.image}
+                            alt={item.name}
+                            className="w-12 h-12 object-contain bg-slate-50 rounded border border-slate-100 shrink-0"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold text-slate-900 truncate">{item.name}</p>
+                            <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                              <span className={`text-[8.5px] font-bold px-1.5 py-0.2 rounded border flex items-center gap-0.5 ${
+                                item.warehouse_code === 'NT'
+                                  ? 'bg-purple-50 text-purple-800 border-purple-200'
+                                  : 'bg-blue-50 text-blue-800 border-blue-200'
+                              }`}>
+                                <MapPin className="w-2.5 h-2.5 shrink-0" /> {item.warehouse_code === 'NT' ? 'Nula Tula (NT)' : 'Cabalwan (CAB)'}
+                              </span>
+                              <span className="text-[8.5px] font-mono font-bold bg-slate-100 text-slate-700 px-1 py-0.2 rounded border border-slate-200">
+                                Box #{item.box_no || '1'} {item.quote_no ? `• ${item.quote_no}` : ''}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between mt-1 gap-2 flex-wrap">
+                              <div>
+                                <div className="flex items-baseline gap-1.5 flex-wrap">
+                                  <span className={`text-[11px] font-black ${effectiveDiscountPercent > 0 ? 'text-slate-400 line-through' : 'text-[#EE4D2D]'}`}>
+                                    ₱{Number(item.price).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </span>
+                                  {effectiveDiscountPercent > 0 && (
+                                    <span className="text-[11px] font-black text-emerald-600 flex items-center gap-1">
+                                      <span>(₱{(Math.round(Number(item.price) * (1 - effectiveDiscountPercent / 100) * 100) / 100).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</span>
+                                      <span className="text-[8.5px] font-bold bg-emerald-100 text-emerald-800 px-1 py-0.2 rounded border border-emerald-300">
+                                        {Math.round(effectiveDiscountPercent)}% OFF
+                                      </span>
+                                    </span>
+                                  )}
+                                  <span className="text-[9px] text-slate-400 font-normal"> / {item.unit || 'pc'}</span>
+                                </div>
+                                {effectiveDiscountPercent > 0 && item.quantity > 1 && (
+                                  <p className="text-[9.5px] text-slate-500 mt-0.5">
+                                    Line Total: <span className="line-through text-slate-400">₱{(Number(item.price) * item.quantity).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>{' '}
+                                    <strong className="text-emerald-600 font-black">₱{(Math.round(Number(item.price) * item.quantity * (1 - effectiveDiscountPercent / 100) * 100) / 100).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* Adjustable Quantity Stepper */}
+                              <div className="flex items-center border border-slate-300 rounded overflow-hidden">
+                                <button
+                                  type="button"
+                                  onClick={() => updateCartQty(item.id, -1)}
+                                  className="px-2 py-0.5 text-slate-700 hover:bg-slate-100 font-bold text-xs select-none cursor-pointer"
+                                  title="Decrease quantity"
+                                >
+                                  -
+                                </button>
+                                <span className="px-2 py-0.5 text-xs font-black text-slate-900 bg-slate-50 border-x border-slate-300 min-w-7 text-center">
+                                  {item.quantity}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => updateCartQty(item.id, 1)}
+                                  disabled={item.quantity >= (item.stock || 0)}
+                                  className={`px-2 py-0.5 font-bold text-xs select-none ${
+                                    item.quantity >= (item.stock || 0)
+                                      ? 'text-slate-300 bg-slate-100 cursor-not-allowed'
+                                      : 'text-slate-700 hover:bg-slate-100 cursor-pointer'
+                                  }`}
+                                  title={item.quantity >= (item.stock || 0) ? `Max stock (${item.stock}) reached` : 'Increase quantity'}
+                                >
+                                  +
+                                </button>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => removeFromCart(item.id)}
+                                className="text-slate-400 hover:text-rose-600 p-1 cursor-pointer"
+                                title="Remove item"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Interactive Automatic Tiered Pricing Progress Banner */}
+                {activeVolumeTier ? (
+                  <div className="bg-emerald-50 border border-emerald-300 rounded-xl p-3 text-xs text-emerald-950 space-y-1.5 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold flex items-center gap-1.5 text-emerald-900">
+                        <Sparkles className="w-4 h-4 text-emerald-600 animate-pulse" />
+                        <span>Auto Volume Tier: <strong>{activeVolumeTier.label}</strong></span>
+                      </span>
+                      <span className="bg-emerald-600 text-white font-black text-[10px] px-2 py-0.5 rounded-full">
+                        {activeVolumeTier.percent}% OFF APPLIED
+                      </span>
+                    </div>
+                    {nextVolumeTier ? (
+                      <div>
+                        <div className="w-full bg-emerald-200/60 rounded-full h-1.5 overflow-hidden">
+                          <div className="bg-emerald-600 h-1.5 rounded-full transition-all duration-300" style={{ width: `${nextVolumeTier.progress}%` }}></div>
+                        </div>
+                        <p className="text-[11px] text-emerald-800 mt-1">
+                          Add <strong>₱{nextVolumeTier.deficit.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong> more to unlock <strong>{nextVolumeTier.label}</strong>!
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-emerald-800 font-bold">Maximum 40% Commercial Reseller Tier Applied!</p>
+                    )}
+                  </div>
+                ) : nextVolumeTier ? (
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-950 space-y-1.5 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-blue-900 flex items-center gap-1.5">
+                        <Coins className="w-4 h-4 text-blue-600" /> Automatic Volume Tiered Pricing
+                      </span>
+                      <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.5 rounded">
+                        Next: {nextVolumeTier.percent}% OFF
+                      </span>
+                    </div>
+                    <div className="w-full bg-blue-200/60 rounded-full h-1.5 overflow-hidden mt-1">
+                      <div className="bg-blue-600 h-1.5 rounded-full transition-all duration-300" style={{ width: `${nextVolumeTier.progress}%` }}></div>
+                    </div>
+                    <p className="text-[11px] text-blue-700 mt-0.5">
+                      Add <strong>₱{nextVolumeTier.deficit.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong> more in materials to automatically unlock <strong>{nextVolumeTier.label}</strong>!
+                    </p>
+                  </div>
+                ) : null}
+
+                
                   <input
                     type="text"
                     name="user_note_verification"
@@ -8038,75 +8312,42 @@ const renderPopups = () => (
                     />
                   </div>
 
-                  {/* Delivery Destination Zone & Distance (₱50/km Long Cargo) */}
-                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2.5">
+                  {/* Priority Fulfillment: Warehouse Pickup (FREE) */}
+                  <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2.5">
                     <div className="flex items-center justify-between">
                       <label className="block text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                        <Truck className="w-4 h-4 text-[#EE4D2D]" /> Logistics Destination Zone & Distance
+                        <Warehouse className="w-4 h-4 text-emerald-600" /> Fulfillment Method
                       </label>
-                      {hasLongCargo && (
-                        <span className="text-[10px] bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded-full border border-amber-300 flex items-center gap-1">
-                          <AlertTriangle className="w-3 h-3 text-amber-600" /> 10ft+ Long Cargo (@ ₱50/km)
-                        </span>
-                      )}
+                      <span className="text-[10px] bg-slate-100 text-slate-800 font-bold px-2 py-0.5 rounded-full border border-slate-300">
+                        Priority: Self-Haul
+                      </span>
                     </div>
 
-                    <select
-                      value={customer.deliveryZone}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        const match = TACLOBAN_DELIVERY_ZONES.find(z => z.label === val);
-                        if (match) {
-                          setCustomer({
-                            ...customer,
-                            deliveryZone: match.label,
-                            distanceKm: match.km > 0 ? match.km : customer.distanceKm,
-                            customDistance: match.km === 0
-                          });
-                        }
-                      }}
-                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:border-[#EE4D2D] focus:outline-none bg-white font-medium text-slate-800"
-                    >
-                      {TACLOBAN_DELIVERY_ZONES.map(zone => (
-                        <option key={zone.label} value={zone.label}>
-                          {zone.label} {zone.km > 0 ? `(${zone.km} km)` : ''}
-                        </option>
-                      ))}
-                    </select>
-
-                    {customer.customDistance ? (
-                      <div className="flex items-center gap-2 pt-1">
-                        <span className="text-xs text-slate-600 font-medium whitespace-nowrap">Custom Distance:</span>
+                    <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-1.5">
+                      <div className="flex items-center gap-2">
                         <input
-                          type="number"
-                          min="1"
-                          max="250"
-                          value={customer.distanceKm}
-                          onChange={(e) => setCustomer({ ...customer, distanceKm: Math.max(1, Number(e.target.value) || 1) })}
-                          className="w-20 px-2 py-1 text-xs border border-slate-300 rounded focus:outline-none focus:border-[#EE4D2D] font-bold text-slate-900 bg-white"
+                          type="radio"
+                          id="fulfillment_pickup"
+                          name="fulfillment"
+                          checked={true}
+                          readOnly
+                          className="accent-emerald-600"
                         />
-                        <span className="text-xs text-slate-500 font-bold">km from Tacloban Dispatch Hub</span>
+                        <label htmlFor="fulfillment_pickup" className="text-xs font-bold text-slate-900 cursor-pointer">
+                          Tacloban Warehouse Pickup (Contractor Self-Haul) — ₱0.00
+                        </label>
                       </div>
-                    ) : (
-                      <div className="flex items-center justify-between text-[11px] text-slate-500 pt-0.5">
-                        <span>Origin: Tacloban City, Leyte</span>
-                        <span className="font-bold text-slate-700 bg-slate-200/70 px-2 py-0.5 rounded">{deliveryDistanceKm} km distance</span>
-                      </div>
-                    )}
+                      <p className="text-[11px] text-slate-500 pl-5 leading-relaxed">
+                        <strong>Pickup Hubs:</strong> Cabalwan &amp; Nula Tula Depots, Tacloban City. Priority loading by warehouse crew for customer pickup trucks, multi-cabs, and elf trucks.
+                      </p>
+                    </div>
 
-                    {hasLongCargo && (
-                      <div className="bg-amber-100/70 border border-amber-300 rounded-lg p-2.5 text-xs text-amber-950 space-y-1">
-                        <div className="flex items-center justify-between font-bold">
-                          <span className="flex items-center gap-1 text-amber-800">
-                            <Truck className="w-3.5 h-3.5 text-amber-700" /> Long Cargo Fee (₱50/km × {deliveryDistanceKm} km):
-                          </span>
-                          <span className="text-amber-900 font-black text-sm">₱{longCargoFee.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                        </div>
-                        <p className="text-[11px] text-amber-800 leading-tight">
-                          Special heavy flatbed vehicle required for 10ft+ materials ({longCargoItemsInCart.map(i => i.name).slice(0, 3).join(', ')}{longCargoItemsInCart.length > 3 ? ` +${longCargoItemsInCart.length - 3} more` : ''}).
-                        </p>
-                      </div>
-                    )}
+                    <div className="text-[11px] text-slate-600 bg-blue-50/70 border border-blue-200/70 p-2.5 rounded-lg flex items-start gap-1.5">
+                      <Truck className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
+                      <span>
+                        <strong>Need Job-Site Trucking Assistance?</strong> For large bulk orders, delivery freight quotes can be arranged with dispatch hotline via Messenger upon checkout.
+                      </span>
+                    </div>
                   </div>
 
                   <div>
@@ -8174,76 +8415,39 @@ const renderPopups = () => (
                   <div className="pt-3 border-t border-slate-100 space-y-1.5 text-xs">
                     <div className="flex justify-between text-slate-500">
                       <span>Merchandise Subtotal</span>
-                      <span>₱{cartSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      <span>₱{cartSubtotal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                     {discountAmount > 0 && (
                       <div className="flex justify-between text-emerald-600 font-bold">
-                        <span>Discount Voucher Savings</span>
-                        <span>-₱{discountAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        <span>{activeVolumeTier && (!appliedPromo || (activeVolumeTier.percent >= (appliedPromo.value || 0))) ? `Auto Volume Tier (${activeVolumeTier.percent}% OFF)` : 'Discount Savings'}</span>
+                        <span>-₱{discountAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
                     )}
-                    <div className="flex justify-between text-slate-500">
-                      <span>Standard Base Delivery</span>
-                      <span>{baseShippingFee === 0 ? <strong className="text-emerald-600">FREE (Orders ₱3,000+)</strong> : `₱${baseShippingFee.toFixed(2)}`}</span>
-                    </div>
-                    {hasLongCargo && (
-                      <div className="flex justify-between text-amber-800 font-semibold bg-amber-50 px-2 py-1 rounded border border-amber-200">
-                        <span>Long Cargo Delivery (10ft+ @ ₱50/km × {deliveryDistanceKm} km)</span>
-                        <span className="font-bold">₱{longCargoFee.toFixed(2)}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between text-slate-700 font-bold pt-1 border-t border-slate-100">
-                      <span>Total Shipping & Logistics</span>
-                      <span>₱{shippingFee.toFixed(2)}</span>
+                    <div className="flex justify-between text-slate-600">
+                      <span>Warehouse Pickup / Self-Haul</span>
+                      <strong className="text-slate-800 font-bold">₱0.00</strong>
                     </div>
                     <div className="flex justify-between text-base font-black text-slate-900 pt-2 border-t border-slate-200">
                       <span>Total Payable:</span>
-                      <span className="text-[#EE4D2D]">₱{orderTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      <span className="text-[#EE4D2D]">₱{orderTotal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                   </div>
 
-                  {/* Wholesale Minimum Order Warning in Checkout */}
-                  {!isWholesaleMinMet && (
-                    <div className="bg-amber-50 border-2 border-amber-400 p-3.5 rounded-xl text-amber-950 my-3 space-y-2">
-                      <div className="flex items-center gap-2 font-black text-xs text-amber-900 uppercase">
-                        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-                        <span>Wholesale Minimum Spend Not Met (₱15,000 Required)</span>
-                      </div>
-                      <p className="text-xs text-amber-900 leading-relaxed">
-                        Mix-and-match contractor orders require a minimum spend of <strong>₱15,000</strong> (Current: ₱{cartSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}). Add <strong>₱{wholesaleDeficit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong> more to qualify.
-                      </p>
-                      <div className="flex items-center gap-3 pt-1">
-                        <button
-                          type="button"
-                          onClick={() => { setActiveTab('lots'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                          className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs px-3 py-1.5 rounded-lg cursor-pointer"
-                        >
-                          Browse Wholesale Lots &rarr;
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => toggleRetailMode(true)}
-                          className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs px-3 py-1.5 rounded-lg cursor-pointer"
-                        >
-                          Enable Retail Mode
-                        </button>
-                      </div>
+                  <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-lg text-[11px] text-amber-950 leading-relaxed my-3 flex items-start gap-2">
+                    <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <strong>Clearance Terms (As-Is, Where-Is):</strong> Items are liquidated surplus, warehouse overstock, and showroom display inventory sold at deep below-retail clearance rates. Images shown are online sample reference photos; actual stock may vary slightly in lighting, packaging, or finish. Buyers are welcome to inspect physical inventory on-site on an As-Is, Where-Is basis before dispatch.
                     </div>
-                  )}
-
-                  <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-lg text-[11px] text-amber-950 leading-relaxed mb-3 flex items-start gap-2">
-                        <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-                        <div>
-                          <strong>Clearance Terms (As-Is, Where-Is):</strong> Items are liquidated surplus, warehouse overstock, and showroom display inventory sold at deep below-retail clearance rates. Images shown are online sample reference photos; actual stock may vary slightly in lighting, packaging, or finish. Buyers are welcome to inspect physical inventory on-site on an As-Is, Where-Is basis before dispatch.
-                        </div>
-                      </div>
-                    <button
+                  </div>
+                  <button
                     type="submit"
-                    disabled={isSubmittingCheckout || !isWholesaleMinMet}
-                    className="w-full bg-[#EE4D2D] hover:bg-[#d73f20] disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg text-sm shadow-md cursor-pointer mt-4 flex items-center justify-center gap-2"
+                    disabled={isSubmittingCheckout || cart.length === 0}
+                    className="w-full bg-[#EE4D2D] hover:bg-[#d73f20] disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg text-sm shadow-md cursor-pointer mt-2 flex items-center justify-center gap-2"
                   >
-                    {!isWholesaleMinMet ? (
-                      `Wholesale Min Spend (₱15k) Not Met - Need ₱${wholesaleDeficit.toLocaleString()} More`
+                    {cart.length === 0 ? (
+                      'Cart is Empty'
+                    ) : !isWholesaleMinMet ? (
+                      `Wholesale Min Spend (₱15k) Not Met - Need ₱${wholesaleDeficit.toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} More`
                     ) : isSubmittingCheckout ? (
                       <>
                         <RefreshCw className="w-4 h-4 animate-spin" /> Verifying & Placing Order...
@@ -8252,6 +8456,20 @@ const renderPopups = () => (
                       'Confirm & Place Order'
                     )}
                   </button>
+                  <a
+                    href={`https://m.me/mannaHardwareTAC?text=${encodeURIComponent(
+                      `Hello MY Hardware Tacloban! I would like to place an order from checkout:\n\n${cart.map(i => {
+                        const discPrice = effectiveDiscountPercent > 0 ? (i.price * (1 - effectiveDiscountPercent / 100)) : i.price;
+                        const lineTotal = discPrice * i.quantity;
+                        return `• ${i.name} (${i.quantity} ${i.unit || 'pc'}) - ₱${lineTotal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${effectiveDiscountPercent > 0 ? `[Unit: ₱${i.price} -> (₱${discPrice.toFixed(2)}) • ${Math.round(effectiveDiscountPercent)}% OFF]` : `[@ ₱${i.price}]`} [${i.warehouse_code === 'NT' ? 'Nula Tula (NT)' : 'Cabalwan (CAB)'} • Box #${i.box_no || '1'} ${i.quote_no ? `• ${i.quote_no}` : ''}]`;
+                      }).join('\n')}\n\nSubtotal: ₱${cartSubtotal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${activeVolumeTier ? `\nAuto Volume Tier: ${activeVolumeTier.label} (-₱${discountAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` : (discountAmount > 0 ? `\nVoucher Discount: -₱${discountAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '')}\nEstimated Total: ₱${orderTotal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\nReceiver: ${customer.fullName || 'Pickup Customer'}\nPhone: ${customer.phone || 'N/A'}\nFulfillment: Warehouse Pickup (Tacloban Hub - Cabalwan/Nula Tula)`
+                    )}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full mt-2.5 py-3 rounded-lg font-bold text-xs bg-[#0084FF] hover:bg-[#0072de] text-white flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer"
+                  >
+                    <MessageCircle className="w-4 h-4 fill-current" /> Order via Messenger (Instant Dispatch)
+                  </a>
                 </form>
               </div>
             )}
@@ -8277,7 +8495,7 @@ const renderPopups = () => (
               </div>
             )}
             <p className="text-xs text-slate-400 max-w-xs mx-auto mb-6">
-              Your materials are being allocated at Manna Hardware Tacloban. You can track fulfillment status live anytime.
+              Your materials are being allocated at MY Hardware Tacloban. You can track fulfillment status live anytime.
             </p>
 
             <div className="flex justify-center gap-3">
@@ -8314,17 +8532,17 @@ const renderPopups = () => (
             {/* Col 1: Brand & Clearance Summary */}
             <div className="space-y-3">
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 bg-[#EE4D2D] text-white rounded-md flex items-center justify-center font-black text-sm shadow-xs">
-                  M
+                <div className="w-7 h-7 bg-[#EE4D2D] text-white rounded-md flex items-center justify-center font-black text-xs shadow-xs">
+                  MY
                 </div>
-                <span className="text-white font-black text-sm tracking-tight">MANNA BUILDING SUPPLY</span>
+                <span className="text-white font-black text-sm tracking-tight">MY HARDWARE</span>
               </div>
               <p className="text-slate-400 text-[11px] leading-relaxed">
                 Commercial warehouse liquidation and specialty inventory clearance. 100% authentic, sound, contractor-ready heavy hardware and construction supplies sold strictly on an As-Is, Where-Is basis.
               </p>
               <div className="text-[11px] text-slate-500 space-y-1 pt-1">
-                <p>📍 Tacloban City, Leyte • Dispatch by Schedule</p>
-                <p>📞 Hotline: <span className="text-white font-mono font-bold">0926 199 5703</span></p>
+                <p className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-slate-400" /> Tacloban City, Leyte • Dispatch by Schedule</p>
+                <p className="flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 text-slate-400" /> Hotline: <span className="text-white font-mono font-bold">0926 199 5703</span></p>
                 <p>
                   <a
                     href="https://www.facebook.com/mannaHardwareTAC/"
@@ -8332,7 +8550,7 @@ const renderPopups = () => (
                     rel="noreferrer"
                     className="text-[#0084FF] hover:underline font-bold inline-flex items-center gap-1 mt-1"
                   >
-                    <MessageCircle className="w-3.5 h-3.5 fill-current" /> Facebook: MANNA Hardware - Tacloban
+                    <MessageCircle className="w-3.5 h-3.5 fill-current" /> Facebook: MY Hardware - Tacloban
                   </a>
                 </p>
               </div>
@@ -8368,8 +8586,9 @@ const renderPopups = () => (
                 Monday – Saturday: 7:30 AM – 5:30 PM<br />
                 Sunday: 8:00 AM – 12:00 PM (Emergency Dispatch)
               </p>
-              <div className="bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-[10px] text-slate-400">
-                🔒 Physical stock verified across Tacloban Hub (Cabalwan), NulaTula Depot, and Annex.
+              <div className="bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-[10px] text-slate-400 flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span>Physical stock verified across Tacloban Hub (Cabalwan), NulaTula Depot, and Annex.</span>
               </div>
             </div>
 
@@ -8378,7 +8597,7 @@ const renderPopups = () => (
           {/* Bottom Bar with subtle powered by mikabuilds */}
           <div className="pt-6 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px]">
             <p className="text-slate-500 text-center sm:text-left">
-              &copy; {new Date().getFullYear()} Manna Building Supply. All rights reserved. Commercial liquidation inventory.
+              &copy; {new Date().getFullYear()} MY Hardware. All rights reserved. Commercial liquidation inventory.
             </p>
             <div className="flex items-center gap-1.5 text-slate-500 hover:text-slate-400 transition-colors">
               <span className="text-[10px] tracking-wide uppercase font-medium">Powered by</span>
@@ -8462,7 +8681,7 @@ const renderPopups = () => (
 
       {/* ==================== CART SLIDE-OVER ==================== */}
       {isCartOpen && (
-        <div className="fixed inset-0 z-50 overflow-hidden bg-slate-900/60 backdrop-blur-xs flex justify-end">
+        <div className="fixed inset-0 z-[60] overflow-hidden bg-slate-900/60 backdrop-blur-xs flex justify-end">
           <div className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col">
             <div className="p-4 bg-[#EE4D2D] text-white flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -8495,11 +8714,42 @@ const renderPopups = () => (
                       <p className="font-bold text-xs text-slate-900 truncate">{item.name}</p>
                       {item.isWholeLot && (
                         <span className="inline-block bg-emerald-100 text-emerald-800 border border-emerald-300 font-black text-[9px] uppercase px-1.5 py-0.5 rounded mt-0.5 mb-1">
-                          ✨ WHOLE LOT CLEARANCE • SAVE ₱{item.savings?.toLocaleString('en-PH')}
+                          WHOLE LOT CLEARANCE • SAVE ₱{item.savings?.toLocaleString('en-PH')}
                         </span>
                       )}
-                      <p className="text-[11px] text-slate-500">Unit: {item.unit}</p>
-                      <p className="text-xs text-[#EE4D2D] font-black mt-1">₱{item.price.toLocaleString()}</p>
+                      <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                        <span className={`text-[8.5px] font-bold px-1.5 py-0.2 rounded border flex items-center gap-0.5 ${
+                          item.warehouse_code === 'NT'
+                            ? 'bg-purple-50 text-purple-800 border-purple-200'
+                            : 'bg-blue-50 text-blue-800 border-blue-200'
+                        }`}>
+                          <MapPin className="w-2.5 h-2.5 shrink-0" /> {item.warehouse_code === 'NT' ? 'Nula Tula (NT)' : 'Cabalwan (CAB)'}
+                        </span>
+                        <span className="text-[8.5px] font-mono font-bold bg-white text-slate-700 px-1 py-0.2 rounded border border-slate-200">
+                          Box #{item.box_no || '1'} {item.quote_no ? `• ${item.quote_no}` : ''}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5">Unit: {item.unit}</p>
+                      <div className="flex items-baseline gap-1.5 mt-1 flex-wrap">
+                        <span className={`text-xs font-black ${effectiveDiscountPercent > 0 ? 'text-slate-400 line-through' : 'text-[#EE4D2D]'}`}>
+                          ₱{Number(item.price).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                        {effectiveDiscountPercent > 0 && (
+                          <span className="text-xs font-black text-emerald-600 flex items-center gap-1">
+                            <span>(₱{(Math.round(Number(item.price) * (1 - effectiveDiscountPercent / 100) * 100) / 100).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</span>
+                            <span className="text-[9px] font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded border border-emerald-300">
+                              {Math.round(effectiveDiscountPercent)}% OFF
+                            </span>
+                          </span>
+                        )}
+                        <span className="text-[10px] text-slate-400 font-normal"> / {item.unit || 'pc'}</span>
+                      </div>
+                      {effectiveDiscountPercent > 0 && item.quantity > 1 && (
+                        <p className="text-[10px] text-slate-500 mt-0.5">
+                          Line Total: <span className="text-slate-400 line-through">₱{(Number(item.price) * item.quantity).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>{' '}
+                          <strong className="text-emerald-600 font-black">₱{(Math.round(Number(item.price) * item.quantity * (1 - effectiveDiscountPercent / 100) * 100) / 100).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                        </p>
+                      )}
                       <div className="flex items-center justify-between mt-2">
                         <div className="flex items-center border border-slate-300 bg-white rounded text-xs shadow-2xs">
                           <button onClick={() => updateCartQty(item.id, -1)} className="px-2.5 py-1 text-slate-600 hover:bg-slate-100 cursor-pointer font-bold select-none">-</button>
@@ -8591,89 +8841,90 @@ const renderPopups = () => (
                   )}
                 </div>
 
-                {hasLongCargo && (
-                  <div className="bg-amber-50 border border-amber-300 rounded-lg p-2.5 text-xs text-amber-900 space-y-1">
-                    <div className="flex items-center gap-1.5 font-bold text-amber-900">
-                      <Truck className="w-4 h-4 text-amber-700 shrink-0" />
-                      <span>10ft+ Long Cargo Delivery (@ ₱50/km)</span>
+                {/* Long cargo delivery surcharge removed per management priority: warehouse pickup is free and prioritized */}
+
+                {/* Automatic Volume Tier Progress Banner in Drawer */}
+                {activeVolumeTier ? (
+                  <div className="bg-emerald-50 border border-emerald-300 rounded-lg p-2.5 text-xs text-emerald-950 space-y-1.5 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold flex items-center gap-1.5 text-emerald-900">
+                        <Sparkles className="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
+                        <span>Auto Tier: <strong>{activeVolumeTier.label}</strong></span>
+                      </span>
+                      <span className="bg-emerald-600 text-white font-black text-[10px] px-2 py-0.5 rounded-full">
+                        {activeVolumeTier.percent}% OFF
+                      </span>
                     </div>
-                    <p className="text-[11px] text-amber-800 leading-snug">
-                      Your cart includes long materials (e.g., {longCargoItemsInCart.map(i => i.name).slice(0, 2).join(', ')}{longCargoItemsInCart.length > 2 ? ` +${longCargoItemsInCart.length - 2} more` : ''}). Surcharge calculated at ₱50 per km from Tacloban dispatch hub.
+                    {nextVolumeTier ? (
+                      <div>
+                        <div className="w-full bg-emerald-200/60 rounded-full h-1.5 overflow-hidden">
+                          <div className="bg-emerald-600 h-1.5 rounded-full transition-all duration-300" style={{ width: `${nextVolumeTier.progress}%` }}></div>
+                        </div>
+                        <p className="text-[10px] text-emerald-800 mt-1">
+                          Add <strong>₱{nextVolumeTier.deficit.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong> more for <strong>{nextVolumeTier.label}</strong>!
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-emerald-800 font-bold">Maximum 40% Commercial Reseller Tier Applied!</p>
+                    )}
+                  </div>
+                ) : nextVolumeTier ? (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5 text-xs text-blue-950 space-y-1 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-blue-900 flex items-center gap-1.5">
+                        <Coins className="w-3.5 h-3.5 text-blue-600" /> Volume Tiered Pricing
+                      </span>
+                      <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.5 rounded">
+                        Next: {nextVolumeTier.percent}% OFF
+                      </span>
+                    </div>
+                    <div className="w-full bg-blue-200/60 rounded-full h-1.5 overflow-hidden mt-1">
+                      <div className="bg-blue-600 h-1.5 rounded-full transition-all duration-300" style={{ width: `${nextVolumeTier.progress}%` }}></div>
+                    </div>
+                    <p className="text-[10px] text-blue-700 mt-0.5">
+                      Add <strong>₱{nextVolumeTier.deficit.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong> more to auto-unlock <strong>{nextVolumeTier.label}</strong>!
                     </p>
                   </div>
-                )}
+                ) : null}
+
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-700 flex items-start gap-2">
+                  <Warehouse className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <div className="leading-tight">
+                    <span className="font-bold text-slate-900">Priority Warehouse Pickup (Self-Haul)</span>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Tacloban Hub (Cabalwan &amp; Nula Tula Depots) • Warehouse loading assistance. Trucking freight quotes available via Messenger upon request.
+                    </p>
+                  </div>
+                </div>
 
                 <div className="space-y-1 text-xs">
                   <div className="flex justify-between text-slate-600">
                     <span>Subtotal</span>
-                    <span className="font-bold text-slate-800">₱{cartSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    <span className="font-bold text-slate-800">₱{cartSubtotal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                   {discountAmount > 0 && (
                     <div className="flex justify-between text-emerald-600 font-bold">
-                      <span>Voucher Discount</span>
-                      <span>-₱{discountAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      <span>{activeVolumeTier && (!appliedPromo || (activeVolumeTier.percent >= (appliedPromo.value || 0))) ? `Auto Tier Discount (${activeVolumeTier.percent}% OFF)` : 'Voucher Discount'}</span>
+                      <span>-₱{discountAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                   )}
                   <div className="flex justify-between text-slate-600">
-                    <span>Base Delivery</span>
-                    <span>{baseShippingFee === 0 ? <strong className="text-emerald-600">FREE</strong> : `₱${baseShippingFee.toFixed(2)}`}</span>
+                    <span>Fulfillment</span>
+                    <span className="text-slate-800 font-bold">Warehouse Pickup (Tacloban)</span>
                   </div>
-                  {hasLongCargo && (
-                    <div className="flex justify-between text-amber-800 font-medium">
-                      <span>Long Cargo ({deliveryDistanceKm} km @ ₱50/km)</span>
-                      <span className="font-bold">₱{longCargoFee.toFixed(2)}</span>
-                    </div>
-                  )}
                   <div className="flex justify-between text-slate-900 font-black text-sm pt-1.5 border-t border-slate-200">
                     <span>Estimated Total</span>
-                    <span className="text-[#EE4D2D]">₱{orderTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    <span className="text-[#EE4D2D]">₱{orderTotal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                 </div>
 
-                {/* Wholesale Minimum Order Warning Notice */}
-                {!isWholesaleMinMet && (
-                  <div className="bg-amber-50 border-2 border-amber-400 p-3 rounded-xl text-amber-950 space-y-2 shadow-xs">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 font-black text-xs text-amber-900 uppercase tracking-wide">
-                        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-                        <span>Wholesale Minimum: ₱15,000</span>
-                      </div>
-                      <span className="text-[9px] bg-amber-200 text-amber-950 font-black px-1.5 py-0.5 rounded">
-                        REQUIRED
-                      </span>
-                    </div>
-                    <p className="text-[11px] leading-relaxed text-amber-900">
-                      Mix-and-match contractor clearance requires a minimum order of <strong>₱15,000</strong>.
-                      Current: <strong>₱{cartSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>.
-                      Add <strong>₱{wholesaleDeficit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong> more to qualify, or buy any Whole Specialty Lot for instant checkout.
-                    </p>
-                    <div className="pt-1 flex items-center gap-2">
-                      <button
-                        onClick={() => { setIsCartOpen(false); setActiveTab('lots'); }}
-                        className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-[10px] px-2.5 py-1 rounded shadow-xs cursor-pointer flex items-center gap-1"
-                      >
-                        <Flame className="w-3 h-3 text-red-600 animate-pulse" /> View Whole Lots &rarr;
-                      </button>
-                      <button
-                        onClick={() => { toggleRetailMode(true); }}
-                        className="text-[10px] text-amber-800 underline hover:text-amber-950 cursor-pointer"
-                      >
-                        Switch to Retail Mode
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Clearance Notice (As-Is, Where-Is) */}
-                <div className="p-2.5 bg-amber-50/90 border border-amber-200/90 rounded-lg text-[10px] text-amber-950 leading-relaxed mb-2.5 flex items-start gap-1.5">
-                  <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-                  <div>
-                    <strong>Clearance Notice (As-Is, Where-Is):</strong> Items are liquidation surplus, warehouse overstock, and showroom display units sold as-is at below-retail rates. Photos are reference samples sourced online; actual items may vary slightly in lighting, packaging, or finish. On-site physical inspection is welcomed before loading.
-                  </div>
+                {/* Clearance Disclaimer */}
+                <div className="text-[10px] text-slate-500 leading-tight flex items-center gap-1 px-1 py-0.5">
+                  <AlertCircle className="w-3 h-3 text-slate-400 shrink-0" />
+                  <span>Sample reference photos. Clearance items sold as-is where-is; physical inspection welcomed upon pickup.</span>
                 </div>
                 <button
                   onClick={() => {
-                    if (!isWholesaleMinMet) return;
                     if (!currentUser) {
                       setAuthPromptMessage('Account Required: Please log in or create an account to proceed to checkout.');
                       setAuthModal('login');
@@ -8682,20 +8933,17 @@ const renderPopups = () => (
                     setIsCartOpen(false);
                     setActiveTab('checkout');
                   }}
-                  disabled={!isWholesaleMinMet}
-                  className={`w-full py-3 rounded-lg font-bold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-1.5 ${
-                    !isWholesaleMinMet
-                      ? 'bg-slate-300 text-slate-600 cursor-not-allowed border border-slate-300'
-                      : 'bg-[#EE4D2D] hover:bg-[#d73f20] text-white cursor-pointer'
-                  }`}
+                  className="w-full py-3 rounded-lg font-bold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-1.5 bg-[#EE4D2D] hover:bg-[#d73f20] text-white cursor-pointer"
                 >
-                  {!isWholesaleMinMet
-                    ? `Add ₱${wholesaleDeficit.toLocaleString(undefined, { minimumFractionDigits: 0 })} more for Wholesale Min (₱15k)`
-                    : `Proceed to Checkout ${!currentUser ? '(Log In Required)' : ''}`}
+                  Proceed to Checkout {orderTotal > 0 ? `(₱${orderTotal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` : ''} {!currentUser ? '• Log In Required' : ''}
                 </button>
                 <a
                   href={`https://m.me/mannaHardwareTAC?text=${encodeURIComponent(
-                    `Hello Manna Hardware! I would like to place an order from my cart:\n\n${cart.map(i => `• ${i.name} (${i.quantity} ${i.unit || 'pc'}) - ₱${(i.price * i.quantity).toLocaleString('en-PH')}`).join('\n')}\n\nEstimated Subtotal: ₱${cartSubtotal.toLocaleString('en-PH')}\nDelivery / Pickup: Tacloban & Leyte`
+                    `Hello MY Hardware Tacloban! I would like to place an order from my cart:\n\n${cart.map(i => {
+                      const discPrice = effectiveDiscountPercent > 0 ? (i.price * (1 - effectiveDiscountPercent / 100)) : i.price;
+                      const lineTotal = discPrice * i.quantity;
+                      return `• ${i.name} (${i.quantity} ${i.unit || 'pc'}) - ₱${lineTotal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${effectiveDiscountPercent > 0 ? `[Unit: ₱${i.price} -> (₱${discPrice.toFixed(2)}) • ${Math.round(effectiveDiscountPercent)}% OFF]` : `[@ ₱${i.price}]`} [${i.warehouse_code === 'NT' ? 'Nula Tula (NT)' : 'Cabalwan (CAB)'} • Box #${i.box_no || '1'} ${i.quote_no ? `• ${i.quote_no}` : ''}]`;
+                    }).join('\n')}\n\nSubtotal: ₱${cartSubtotal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${discountAmount > 0 ? `\nVoucher Discount: -₱${discountAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}\nEstimated Total: ₱${orderTotal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\nFulfillment: Warehouse Pickup (Tacloban Hub - Cabalwan/Nula Tula)`
                   )}`}
                   target="_blank"
                   rel="noreferrer"
@@ -8857,8 +9105,9 @@ const renderPopups = () => (
                   </label>
                 </div>
                 {(editingItem.isCancelled || editingItem.status === 'cancelled') && (
-                  <div className="text-[11px] text-rose-700 bg-rose-50 border border-rose-200 p-2 rounded-lg font-medium">
-                    ⚠️ <strong>Item Cancelled / Discrepancy Marked:</strong> This SKU is excluded from customer-facing lot manifests and catalog checkout until restocked or restored.
+                  <div className="text-[11px] text-rose-700 bg-rose-50 border border-rose-200 p-2 rounded-lg font-medium flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span><strong>Item Cancelled / Discrepancy Marked:</strong> This SKU is excluded from customer-facing lot manifests and catalog checkout until restocked or restored.</span>
                   </div>
                 )}
               </div>
@@ -8977,7 +9226,7 @@ const renderPopups = () => (
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = "manna_price_list_template.csv";
+                    a.download = "my_hardware_price_list_template.csv";
                     a.click();
                   }}
                   className="text-blue-600 font-bold hover:underline cursor-pointer"
@@ -9287,7 +9536,7 @@ const renderPopups = () => (
                   <Phone className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm text-slate-900">Manna Hardware Support</h3>
+                  <h3 className="font-bold text-sm text-slate-900">MY Hardware Support</h3>
                   <p className="text-[10px] text-slate-400">Tacloban Logistics & Dispatch</p>
                 </div>
               </div>
@@ -9310,7 +9559,7 @@ const renderPopups = () => (
                   rel="noreferrer"
                   className="inline-flex items-center gap-1 text-[11px] font-bold text-[#0084FF] hover:underline mt-0.5"
                 >
-                  <MessageCircle className="w-3 h-3 fill-current" /> Chat on Manna Hardware Messenger
+                  <MessageCircle className="w-3 h-3 fill-current" /> Chat on MY Hardware Messenger
                 </a>
               </div>
 
@@ -9350,7 +9599,7 @@ const renderPopups = () => (
         <div className="fixed bottom-0 left-0 right-0 z-50 p-3 sm:p-4 bg-slate-900/95 text-white backdrop-blur-md border-t border-slate-700 shadow-2xl no-print">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
             <p className="text-slate-300 text-center sm:text-left">
-              Manna Hardware complies with the <strong>Philippine Data Privacy Act of 2012 (RA 10173)</strong>. We use cookies and local storage to secure customer checkout, remember cart items, and optimize delivery dispatch in Leyte & Samar.
+              MY Hardware complies with the <strong>Philippine Data Privacy Act of 2012 (RA 10173)</strong>. We use cookies and local storage to secure customer checkout, remember cart items, and optimize delivery dispatch in Leyte & Samar.
             </p>
             <div className="flex items-center gap-2 shrink-0">
               <button
@@ -9646,7 +9895,7 @@ const renderPopups = () => (
                     <Phone className="w-3.5 h-3.5" /> Call Dispatch: 0926 199 5703
                   </a>
                   <a
-                    href={`https://m.me/mannaHardwareTAC?text=${encodeURIComponent(`Hello Manna Hardware! I am interested in reserving ${selectedLotModal.name} for ₱${selectedLotModal.lotPrice.toLocaleString('en-PH')}. Please confirm availability and hauling schedule.`)}`}
+                    href={`https://m.me/mannaHardwareTAC?text=${encodeURIComponent(`Hello MY Hardware! I am interested in reserving ${selectedLotModal.name} for ₱${selectedLotModal.lotPrice.toLocaleString('en-PH')}. Please confirm availability and hauling schedule.`)}`}
                     target="_blank"
                     rel="noreferrer"
                     className="bg-[#0084FF] hover:bg-[#0072de] text-white font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all active:scale-95"
@@ -9721,7 +9970,8 @@ const renderPopups = () => (
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  📄 Customer Invoice (BIR)
+                  <FileText className="w-3.5 h-3.5 inline mr-1" />
+                  Customer Invoice (BIR)
                 </button>
                 <button
                   type="button"
@@ -9733,7 +9983,7 @@ const renderPopups = () => (
                   }`}
                 >
                   <Box className="w-3.5 h-3.5 text-amber-950" />
-                  📦 Warehouse Pick Slip (Shows Box #)
+                  Warehouse Pick Slip (Shows Box #)
                 </button>
               </div>
 
@@ -9765,9 +10015,9 @@ const renderPopups = () => (
                 <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="bg-[#EE4D2D] text-white font-black text-xs px-2 py-0.5 rounded">MANNA</span>
+                      <span className="bg-[#EE4D2D] text-white font-black text-xs px-2 py-0.5 rounded">MY</span>
                       <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                        MANNA HARDWARE &amp; CONSTRUCTION SUPPLY
+                        MY HARDWARE &amp; CONSTRUCTION SUPPLY
                       </h1>
                     </div>
                     <p className="text-xs font-bold text-slate-600 uppercase tracking-wider">
@@ -9780,8 +10030,8 @@ const renderPopups = () => (
                     <p className="text-xs text-slate-500 mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
                       <span><strong>Hotline:</strong> (053) 832-4911</span>
                       <span><strong>Mobile:</strong> 0926 199 5703</span>
-                      <span><a href="https://www.facebook.com/mannaHardwareTAC/" target="_blank" rel="noreferrer" className="text-[#0084FF] hover:underline font-bold inline-flex items-center gap-0.5"><MessageCircle className="w-3 h-3 fill-current" /> Messenger: MANNA Hardware</a></span>
-                      <span><strong>Email:</strong> sales@mannahardware.ph</span>
+                      <span><a href="https://www.facebook.com/mannaHardwareTAC/" target="_blank" rel="noreferrer" className="text-[#0084FF] hover:underline font-bold inline-flex items-center gap-0.5"><MessageCircle className="w-3 h-3 fill-current" /> Messenger: MY Hardware</a></span>
+                      <span><strong>Email:</strong> sales@myhardware.ph</span>
                     </p>
                   </div>
 
@@ -9900,7 +10150,7 @@ const renderPopups = () => (
                       <th className="py-2.5 px-3">Item Description &amp; Specification</th>
                       {invoicePrintMode === 'internal_pick' && (
                         <th className="py-2.5 px-3 bg-amber-400 text-slate-950 font-black">
-                          📦 Physical Box Location &amp; Quote #
+                          Physical Box Location &amp; Quote #
                         </th>
                       )}
                       <th className="py-2.5 px-3 text-center">Unit</th>
@@ -9941,7 +10191,7 @@ const renderPopups = () => (
                                     {locs.map((loc, lIdx) => (
                                       <div key={lIdx} className="flex items-center gap-1.5 flex-wrap">
                                         <span className="bg-amber-300 text-amber-950 font-black px-2 py-0.5 rounded text-xs border border-amber-400 shadow-2xs font-mono inline-block">
-                                          📦 BOX #{loc.box_no}
+                                          BOX #{loc.box_no}
                                         </span>
                                         <span className="text-[11px] font-bold text-slate-800 font-mono">
                                           {loc.quote_no}
@@ -9983,7 +10233,7 @@ const renderPopups = () => (
                       <p className="font-bold text-slate-700 uppercase tracking-wider text-[10px]">Commercial Warranty &amp; Return Terms:</p>
                       <p>• Goods received in good order and condition. Check count upon site drop-off.</p>
                       <p>• 7 days commercial warranty for factory defects with this original sales invoice.</p>
-                      <p>• Heavy structural items (C-Purlins, Pipes, Rebar) verified by Manna warehouse inspection.</p>
+                      <p>• Heavy structural items (C-Purlins, Pipes, Rebar) verified by MY Hardware warehouse inspection.</p>
                     </div>
 
                     {/* Breakdown Calculation */}
@@ -10005,7 +10255,7 @@ const renderPopups = () => (
 
                       <div className="flex justify-between text-slate-600">
                         <span>Base Freight &amp; Handling:</span>
-                        <span className="font-mono">{baseShip === 0 ? <strong className="text-emerald-600 font-bold">FREE</strong> : `₱${baseShip.toFixed(2)}`}</span>
+                        <span className="font-mono">{baseShip === 0 ? <strong className="text-slate-800 font-bold">₱0.00</strong> : `₱${baseShip.toFixed(2)}`}</span>
                       </div>
 
                       {longFee > 0 && (
@@ -10020,7 +10270,7 @@ const renderPopups = () => (
 
                       <div className="flex justify-between text-slate-700 pt-1 border-t border-slate-200 font-bold">
                         <span>Total Delivery Logistics:</span>
-                        <span className="font-mono">{totalShip === 0 ? <strong className="text-emerald-600">FREE (₱0.00)</strong> : `₱${totalShip.toFixed(2)}`}</span>
+                        <span className="font-mono">{totalShip === 0 ? <strong className="text-slate-800 font-bold">₱0.00</strong> : `₱${totalShip.toFixed(2)}`}</span>
                       </div>
 
                       <div className="flex justify-between items-baseline pt-2 border-t-2 border-slate-900 text-slate-900">
@@ -10040,7 +10290,7 @@ const renderPopups = () => (
                   <div>
                     <div className="border-b border-slate-400 pb-10"></div>
                     <p className="font-bold text-slate-800 mt-1.5 uppercase text-[10px]">Prepared &amp; Inspected By</p>
-                    <p className="text-[10px] text-slate-500">Manna Warehouse Dispatch Officer</p>
+                    <p className="text-[10px] text-slate-500">MY Hardware Warehouse Dispatch Officer</p>
                   </div>
                   <div>
                     <div className="border-b border-slate-400 pb-10"></div>
@@ -10057,7 +10307,7 @@ const renderPopups = () => (
 
               {/* 6. Document Footer */}
               <div className="text-center text-[10px] text-slate-400 pt-3 border-t border-slate-100">
-                <p>This is an official commercial sales invoice &amp; delivery manifest generated by Manna Hardware &amp; Construction Supply.</p>
+                <p>This is an official commercial sales invoice &amp; delivery manifest generated by MY Hardware &amp; Construction Supply.</p>
                 <p className="font-mono mt-0.5">Tacloban City • Leyte • Philippines | Hotline: (053) 832-4911</p>
               </div>
 
@@ -10102,7 +10352,7 @@ const renderPopups = () => (
   );
 }
 
-// ==================== MANNA PRODUCT CARD COMPONENT ====================
+// ==================== MY HARDWARE PRODUCT CARD COMPONENT ====================
 function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = false, storewideDiscount = 0, isRetailMode = false, cart = [] }) {
   const getDisplaySold = (p) => {
     let s = typeof p.sold === 'number' ? p.sold : null;
@@ -10181,7 +10431,7 @@ function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = f
           </div>
         ) : isRetailMode ? (
           <div className="absolute top-1.5 left-1.5 bg-emerald-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-xs flex items-center gap-1">
-            <span>🛍️</span> RETAIL (PER PC)
+            <span>RETAIL (PER PC)</span>
           </div>
         ) : (
           <div className="absolute top-1.5 left-1.5 bg-slate-900 text-amber-400 border border-amber-400/40 text-[8px] font-black px-1.5 py-0.5 rounded shadow-xs flex items-center gap-1">
@@ -10224,7 +10474,22 @@ function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = f
             {product.name}
           </h3>
 
-          {/* Manna Hardware Badges */}
+          {/* Warehouse Depot & Box Tracing Badge */}
+          <div className="flex items-center gap-1.5 my-1 flex-wrap">
+            <span className={`inline-flex items-center gap-0.5 font-bold text-[8px] px-1.5 py-0.5 rounded border ${
+              product.warehouse_code === 'NT'
+                ? 'bg-purple-50 text-purple-800 border-purple-200'
+                : 'bg-blue-50 text-blue-800 border-blue-200'
+            }`}>
+              <MapPin className="w-2.5 h-2.5 shrink-0" />
+              <span>{product.warehouse_code === 'NT' ? 'Nula Tula (NT)' : 'Cabalwan (CAB)'}</span>
+            </span>
+            <span className="font-mono text-[8px] font-bold text-slate-700 bg-slate-100 px-1 py-0.5 rounded border border-slate-200">
+              Box #{product.box_no || '1'} {product.quote_no ? `• ${product.quote_no}` : ''}
+            </span>
+          </div>
+
+          {/* MY Hardware Badges */}
           <div className="flex flex-wrap items-center gap-1 mt-1.5">
             <span className="border border-emerald-600 text-emerald-700 text-[8px] font-bold px-1 rounded-xs leading-none py-0.5 bg-emerald-50">
               Tacloban Stock
@@ -10249,7 +10514,7 @@ function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = f
             )}
             {isLongCargoItem(product) && (
               <span className="bg-amber-600 text-white text-[8px] font-bold px-1 rounded-xs leading-none py-0.5 flex items-center gap-0.5">
-                <Truck className="w-2.5 h-2.5" /> 10ft+ (₱50/km)
+                <Warehouse className="w-2.5 h-2.5" /> Self-Haul Priority
               </span>
             )}
             <span className="bg-[#EE4D2D] text-white text-[8px] font-bold px-1 rounded-xs leading-none py-0.5">
@@ -10257,7 +10522,7 @@ function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = f
             </span>
             {maxDiscount > 0 && (
               <span className="bg-red-600 text-white text-[9px] font-black px-1.5 rounded-xs leading-tight py-0.5 tracking-tight shadow-xs flex items-center gap-0.5 animate-pulse">
-                <span>🔥</span> {maxDiscount}% OFF
+                <span>{maxDiscount}% OFF</span>
               </span>
             )}
           </div>

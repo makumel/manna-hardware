@@ -12,9 +12,6 @@
   <!-- Rounded Square Container -->
   <rect width="64" height="64" rx="14" fill="url(#mannaGradient)"/>
   
-  <!-- Bold Geometric 'M' Glyph -->
-  <path d="M14 47V17h7.2l10.8 17.5L42.8 17H50v30h-7V27.5L33.2 43h-2.4L21 27.5V47H14z" 
-        fill="#FFFFFF" 
-        filter="url(#shadow)"
-        font-weight="900"/>
+  <!-- Bold Geometric 'MY' Glyph -->
+  <text x="32" y="42" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="900" fill="#FFFFFF" text-anchor="middle" filter="url(#shadow)" letter-spacing="-1">MY</text>
 </svg>

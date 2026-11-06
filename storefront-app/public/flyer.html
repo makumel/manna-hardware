@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MY Hardware - Contractor & Wholesale Promo Flyer</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;600;700;800;900&display=swap');
+
+    :root {
+      --primary-red: #d32f2f;
+      --accent-yellow: #ffeb3b;
+      --dark-yellow: #fbc02d;
+      --dark-navy: #0f172a;
+      --steel-blue: #1e3a8a;
+      --light-gray: #f8fafc;
+      --border-gray: #e2e8f0;
+      --sale-badge: #e11d48;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #cbd5e1;
+      color: #1e293b;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .flyer-container {
+      width: 100%;
+      max-width: 900px;
+      background: #ffffff;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+      border: 3px solid #b91c1c;
+      overflow: hidden;
+    }
+
+    /* Print settings */
+    @media print {
+      body {
+        background: transparent;
+        padding: 0;
+      }
+      .flyer-container {
+        max-width: 100%;
+        box-shadow: none;
+        border: none;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+
+    /* Header Banner */
+    .flyer-header {
+      background: linear-gradient(135deg, #b91c1c 0%, #dc2626 50%, #991b1b 100%);
+      color: white;
+      padding: 16px 20px;
+      position: relative;
+      border-bottom: 5px solid #facc15;
+    }
+
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .brand-badge {
+      background: #facc15;
+      color: #7f1d1d;
+      font-size: 11px;
+      font-weight: 900;
+      text-transform: uppercase;
+      padding: 3px 10px;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+    }
+
+    .dispatch-pill {
+      font-size: 11px;
+      font-weight: 700;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 3px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .main-title {
+      font-family: 'Anton', sans-serif;
+      font-size: 42px;
+      line-height: 1.05;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.35);
+      color: #ffffff;
+      margin-bottom: 4px;
+    }
+
+    .main-title span {
+      color: #fef08a;
+    }
+
+    .header-subtitle {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      color: #fee2e2;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Red / Yellow Alert Ribbon */
+    .promo-ribbon {
+      background: #facc15;
+      color: #78350f;
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      padding: 8px 12px;
+      font-weight: 900;
+      font-size: 12px;
+      text-transform: uppercase;
+      border-bottom: 2px solid #ca8a04;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .ribbon-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .ribbon-item .bullet {
+      width: 6px;
+      height: 6px;
+      background: #dc2626;
+      border-radius: 50%;
+    }
+
+    /* Grid Sections */
+    .section-block {
+      padding: 14px 18px;
+      border-bottom: 2px dashed #cbd5e1;
+    }
+
+    .section-title-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #0f172a;
+      color: #ffffff;
+      padding: 6px 12px;
+      border-radius: 4px;
+      margin-bottom: 12px;
+    }
+
+    .section-title {
+      font-family: 'Anton', sans-serif;
+      font-size: 18px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section-tag {
+      background: #e11d48;
+      color: white;
+      font-size: 10px;
+      font-weight: 800;
+      padding: 2px 8px;
+      border-radius: 3px;
+      text-transform: uppercase;
+    }
+
+    /* Product Grid */
+    .product-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+
+    .product-grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .product-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 10px;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      transition: transform 0.15s;
+    }
+
+    .discount-burst {
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      background: #dc2626;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 900;
+      padding: 2px 6px;
+      border-radius: 3px;
+      box-shadow: 0 2px 4px rgba(220, 38, 38, 0.3);
+      z-index: 2;
+    }
+
+    .product-img-wrapper {
+      height: 110px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f8fafc;
+      border-radius: 4px;
+      margin-bottom: 8px;
+      overflow: hidden;
+      padding: 6px;
+    }
+
+    .product-img {
+      max-height: 100%;
+      max-width: 100%;
+      object-fit: contain;
+    }
+
+    .product-title {
+      font-size: 11.5px;
+      font-weight: 800;
+      line-height: 1.25;
+      color: #1e293b;
+      margin-bottom: 4px;
+      height: 29px;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .product-meta {
+      font-size: 10px;
+      color: #64748b;
+      margin-bottom: 6px;
+    }
+
+    .price-box {
+      margin-top: auto;
+      border-top: 1px solid #f1f5f9;
+      padding-top: 6px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .old-price {
+      font-size: 10px;
+      color: #94a3b8;
+      text-decoration: line-through;
+    }
+
+    .current-price {
+      font-family: 'Anton', sans-serif;
+      font-size: 20px;
+      color: #dc2626;
+      line-height: 1;
+    }
+
+    .per-unit {
+      font-size: 9px;
+      font-weight: 700;
+      color: #64748b;
+    }
+
+    /* Turnkey Lot Spotlight Banner */
+    .lot-banner {
+      background: linear-gradient(to right, #1e3a8a, #0f172a);
+      border-radius: 8px;
+      padding: 14px 16px;
+      color: #ffffff;
+      margin-top: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-left: 6px solid #facc15;
+    }
+
+    .lot-info h4 {
+      font-size: 15px;
+      font-weight: 900;
+      color: #fef08a;
+      margin-bottom: 2px;
+    }
+
+    .lot-info p {
+      font-size: 11px;
+      color: #e2e8f0;
+      max-width: 480px;
+      line-height: 1.3;
+    }
+
+    .lot-pricing {
+      text-align: right;
+    }
+
+    .lot-price-tag {
+      font-family: 'Anton', sans-serif;
+      font-size: 26px;
+      color: #facc15;
+      line-height: 1;
+    }
+
+    .lot-savings {
+      font-size: 10.5px;
+      font-weight: 800;
+      color: #86efac;
+      background: rgba(22, 101, 52, 0.4);
+      padding: 2px 6px;
+      border-radius: 3px;
+      display: inline-block;
+      margin-top: 2px;
+    }
+
+    /* Bulk Tiers Strip */
+    .tiers-section {
+      background: #f1f5f9;
+      padding: 14px 18px;
+      border-bottom: 2px solid #cbd5e1;
+    }
+
+    .tier-boxes {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .tier-box {
+      background: white;
+      border: 2px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 10px;
+      text-align: center;
+    }
+
+    .tier-box.highlight {
+      border-color: #dc2626;
+      background: #fff7ed;
+    }
+
+    .tier-name {
+      font-size: 11px;
+      font-weight: 900;
+      color: #475569;
+      text-transform: uppercase;
+    }
+
+    .tier-discount {
+      font-family: 'Anton', sans-serif;
+      font-size: 28px;
+      color: #dc2626;
+      line-height: 1;
+      margin: 4px 0;
+    }
+
+    .tier-req {
+      font-size: 10px;
+      color: #64748b;
+      font-weight: 600;
+    }
+
+    /* Bottom Contact & QR Section */
+    .flyer-footer {
+      background: #0f172a;
+      color: white;
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .footer-left {
+      flex: 1;
+    }
+
+    .footer-heading {
+      font-family: 'Anton', sans-serif;
+      font-size: 22px;
+      color: #facc15;
+      margin-bottom: 4px;
+      letter-spacing: 0.5px;
+    }
+
+    .footer-desc {
+      font-size: 11.5px;
+      color: #cbd5e1;
+      margin-bottom: 8px;
+      line-height: 1.35;
+    }
+
+    .footer-contact-items {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #e2e8f0;
+    }
+
+    .contact-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .qr-container {
+      background: white;
+      padding: 8px;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      border: 3px solid #facc15;
+      min-width: 130px;
+    }
+
+    .qr-image {
+      width: 105px;
+      height: 105px;
+      object-fit: contain;
+    }
+
+    .qr-caption {
+      font-size: 9px;
+      font-weight: 900;
+      color: #0f172a;
+      margin-top: 4px;
+      text-align: center;
+      text-transform: uppercase;
+      line-height: 1.1;
+    }
+
+    /* Print toolbar (hidden on paper) */
+    .action-bar {
+      margin-bottom: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      max-width: 900px;
+      width: 100%;
+    }
+
+    .print-btn {
+      background: #dc2626;
+      color: white;
+      padding: 8px 18px;
+      border-radius: 6px;
+      font-weight: 800;
+      font-size: 13px;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    }
+
+    .print-btn:hover {
+      background: #b91c1c;
+    }
+
+    .site-link {
+      font-size: 12px;
+      color: #334155;
+      font-weight: 700;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
+
+    <!-- Print Control Bar -->
+    <div class="action-bar no-print">
+      <span class="site-link">
+        MY Hardware Wholesale Circular | <a href="https://manna.mikabiz.space" target="_blank" style="color:#b91c1c;">manna.mikabiz.space</a> | <a href="./intake.html" style="color:#1e3a8a; font-weight:800;">📋 Store Visit Lead Intake</a>
+      </span>
+      <button class="print-btn" onclick="window.print()">
+        🖨️ Print / Save as PDF Flyer
+      </button>
+    </div>
+
+    <!-- MAIN CIRCULAR FLYER CONTAINER -->
+    <div class="flyer-container">
+
+      <!-- HEADER BANNER -->
+      <header class="flyer-header">
+        <div class="header-top">
+          <span class="brand-badge">Official Trade & Contractor Circular</span>
+          <span class="dispatch-pill">⚡ Tacloban & Leyte/Samar Fast Truck Dispatch</span>
+        </div>
+        <h1 class="main-title">MY HARDWARE <span>MEGA CLEARANCE</span></h1>
+        <div class="header-subtitle">
+          <span>🏗️ PHYSICAL HARDWARE STORES & CONTRACTORS SPECIAL BUYOUT SALE</span>
+          <span>•</span>
+          <span>UP TO 40% OFF SRP</span>
+        </div>
+      </header>
+
+      <!-- PROMO RIBBON -->
+      <div class="promo-ribbon">
+        <div class="ribbon-item"><div class="bullet"></div> 930+ TRADE ITEMS IN STOCK</div>
+        <div class="ribbon-item"><div class="bullet"></div> DIRECT FACTORY LIQUIDATION PRICING</div>
+        <div class="ribbon-item"><div class="bullet"></div> INSTANT 25%-40% COUNTER PROFIT MARGIN</div>
+        <div class="ribbon-item"><div class="bullet"></div> CASH-ON-DELIVERY / SITE PICKUP</div>
+      </div>
+
+      <!-- SECTION 1: PAINTS & SPECIALTY COATINGS -->
+      <section class="section-block">
+        <div class="section-title-bar">
+          <div class="section-title">🎨 PAINTS, AEROSOLS & WOOD FINISHES</div>
+          <div class="section-tag">High-Margin Reseller Stock</div>
+        </div>
+        <div class="product-grid">
+          <!-- Item 1 -->
+          <div class="product-card">
+            <span class="discount-burst">15% OFF</span>
+            <div class="product-img-wrapper">
+              <img src="./images/bosny_gold_351_clean.jpg" alt="Bosny Gold Spray Paint" class="product-img" onerror="this.src='https://placehold.co/120x120?text=Bosny+Gold'">
+            </div>
+            <div class="product-title">Bosny Acrylic Spray Gold #351</div>
+            <div class="product-meta">400cc Quick-Dry Metallic</div>
+            <div class="price-box">
+              <span class="old-price">SRP ₱260.00</span>
+              <span class="current-price">₱222<small>.75</small></span>
+              <span class="per-unit">Case packs available</span>
+            </div>
+          </div>
+
+          <!-- Item 2 -->
+          <div class="product-card">
+            <span class="discount-burst">15% OFF</span>
+            <div class="product-img-wrapper">
+              <img src="./images/bosny_flat_black_04_clean.jpg" alt="Bosny Flat Black" class="product-img" onerror="this.src='https://placehold.co/120x120?text=Flat+Black'">
+            </div>
+            <div class="product-title">Bosny Flat Black #04 Spray</div>
+            <div class="product-meta">Chassis & Fabrication Standard</div>
+            <div class="price-box">
+              <span class="old-price">SRP ₱240.00</span>
+              <span class="current-price">₱195<small>.00</small></span>
+              <span class="per-unit">High turnover SKU</span>
+            </div>
+          </div>
+
+          <!-- Item 3 -->
+          <div class="product-card">
+            <span class="discount-burst">HOT DEAL</span>
+            <div class="product-img-wrapper">
+              <img src="./images/boysen_roofkote_clean.png" alt="Boysen Roofkote" class="product-img" onerror="this.src='https://placehold.co/120x120?text=Boysen+Roof'">
+            </div>
+            <div class="product-title">Boysen Roofkote Acrylic Gloss</div>
+            <div class="product-meta">Galvanized Sheet Protection</div>
+            <div class="price-box">
+              <span class="old-price">SRP ₱790.00</span>
+              <span class="current-price">₱685<small>.00</small></span>
+              <span class="per-unit">Gallon / Case Lot</span>
+            </div>
+          </div>
+
+          <!-- Item 4 -->
+          <div class="product-card">
+            <span class="discount-burst">20% OFF</span>
+            <div class="product-img-wrapper">
+              <img src="./images/stikwel_clean.jpg" alt="Stikwel Wood Glue" class="product-img" onerror="this.src='https://placehold.co/120x120?text=Stikwel'">
+            </div>
+            <div class="product-title">Stikwel Original Wood Glue</div>
+            <div class="product-meta">Carpentry & Cabinet Essential</div>
+            <div class="price-box">
+              <span class="old-price">SRP ₱125.00</span>
+              <span class="current-price">₱98<small>.50</small></span>
+              <span class="per-unit">Per bottle / Box of 24</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 2: STRUCTURAL STEEL & ROOFING TRUSSES -->
+      <section class="section-block">
+        <div class="section-title-bar">
+          <div class="section-title">🔩 STRUCTURAL STEEL, PURLINS & PIPES</div>
+          <div class="section-tag">Direct Jobsite Supply</div>
+        </div>
+        <div class="product-grid">
+          <!-- Item 1 -->
+          <div class="product-card">
+            <span class="discount-burst">SAVE 20%</span>
+            <div class="product-img-wrapper">
+              <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRJ1lDF-ht6yaqParkahCFb91OYZoNf7fsHZoLZhP8q7g&s=10" alt="C-Purlins" class="product-img">
+            </div>
+            <div class="product-title">C-Purlins 2x4 1.2mm Commercial</div>
+            <div class="product-meta">6-Meter Heavy Truss Standard</div>
+            <div class="price-box">
+              <span class="old-price">SRP ₱968.00</span>
+              <span class="current-price">₱775<small>.00</small></span>
+              <span class="per-unit">Wholesale / Per Piece</span>
+            </div>
+          </div>
+
+          <!-- Item 2 -->
+          <div class="product-card">
+            <span class="discount-burst">SAVE 20%</span>
+            <div class="product-img-wrapper">
+              <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTJzVHyZ12Skv8mdJfdA16ZpAhOWE03o76OVgrOxW1ffA&s=10" alt="Angle Bar" class="product-img">
+            </div>
+            <div class="product-title">Angle Bar 6mm x 2-1/2 (Heavy)</div>
+            <div class="product-meta">High-Tensile Structural Grade</div>
+            <div class="price-box">
+              <span class="old-price">SRP ₱2,550.00</span>
+              <span class="current-price">₱2,050<small>.00</small></span>
+              <span class="per-unit">Per Piece / Flatbed Ready</span>
+            </div>
+          </div>
+
+          <!-- Item 3 -->
+          <div class="product-card">
+            <span class="discount-burst">TRADE DEAL</span>
+            <div class="product-img-wrapper">
+              <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTb2xbrIDcug5TiTWXFg_ouj3oP8x1AVb7M5rg3pwOsqg&s=10" alt="GI Pipe" class="product-img">
+            </div>
+            <div class="product-title">GI Pipe S-40 3/4" Samurai Spec</div>
+            <div class="product-meta">Schedule 40 Galvanized Iron</div>
+            <div class="price-box">
+              <span class="old-price">SRP ₱725.00</span>
+              <span class="current-price">₱580<small>.00</small></span>
+              <span class="per-unit">Per Pipe (6-Meter)</span>
+            </div>
+          </div>
+
+          <!-- Item 4 -->
+          <div class="product-card">
+            <span class="discount-burst">SAVE 20%</span>
+            <div class="product-img-wrapper">
+              <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTFgVbuAjj8kZzWHjRLwSOb4EN_-z9zCzixiNPl8EWbAw&s=10" alt="I-Bar" class="product-img">
+            </div>
+            <div class="product-title">I-Bar & Plain Bars 6mm / 16mm</div>
+            <div class="product-meta">Solid Construction Steel</div>
+            <div class="price-box">
+              <span class="old-price">SRP ₱812.00</span>
+              <span class="current-price">₱650<small>.00</small></span>
+              <span class="per-unit">Per Piece / Bundle Deals</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- SPECIAL BUNDLE LOT -->
+        <div class="lot-banner">
+          <div class="lot-info">
+            <h4>⭐ THE STRUCTURAL STEEL & FRAMING CLEARANCE LOT</h4>
+            <p>170 pcs C-Purlins (2x4 1.2mm) + 21 pcs 16mm Plain Bars + 150+ packs Heavy-Duty Tex Screws. Turnkey package for fabricators & builders!</p>
+          </div>
+          <div class="lot-pricing">
+            <div class="lot-price-tag">₱115,000</div>
+            <div class="lot-savings">SAVE ₱38,460 (25% OFF SRP ₱153,460)</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 3: PLUMBING & HEAVY HARDWARE -->
+      <section class="section-block">
+        <div class="section-title-bar">
+          <div class="section-title">🚰 PLUMBING FIXTURES, VALVES & HARDWARE</div>
+          <div class="section-tag">Instant Counter Profit</div>
+        </div>
+        <div class="product-grid">
+          <!-- Item 1 -->
+          <div class="product-card">
+            <span class="discount-burst">30% OFF</span>
+            <div class="product-img-wrapper">
+              <img src="./images/two_way_faucet_clean.jpg" alt="2-Way Faucet Flexco" class="product-img" onerror="this.src='https://placehold.co/120x120?text=Flexco+Faucet'">
+            </div>
+            <div class="product-title">Flexco FC9007 2-Way Faucet</div>
+            <div class="product-meta">Solid Brass Chrome Finish</div>
+            <div class="price-box">
+              <span class="old-price">SRP ₱310.00</span>
+              <span class="current-price">₱215<small>.00</small></span>
+              <span class="per-unit">Per Piece / Wholesale</span>
+            </div>
+          </div>
+
+          <!-- Item 2 -->
+          <div class="product-card">
+            <span class="discount-burst">32% OFF</span>
+            <div class="product-img-wrapper">
+              <img src="./images/brass_swing_valve_clean.jpg" alt="Brass Swing Valve" class="product-img" onerror="this.src='https://placehold.co/120x120?text=Brass+Valve'">
+            </div>
+            <div class="product-title">Heavy Brass Swing Check Valve</div>
+            <div class="product-meta">Commercial Flow Control 3/4" & 1"</div>
+            <div class="price-box">
+              <span class="old-price">SRP ₱450.00</span>
+              <span class="current-price">₱295<small>.00</small></span>
+              <span class="per-unit">Contractor Grade</span>
+            </div>
+          </div>
+
+          <!-- Item 3 -->
+          <div class="product-card">
+            <span class="discount-burst">TOP SELLER</span>
+            <div class="product-img-wrapper">
+              <img src="./images/anam_outlet_3213_clean.jpg" alt="Anam Outlet" class="product-img" onerror="this.src='https://placehold.co/120x120?text=Anam+Outlet'">
+            </div>
+            <div class="product-title">Anam ALH-3213 Duplex Outlet</div>
+            <div class="product-meta">Modern Wide Series Grounded</div>
+            <div class="price-box">
+              <span class="old-price">SRP ₱180.00</span>
+              <span class="current-price">₱128<small>.00</small></span>
+              <span class="per-unit">Box of 10 / Carton of 100</span>
+            </div>
+          </div>
+
+          <!-- Item 4 -->
+          <div class="product-card">
+            <span class="discount-burst">BULK PACK</span>
+            <div class="product-img-wrapper">
+              <img src="./images/finishing_nails_clean.jpg" alt="Finishing Nails" class="product-img" onerror="this.src='https://placehold.co/120x120?text=Finishing+Nails'">
+            </div>
+            <div class="product-title">Finishing & Concrete Nails (All Sizes)</div>
+            <div class="product-meta">#1, #1-1/2, #2 Hardened Steel</div>
+            <div class="price-box">
+              <span class="old-price">SRP ₱100/kg</span>
+              <span class="current-price">₱68<small>.00</small></span>
+              <span class="per-unit">Per Kilo / 25kg Sacks</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- SPECIAL BUNDLE LOT 2 -->
+        <div class="lot-banner" style="background: linear-gradient(to right, #047857, #064e3b); border-left-color: #34d399;">
+          <div class="lot-info">
+            <h4 style="color: #6ee7b7;">🚰 THE MASTER PLUMBER & PIPING CLEARANCE LOT</h4>
+            <p>181 PPR Gate Valves + Schedule 40 GI Pipes + 224 PNS Short Elbows + 615 Teflon Rolls + Chrome Brackets. Instant 32% wholesale discount!</p>
+          </div>
+          <div class="lot-pricing">
+            <div class="lot-price-tag" style="color: #6ee7b7;">₱190,000</div>
+            <div class="lot-savings" style="color: #fef08a; background: rgba(0,0,0,0.3);">SAVE ₱88,868 (32% OFF SRP ₱278,868)</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- WHOLESALE DISCOUNT TIERS STRIP -->
+      <section class="tiers-section">
+        <div style="text-align: center; margin-bottom: 6px;">
+          <h3 style="font-family: 'Anton', sans-serif; font-size: 20px; color: #0f172a; text-transform: uppercase;">
+            💥 MIX & MATCH WHOLESALE DISCOUNTS (ANY COMBINATION)
+          </h3>
+          <p style="font-size: 11px; color: #64748b; font-weight: 600;">
+            Applicable across all 930+ products — Structural Steel, Paints, Plumbing, Fasteners & Electrical!
+          </p>
+        </div>
+        <div class="tier-boxes">
+          <div class="tier-box">
+            <div class="tier-name">Contractor Tier 1</div>
+            <div class="tier-discount">20% OFF</div>
+            <div class="tier-req">Purchases over ₱25,000<br>Code: <strong>BULK25</strong></div>
+          </div>
+          <div class="tier-box highlight">
+            <div class="tier-name" style="color: #dc2626;">⭐ Builder Tier 2 (Most Popular)</div>
+            <div class="tier-discount">30% OFF</div>
+            <div class="tier-req">Purchases over ₱50,000<br>Code: <strong>BUILDER</strong></div>
+          </div>
+          <div class="tier-box">
+            <div class="tier-name">Hardware Reseller Tier 3</div>
+            <div class="tier-discount">40% OFF</div>
+            <div class="tier-req">Wholesale over ₱100,000<br>Code: <strong>HARDWARE</strong></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- FOOTER CALL TO ACTION & QR CODE -->
+      <footer class="flyer-footer">
+        <div class="footer-left">
+          <div class="footer-heading">ORDER ONLINE OR BOOK WAREHOUSE PICKUP</div>
+          <div class="footer-desc">
+            Browse our full real-time inventory of 930+ discounted SKUs, view live stock counts, and checkout online with instant wholesale pricing.
+          </div>
+          <div class="footer-contact-items">
+            <div class="contact-item">🌐 <strong>manna.mikabiz.space</strong></div>
+            <div class="contact-item">📍 <strong>Tacloban City & Eastern Visayas</strong></div>
+            <div class="contact-item">🚚 <strong>Flatbed & Truck Delivery Available</strong></div>
+            <div class="contact-item"><a href="./intake.html" style="color: #facc15; text-decoration: underline;">📋 Book Field Agent Store Visit</a></div>
+          </div>
+        </div>
+
+        <div class="qr-container">
+          <!-- Live QR code pointing to https://manna.mikabiz.space -->
+          <img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https%3A%2F%2Fmanna.mikabiz.space" alt="Scan QR Code to visit MY Hardware" class="qr-image">
+          <div class="qr-caption">
+            SCAN WITH PHONE CAMERA<br>TO VIEW LIVE PRICES
+          </div>
+        </div>
+      </footer>
+
+    </div>
+
+  </div>
+
+</body>
+</html>

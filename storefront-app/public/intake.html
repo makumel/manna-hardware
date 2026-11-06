@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MY Hardware - Store Visit & B2B Lead Intake</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+    :root {
+      --primary: #b91c1c;
+      --primary-hover: #991b1b;
+      --accent-yellow: #facc15;
+      --dark-navy: #0f172a;
+      --slate-bg: #f8fafc;
+      --border: #e2e8f0;
+      --text: #1e293b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #f1f5f9;
+      color: var(--text);
+      padding: 16px;
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 650px;
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      margin-bottom: 30px;
+    }
+
+    /* Header */
+    .form-header {
+      background: linear-gradient(135deg, #b91c1c 0%, #dc2626 60%, #991b1b 100%);
+      color: white;
+      padding: 24px;
+      position: relative;
+      border-bottom: 4px solid var(--accent-yellow);
+    }
+
+    .badge {
+      display: inline-block;
+      background: var(--accent-yellow);
+      color: #7f1d1d;
+      font-size: 11px;
+      font-weight: 900;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 4px;
+      margin-bottom: 8px;
+    }
+
+    .form-title {
+      font-family: 'Anton', sans-serif;
+      font-size: 28px;
+      line-height: 1.15;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .form-subtitle {
+      font-size: 13px;
+      color: #fee2e2;
+      margin-top: 6px;
+      line-height: 1.4;
+    }
+
+    /* Form Content */
+    form {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: #334155;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .required-star {
+      color: #dc2626;
+    }
+
+    input[type="text"],
+    input[type="tel"],
+    input[type="date"],
+    select,
+    textarea {
+      width: 100%;
+      padding: 11px 14px;
+      border-radius: 8px;
+      border: 1.5px solid #cbd5e1;
+      font-size: 14px;
+      font-family: inherit;
+      color: #1e293b;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      background: #ffffff;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.12);
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    @media (max-width: 550px) {
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Checkbox Group */
+    .checkbox-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #334155;
+      background: #f8fafc;
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1px solid #e2e8f0;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s;
+    }
+
+    .checkbox-label:hover {
+      background: #f1f5f9;
+    }
+
+    .checkbox-label input {
+      accent-color: var(--primary);
+      width: 16px;
+      height: 16px;
+    }
+
+    /* Honeypot field (invisible to real humans, catches spam bots silently) */
+    .hp-field {
+      position: absolute !important;
+      left: -9999px !important;
+      top: -9999px !important;
+      width: 1px !important;
+      height: 1px !important;
+      opacity: 0 !important;
+      overflow: hidden !important;
+      z-index: -100 !important;
+    }
+
+    /* Submit Button */
+    .submit-btn {
+      background: var(--primary);
+      color: white;
+      padding: 13px;
+      border-radius: 8px;
+      border: none;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 800;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      box-shadow: 0 4px 10px rgba(185, 28, 28, 0.25);
+      transition: background 0.15s, transform 0.05s;
+      margin-top: 8px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .submit-btn:hover {
+      background: var(--primary-hover);
+    }
+
+    .submit-btn:active {
+      transform: scale(0.99);
+    }
+
+    /* Success Banner */
+    .success-alert {
+      display: none;
+      background: #f0fdf4;
+      border: 1.5px solid #86efac;
+      padding: 16px;
+      border-radius: 8px;
+      margin: 20px 24px;
+      color: #166534;
+    }
+
+    .success-alert h4 {
+      font-size: 15px;
+      font-weight: 800;
+      margin-bottom: 4px;
+    }
+
+    .success-alert p {
+      font-size: 13px;
+      color: #15803d;
+    }
+
+    /* Bottom Link & Print */
+    .footer-bar {
+      padding: 14px 24px;
+      background: #f8fafc;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: #64748b;
+    }
+
+    .footer-bar a {
+      color: var(--primary);
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .print-field-btn {
+      background: transparent;
+      border: 1px solid #cbd5e1;
+      padding: 5px 10px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 700;
+      color: #475569;
+    }
+
+    .print-field-btn:hover {
+      background: #e2e8f0;
+    }
+
+    /* Captured Submissions Drawer */
+    .leads-drawer {
+      margin-top: 16px;
+      padding: 16px 24px;
+      background: #ffffff;
+      border-top: 1px solid var(--border);
+    }
+
+    .leads-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .leads-title {
+      font-size: 12.5px;
+      font-weight: 800;
+      color: #334155;
+      text-transform: uppercase;
+    }
+
+    .lead-count-badge {
+      background: #e2e8f0;
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .lead-card {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px;
+      margin-bottom: 8px;
+      background: #fafafa;
+      font-size: 12px;
+    }
+
+    .lead-card-title {
+      font-weight: 800;
+      color: #0f172a;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .lead-card-meta {
+      color: #64748b;
+      margin-top: 3px;
+    }
+
+    /* Print Paper Form Styles */
+    @media print {
+      body {
+        background: white;
+        padding: 0;
+      }
+      .container {
+        box-shadow: none;
+        border: none;
+        max-width: 100%;
+      }
+      .footer-bar, .leads-drawer, .submit-btn, .success-alert {
+        display: none !important;
+      }
+      input, select, textarea {
+        border-bottom: 1px solid #000 !important;
+        border-top: none !important;
+        border-left: none !important;
+        border-right: none !important;
+        border-radius: 0 !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+
+    <!-- Header -->
+    <header class="form-header">
+      <span class="badge">B2B Trade & Wholesale Intake</span>
+      <h1 class="form-title">Store Visit & Trade Lead Intake</h1>
+      <p class="form-subtitle">For physical hardware stores, contractor supply visits, and wholesale reorder inquiries.</p>
+    </header>
+
+    <!-- Success Message Container -->
+    <div id="successAlert" class="success-alert">
+      <h4>✅ Store Lead Saved Successfully!</h4>
+      <p>The store visit information has been logged. You can view saved leads below or export anytime.</p>
+    </div>
+
+    <!-- Intake Form -->
+    <form id="storeIntakeForm" onsubmit="handleFormSubmit(event)">
+
+      <!-- MANDATORY HONEYPOT FIELD (Spam bot trap, invisible to humans) -->
+      <div class="hp-field" aria-hidden="true">
+        <label for="fax_company_url">Do not fill this</label>
+        <input type="text" id="fax_company_url" name="fax_company_url" tabindex="-1" autocomplete="off">
+      </div>
+
+      <!-- 1. Store / Business Information -->
+      <div class="form-group">
+        <label for="storeName">Hardware Store / Company Name <span class="required-star">*</span></label>
+        <input type="text" id="storeName" name="storeName" placeholder="e.g. Leyte Builders Supply / Tacloban Hardware" required>
+      </div>
+
+      <!-- 2. Contact Person & Role -->
+      <div class="grid-2">
+        <div class="form-group">
+          <label for="contactPerson">Owner / Purchasing Officer <span class="required-star">*</span></label>
+          <input type="text" id="contactPerson" name="contactPerson" placeholder="Full name" required>
+        </div>
+        <div class="form-group">
+          <label for="phoneNumber">Mobile / Viber Number <span class="required-star">*</span></label>
+          <input type="tel" id="phoneNumber" name="phoneNumber" placeholder="09XX-XXX-XXXX" required>
+        </div>
+      </div>
+
+      <!-- 3. Store Location & Town -->
+      <div class="grid-2">
+        <div class="form-group">
+          <label for="locationZone">Dispatch Zone / Municipality <span class="required-star">*</span></label>
+          <select id="locationZone" name="locationZone" required>
+            <option value="">-- Select Municipality / Zone --</option>
+            <option value="Tacloban City Proper">Tacloban City Proper / Downtown</option>
+            <option value="Tacloban North">Tacloban North (Dispatch Hub)</option>
+            <option value="Tacloban South">Tacloban South (Marasbaras / V&G)</option>
+            <option value="Palo">Palo, Leyte (Gov Center / Pawing)</option>
+            <option value="Tanauan">Tanauan, Leyte</option>
+            <option value="Alangalang">Alangalang, Leyte</option>
+            <option value="Babatngon">Babatngon, Leyte</option>
+            <option value="Basey Samar">Basey, Samar</option>
+            <option value="Other Leyte/Samar">Other Leyte / Samar Town</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="streetAddress">Store Address / Landmark</label>
+          <input type="text" id="streetAddress" name="streetAddress" placeholder="Barangay / Street / Landmark">
+        </div>
+      </div>
+
+      <!-- 4. Categories of Interest -->
+      <div class="form-group">
+        <label>Primary Products of Interest (Check all that apply)</label>
+        <div class="checkbox-grid">
+          <label class="checkbox-label">
+            <input type="checkbox" name="categories" value="Structural Steel (C-Purlins, Bars)">
+            Structural Steel (Purlins, Bars)
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" name="categories" value="GI Pipes (S-40 & Samurai)">
+            GI Pipes (S-40 & Samurai)
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" name="categories" value="Paints & Sprays (Bosny, Pylox)">
+            Paints & Sprays (Bosny, Pylox)
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" name="categories" value="Plumbing Fixtures & Gate Valves">
+            Plumbing (Valves, Faucets)
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" name="categories" value="Fasteners (Nails, Tex Screws, Rivets)">
+            Fasteners (Nails, Tex Screws)
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" name="categories" value="Electrical (Anam Outlets, Bulbs)">
+            Electrical (Anam Outlets, Wire)
+          </label>
+        </div>
+      </div>
+
+      <!-- 5. Estimated Order Volume & Preferred Visit Date -->
+      <div class="grid-2">
+        <div class="form-group">
+          <label for="estimatedSpend">Estimated Restock Volume</label>
+          <select id="estimatedSpend" name="estimatedSpend">
+            <option value="Under ₱25k">Small Trial (< ₱25,000)</option>
+            <option value="₱25k - ₱50k (Tier 1 20% OFF)">₱25,000 – ₱50,000 (Tier 1: 20% OFF)</option>
+            <option value="₱50k - ₱100k (Tier 2 30% OFF)">₱50,000 – ₱100,000 (Tier 2: 30% OFF)</option>
+            <option value="₱100k+ Wholesale Lot (Tier 3 40% OFF)">₱100,000+ Full Wholesale Lot (40% OFF)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="visitDate">Preferred Visit / Delivery Date</label>
+          <input type="date" id="visitDate" name="visitDate">
+        </div>
+      </div>
+
+      <!-- 6. Notes & Special Requests -->
+      <div class="form-group">
+        <label for="notes">Notes / Special Requests / Specific SKUs Needed</label>
+        <textarea id="notes" name="notes" rows="2" placeholder="e.g. Needs 50 pcs C-purlins delivered Thursday, looking for Bosny Gold case prices..."></textarea>
+      </div>
+
+      <!-- Submit Button -->
+      <button type="submit" class="submit-btn">
+        💾 Save Store Intake Lead
+      </button>
+
+    </form>
+
+    <!-- Footer Action Bar -->
+    <div class="footer-bar">
+      <span>Official Portal: <a href="https://manna.mikabiz.space" target="_blank">manna.mikabiz.space</a></span>
+      <button type="button" class="print-field-btn" onclick="window.print()">
+        🖨️ Print Blank Field Sheet
+      </button>
+    </div>
+
+    <!-- Live Captured Leads Drawer -->
+    <div class="leads-drawer" id="leadsDrawer">
+      <div class="leads-header">
+        <span class="leads-title">Logged Store Visits & Leads</span>
+        <span class="lead-count-badge" id="leadCount">0 leads</span>
+      </div>
+      <div id="leadsList">
+        <div style="font-size: 12px; color: #94a3b8; font-style: italic;">No store visits logged yet on this device.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'manna_store_visit_leads';
+
+    // Load stored leads on page load
+    window.addEventListener('DOMContentLoaded', () => {
+      renderStoredLeads();
+    });
+
+    function getStoredLeads() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        return raw ? JSON.parse(raw) : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function renderStoredLeads() {
+      const leads = getStoredLeads();
+      const listEl = document.getElementById('leadsList');
+      const countEl = document.getElementById('leadCount');
+
+      countEl.textContent = `${leads.length} lead${leads.length === 1 ? '' : 's'}`;
+
+      if (leads.length === 0) {
+        listEl.innerHTML = '<div style="font-size: 12px; color: #94a3b8; font-style: italic;">No store visits logged yet on this device.</div>';
+        return;
+      }
+
+      listEl.innerHTML = leads.slice().reverse().map((lead, idx) => `
+        <div class="lead-card">
+          <div class="lead-card-title">
+            <span>🏪 ${escapeHtml(lead.storeName)}</span>
+            <span style="font-size: 11px; color: #b91c1c; font-weight: 700;">${escapeHtml(lead.estimatedSpend)}</span>
+          </div>
+          <div class="lead-card-meta">
+            👤 <strong>${escapeHtml(lead.contactPerson)}</strong> (${escapeHtml(lead.phoneNumber)}) • 📍 ${escapeHtml(lead.locationZone)}
+          </div>
+          ${lead.categories && lead.categories.length ? `<div style="margin-top: 3px; color: #475569; font-size: 11px;">📦 ${escapeHtml(lead.categories.join(', '))}</div>` : ''}
+          ${lead.notes ? `<div style="margin-top: 3px; font-style: italic; color: #64748b; font-size: 11px;">📝 "${escapeHtml(lead.notes)}"</div>` : ''}
+          <div style="font-size: 10px; color: #94a3b8; margin-top: 4px;">Logged: ${lead.timestamp}</div>
+        </div>
+      `).join('');
+    }
+
+    function handleFormSubmit(e) {
+      e.preventDefault();
+
+      const form = document.getElementById('storeIntakeForm');
+
+      // Honeypot check: If bot filled this hidden field, silently reject
+      const hp = form.elements['fax_company_url'].value;
+      if (hp && hp.trim() !== '') {
+        console.warn('Bot submission blocked via honeypot.');
+        return false;
+      }
+
+      // Collect checked categories
+      const categoryCheckboxes = form.querySelectorAll('input[name="categories"]:checked');
+      const selectedCategories = Array.from(categoryCheckboxes).map(cb => cb.value);
+
+      const leadData = {
+        id: 'LEAD-' + Date.now(),
+        storeName: form.elements['storeName'].value.trim(),
+        contactPerson: form.elements['contactPerson'].value.trim(),
+        phoneNumber: form.elements['phoneNumber'].value.trim(),
+        locationZone: form.elements['locationZone'].value,
+        streetAddress: form.elements['streetAddress'].value.trim(),
+        categories: selectedCategories,
+        estimatedSpend: form.elements['estimatedSpend'].value,
+        visitDate: form.elements['visitDate'].value,
+        notes: form.elements['notes'].value.trim(),
+        timestamp: new Date().toLocaleString()
+      };
+
+      // Save to local storage
+      const existing = getStoredLeads();
+      existing.push(leadData);
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
+      } catch (err) {
+        console.error('Storage error:', err);
+      }
+
+      // Show alert & update list
+      const alert = document.getElementById('successAlert');
+      alert.style.display = 'block';
+      setTimeout(() => { alert.style.display = 'none'; }, 5000);
+
+      renderStoredLeads();
+      form.reset();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/[&<>"']/g, function(m) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+      });
+    }
+  </script>
+
+</body>
+</html>

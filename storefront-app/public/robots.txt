@@ -46,4 +46,4 @@ User-agent: PetalBot
 Disallow: /
 
 # Canonical Sitemap
-Sitemap: https://MYHardware.mikashop.online/sitemap.xml
+Sitemap: https://myhardware.mikashop.online/sitemap.xml

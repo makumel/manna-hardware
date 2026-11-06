@@ -1,0 +1,99 @@
+{
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Frame-Options",
+          "value": "SAMEORIGIN"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        }
+      ]
+    },
+    {
+      "source": "/images/(.*)",
+      "headers": [
+        {
+          "key": "Cross-Origin-Resource-Policy",
+          "value": "same-origin"
+        },
+        {
+          "key": "X-Robots-Tag",
+          "value": "noai, noimageindex"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/.env",
+      "destination": "https://manna-hardware.fearless-chandrasekhar.workers.dev/.env"
+    },
+    {
+      "source": "/wp-login.php",
+      "destination": "https://manna-hardware.fearless-chandrasekhar.workers.dev/wp-login.php"
+    },
+    {
+      "source": "/catalog-export/:path*",
+      "destination": "https://manna-hardware.fearless-chandrasekhar.workers.dev/catalog-export/:path*"
+    },
+    {
+      "source": "/spider-trap/:path*",
+      "destination": "https://manna-hardware.fearless-chandrasekhar.workers.dev/spider-trap/:path*"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "https://manna-hardware.fearless-chandrasekhar.workers.dev/api/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "manna.mikabiz.space"
+        }
+      ],
+      "destination": "https://myhardware.mikashop.online/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.manna.mikabiz.space"
+        }
+      ],
+      "destination": "https://myhardware.mikashop.online/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/messenger",
+      "destination": "https://www.facebook.com/mannaHardwareTAC/",
+      "permanent": false
+    },
+    {
+      "source": "/facebook",
+      "destination": "https://www.facebook.com/mannaHardwareTAC/",
+      "permanent": false
+    },
+    {
+      "source": "/fb",
+      "destination": "https://www.facebook.com/mannaHardwareTAC/",
+      "permanent": false
+    }
+  ]
+}

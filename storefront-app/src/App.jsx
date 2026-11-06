@@ -2774,21 +2774,20 @@ const renderPopups = () => (
           
           {/* Main Search Row */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Mobile & Desktop Brand Logo */}
+            {/* Mobile & Desktop Brand Logo (MY Hardware Red Badge Logo) */}
             <div 
               onClick={() => { setActiveTab('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
-              className="flex items-center gap-1.5 sm:gap-2 cursor-pointer shrink-0 mr-0.5 sm:mr-2"
+              className="flex items-center gap-2 cursor-pointer shrink-0 mr-0.5 sm:mr-2 group"
+              title="MY Hardware Supplies - Direct Warehouse & Industrial Supplies"
             >
-              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-white text-[#EE4D2D] font-black flex items-center justify-center text-xs sm:text-sm shadow-sm">
-                MY
-              </div>
-              <div className="hidden sm:block">
+              <img
+                src="/images/brand/my_hardware_logo_badge.png"
+                alt="MY Hardware Supplies Logo"
+                className="h-9 sm:h-11 w-auto object-contain drop-shadow-md group-hover:scale-105 transition-transform"
+              />
+              <div className="hidden lg:block">
                 <h1 className="text-base font-black leading-tight tracking-tight text-white">MY HARDWARE</h1>
-                <p className="text-[9px] uppercase tracking-wider text-orange-100 font-semibold leading-none">Building Supply</p>
-              </div>
-              <div className="sm:hidden">
-                <h1 className="text-[11px] font-black leading-none tracking-tight text-white">MY</h1>
-                <p className="text-[8px] uppercase tracking-tighter text-orange-100 font-bold leading-none mt-0.5">HARDWARE</p>
+                <p className="text-[9px] uppercase tracking-wider text-amber-200 font-bold leading-none">Direct Warehouse</p>
               </div>
             </div>
 
@@ -3264,12 +3263,17 @@ const renderPopups = () => (
                     >
                       Structural Catalog
                     </button>
+                    <img
+                      src="/images/brand/my_hardware_wholesale_seal.png"
+                      alt="Direct Wholesale Since 2026"
+                      className="h-11 w-auto object-contain drop-shadow-md sm:hidden ml-auto"
+                    />
                   </div>
                 </div>
 
-                {/* Right Hero Visual: Structural Steel + Brass Plumbing + Paint Can Trio */}
+                {/* Right Hero Visual: MY Hardware Emblem + Structural Steel + Brass Plumbing + Paint Can */}
                 <div className="shrink-0 hidden sm:flex items-center justify-center relative">
-                  <div className="relative w-44 h-44 sm:w-52 sm:h-52 flex items-center justify-center">
+                  <div className="relative w-48 h-48 sm:w-56 sm:h-52 flex items-center justify-center">
                     {/* Structural Steel Purlin visual background */}
                     <div className="absolute inset-0 rounded-2xl bg-slate-900/10 border border-slate-900/20 flex flex-col justify-between p-2 overflow-hidden shadow-inner">
                       <span className="text-[9px] font-mono font-black text-slate-800 uppercase tracking-widest bg-amber-300/80 px-1.5 py-0.5 rounded w-fit">
@@ -3281,27 +3285,30 @@ const renderPopups = () => (
                         className="w-full h-16 object-cover rounded opacity-80"
                       />
                     </div>
+                    {/* MY Hardware House & Gear Emblem (Top Left) */}
+                    <img
+                      src="/images/brand/my_hardware_house_gear.png"
+                      alt="MY Hardware Supplies"
+                      className="w-22 h-22 object-contain drop-shadow-xl absolute -top-2 -left-3 z-25 bg-amber-50/95 p-1 rounded-xl border border-amber-300"
+                    />
                     {/* Brass Valve (Plumbing) */}
                     <img
                       src="/images/brass_swing_valve_clean.jpg"
                       alt="Brass Valve"
-                      className="w-20 h-20 object-contain drop-shadow-xl absolute -bottom-1 -left-2 z-20 bg-white/90 p-1 rounded-xl border border-amber-200"
+                      className="w-19 h-19 object-contain drop-shadow-xl absolute -bottom-1 -left-2 z-20 bg-white/90 p-1 rounded-xl border border-amber-200"
                     />
                     {/* Davies Paint Can */}
                     <img
                       src="/images/davies_gloss_it_clean.jpg"
                       alt="Davies Paint"
-                      className="w-24 h-24 object-contain drop-shadow-2xl absolute -top-1 -right-2 z-10"
+                      className="w-22 h-22 object-contain drop-shadow-2xl absolute -top-1 -right-2 z-10"
                     />
-                    {/* Rosco Faucet */}
+                    {/* Direct Wholesale Seal Badge */}
                     <img
-                      src="/images/gooseneck_faucet_clean.jpg"
-                      alt="Rosco Faucet"
-                      className="w-18 h-18 object-contain drop-shadow-xl absolute top-8 left-4 z-15 bg-white/80 p-0.5 rounded-lg border border-slate-200"
+                      src="/images/brand/my_hardware_wholesale_seal.png"
+                      alt="MY Hardware Direct Wholesale Seal"
+                      className="w-18 h-18 object-contain drop-shadow-xl absolute -bottom-2 -right-2 z-30 bg-white/95 p-0.5 rounded-full border border-amber-300"
                     />
-                    <div className="absolute -bottom-2 right-1 bg-red-600 text-white font-black text-xs px-2.5 py-1 rounded-full shadow-lg z-30 animate-pulse">
-                      -40% OFF
-                    </div>
                   </div>
                 </div>
               </div>
@@ -3631,9 +3638,11 @@ const renderPopups = () => (
             {/* 6. DEDICATED PROCEED TO WHOLESALE CALLOUT BANNER */}
             <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-red-950 text-white p-3.5 sm:p-4 rounded-2xl border border-amber-500/40 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center shrink-0">
-                  <Package className="w-5 h-5 text-amber-400" />
-                </div>
+                <img
+                  src="/images/brand/my_hardware_wholesale_seal.png"
+                  alt="MY Hardware Direct Wholesale Seal"
+                  className="w-12 h-12 sm:w-14 sm:h-14 object-contain bg-white/95 p-1 rounded-full border border-amber-400 shadow-sm shrink-0"
+                />
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="bg-amber-500 text-slate-950 text-[10px] font-black uppercase px-2 py-0.5 rounded tracking-wider">
@@ -3644,7 +3653,7 @@ const renderPopups = () => (
                     </span>
                   </div>
                   <p className="text-xs text-slate-200 mt-0.5">
-                    Contractors, hardware stores & bulk buyers: Access 465 SKUs in pre-packaged lots or ₱15,000+ volume clearance.
+                    Contractors, hardware stores & bulk buyers: Access 934 SKUs in pre-packaged lots or tiered volume clearance.
                   </p>
                 </div>
               </div>
@@ -3772,8 +3781,8 @@ const renderPopups = () => (
             </div>
 
             {/* 20 Frontend Polish: Contractor Club VIP Newsletter Lead Capture with Honeypot */}
-            <div className="mt-6 bg-gradient-to-r from-slate-900 to-slate-800 text-white p-6 rounded-2xl border border-slate-700 shadow-md">
-              <div className="max-w-xl">
+            <div className="mt-6 bg-gradient-to-r from-slate-900 to-slate-800 text-white p-6 rounded-2xl border border-slate-700 shadow-md flex flex-col md:flex-row items-center justify-between gap-6">
+              <div className="max-w-xl flex-1">
                 <span className="text-[10px] font-black uppercase tracking-widest text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded">
                   Tacloban Builders Club
                 </span>
@@ -3829,6 +3838,18 @@ const renderPopups = () => (
                   </form>
                 )}
               </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <img
+                  src="/images/brand/my_hardware_hardhat.png"
+                  alt="MY Hardware Contractor Hardhat & Industrial Stamp"
+                  className="h-24 sm:h-28 w-auto object-contain rounded-xl border border-slate-700 shadow-lg"
+                />
+                <img
+                  src="/images/brand/my_hardware_metal_sign.png"
+                  alt="MY Hardware Supplies Industrial Sign"
+                  className="hidden sm:block h-24 sm:h-28 w-auto object-contain rounded-xl border border-slate-700 shadow-lg"
+                />
+              </div>
             </div>
           </main>
         )}
@@ -3852,13 +3873,27 @@ const renderPopups = () => (
                   </span>
                 </div>
 
-                <div className="max-w-3xl">
-                  <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-white tracking-tight">
-                    Commercial Warehouse Liquidation & Specialty Category Lots
-                  </h1>
-                  <p className="text-xs sm:text-sm text-slate-300 mt-2 leading-relaxed">
-                    Direct liquidation of Heavy-Duty (HD) and Premium hardware supplies and construction materials. Sold strictly on an <strong>As-Is, Where-Is</strong> basis—featuring warehouse surplus overstock and showroom display inventory priced at deep clearance discounts, verified 100% genuine, sound, and fully contractor-ready. Available in pre-packaged <strong>Specialty Category Lots</strong> or tiered bulk orders at <strong>20% to 40% below retail</strong>. Images shown are online sample reference photos; actual stock may differ slightly in lighting, packaging, or surface finish. Physical inspection is welcomed on-site before hauling.
-                  </p>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="max-w-2xl">
+                    <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-white tracking-tight">
+                      Commercial Warehouse Liquidation & Specialty Category Lots
+                    </h1>
+                    <p className="text-xs sm:text-sm text-slate-300 mt-2 leading-relaxed">
+                      Direct liquidation of Heavy-Duty (HD) and Premium hardware supplies and construction materials. Sold strictly on an <strong>As-Is, Where-Is</strong> basis—featuring warehouse surplus overstock and showroom display inventory priced at deep clearance discounts, verified 100% genuine, sound, and fully contractor-ready. Available in pre-packaged <strong>Specialty Category Lots</strong> or tiered bulk orders at <strong>20% to 40% below retail</strong>. Images shown are online sample reference photos; actual stock may differ slightly in lighting, packaging, or surface finish. Physical inspection is welcomed on-site before hauling.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <img
+                      src="/images/brand/my_hardware_wholesale_seal.png"
+                      alt="MY Hardware Direct Wholesale Since 2026"
+                      className="h-20 sm:h-24 w-auto object-contain bg-white/95 p-1.5 rounded-full border-2 border-amber-400 shadow-lg"
+                    />
+                    <img
+                      src="/images/brand/my_hardware_hardhat.png"
+                      alt="Contractor Hardhat & Industrial Stamp"
+                      className="h-20 sm:h-24 w-auto object-contain rounded-xl border border-amber-500/40 shadow-lg"
+                    />
+                  </div>
                 </div>
 
                 {/* Live Liquidation Metrics Grid */}
@@ -5068,15 +5103,26 @@ const renderPopups = () => (
         {/* ==================== TAB 4: MALL VIEW ==================== */}
         {activeTab === 'mall' && (
           <main className="w-full">
-            <div className="bg-[#EE4D2D] text-white p-5 rounded-xl mb-4 flex items-center justify-between shadow-sm">
-              <div>
-                <span className="text-[10px] uppercase font-black tracking-widest bg-white/20 px-2 py-0.5 rounded">
-                  Official Hardware Mall
-                </span>
-                <h2 className="text-lg font-black mt-1">MY Hardware Mall Tacloban</h2>
-                <p className="text-xs text-white/90">100% Genuine Boysen, Island, Makita, Dewalt & Amerilock</p>
+            <div className="bg-[#EE4D2D] text-white p-5 rounded-xl mb-4 flex items-center justify-between shadow-sm gap-4">
+              <div className="flex items-center gap-3">
+                <img
+                  src="/images/brand/my_hardware_logo_badge.png"
+                  alt="MY Hardware Supplies Logo"
+                  className="h-14 sm:h-16 w-auto object-contain drop-shadow-md shrink-0"
+                />
+                <div>
+                  <span className="text-[10px] uppercase font-black tracking-widest bg-white/20 px-2 py-0.5 rounded">
+                    Official Hardware Mall
+                  </span>
+                  <h2 className="text-lg font-black mt-1">MY Hardware Mall Tacloban</h2>
+                  <p className="text-xs text-white/90">100% Genuine Boysen, Island, Makita, Dewalt & Amerilock</p>
+                </div>
               </div>
-              <ShieldCheck className="w-12 h-12 text-white/80" />
+              <img
+                src="/images/brand/my_hardware_metal_sign.png"
+                alt="MY Hardware Supplies Metal Sign"
+                className="hidden sm:block h-16 w-auto object-contain rounded-lg border border-white/30 shadow-md"
+              />
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3">
@@ -5604,9 +5650,11 @@ const renderPopups = () => (
                       <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-100 px-1.5">
                         {!isSidebarCollapsed ? (
                           <div className="flex items-center gap-2.5">
-                            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#EE4D2D] to-orange-500 text-white flex items-center justify-center font-black text-sm shadow-sm ring-2 ring-orange-100">
-                              MY
-                            </div>
+                            <img
+                              src="/images/brand/my_hardware_logo_badge.png"
+                              alt="MY Hardware Logo"
+                              className="h-9 w-auto object-contain drop-shadow-xs shrink-0"
+                            />
                             <div>
                               <div className="flex items-center gap-1.5">
                                 <span className="font-black text-slate-900 text-sm tracking-tight">MY HARDWARE PRO</span>
@@ -5619,9 +5667,11 @@ const renderPopups = () => (
                           </div>
                         ) : (
                           <div className="mx-auto">
-                            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#EE4D2D] to-orange-500 text-white flex items-center justify-center font-black text-sm shadow-sm ring-2 ring-orange-100">
-                              MY
-                            </div>
+                            <img
+                              src="/images/brand/my_hardware_logo_badge.png"
+                              alt="MY Hardware Logo"
+                              className="h-8 w-auto object-contain drop-shadow-xs"
+                            />
                           </div>
                         )}
 
@@ -8531,11 +8581,17 @@ const renderPopups = () => (
             
             {/* Col 1: Brand & Clearance Summary */}
             <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 bg-[#EE4D2D] text-white rounded-md flex items-center justify-center font-black text-xs shadow-xs">
-                  MY
-                </div>
-                <span className="text-white font-black text-sm tracking-tight">MY HARDWARE</span>
+              <div className="flex items-center gap-2.5">
+                <img
+                  src="/images/brand/my_hardware_logo_badge.png"
+                  alt="MY Hardware Supplies Logo"
+                  className="h-12 w-auto object-contain drop-shadow-md shrink-0"
+                />
+                <img
+                  src="/images/brand/my_hardware_wholesale_seal.png"
+                  alt="MY Hardware Direct Wholesale Seal"
+                  className="h-11 w-auto object-contain bg-white/95 p-0.5 rounded-full border border-amber-400 shrink-0"
+                />
               </div>
               <p className="text-slate-400 text-[11px] leading-relaxed">
                 Commercial warehouse liquidation and specialty inventory clearance. 100% authentic, sound, contractor-ready heavy hardware and construction supplies sold strictly on an As-Is, Where-Is basis.
@@ -9531,10 +9587,12 @@ const renderPopups = () => (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-5 border border-slate-200">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-orange-100 text-[#EE4D2D] flex items-center justify-center font-bold">
-                  <Phone className="w-4 h-4" />
-                </div>
+              <div className="flex items-center gap-2.5">
+                <img
+                  src="/images/brand/my_hardware_logo_badge.png"
+                  alt="MY Hardware Logo"
+                  className="h-9 w-auto object-contain shrink-0"
+                />
                 <div>
                   <h3 className="font-bold text-sm text-slate-900">MY Hardware Support</h3>
                   <p className="text-[10px] text-slate-400">Tacloban Logistics & Dispatch</p>
@@ -10013,26 +10071,33 @@ const renderPopups = () => (
               {/* 1. Header / Store Letterhead */}
               <div className="border-b-2 border-slate-900 pb-4">
                 <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="bg-[#EE4D2D] text-white font-black text-xs px-2 py-0.5 rounded">MY</span>
-                      <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                        MY HARDWARE &amp; CONSTRUCTION SUPPLY
-                      </h1>
+                  <div className="flex items-start gap-3">
+                    <img
+                      src="/images/brand/my_hardware_logo_badge.png"
+                      alt="MY Hardware Supplies Logo"
+                      className="h-14 sm:h-16 w-auto object-contain shrink-0"
+                    />
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="bg-[#EE4D2D] text-white font-black text-xs px-2 py-0.5 rounded">MY</span>
+                        <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                          MY HARDWARE &amp; CONSTRUCTION SUPPLY
+                        </h1>
+                      </div>
+                      <p className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                        Direct Importer • Wholesaler • Retailer • Leyte Regional Depot
+                      </p>
+                      <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                        <MapPin className="w-3.5 h-3.5 text-[#EE4D2D] shrink-0" />
+                        Tacloban City, Leyte 6500 (Dispatch Hub)
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <span><strong>Hotline:</strong> (053) 832-4911</span>
+                        <span><strong>Mobile:</strong> 0926 199 5703</span>
+                        <span><a href="https://www.facebook.com/mannaHardwareTAC/" target="_blank" rel="noreferrer" className="text-[#0084FF] hover:underline font-bold inline-flex items-center gap-0.5"><MessageCircle className="w-3 h-3 fill-current" /> Messenger: MY Hardware</a></span>
+                        <span><strong>Email:</strong> sales@myhardware.ph</span>
+                      </p>
                     </div>
-                    <p className="text-xs font-bold text-slate-600 uppercase tracking-wider">
-                      Direct Importer • Wholesaler • Retailer • Leyte Regional Depot
-                    </p>
-                    <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
-                      <MapPin className="w-3.5 h-3.5 text-[#EE4D2D] shrink-0" />
-                      Tacloban City, Leyte 6500 (Dispatch Hub)
-                    </p>
-                    <p className="text-xs text-slate-500 mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-                      <span><strong>Hotline:</strong> (053) 832-4911</span>
-                      <span><strong>Mobile:</strong> 0926 199 5703</span>
-                      <span><a href="https://www.facebook.com/mannaHardwareTAC/" target="_blank" rel="noreferrer" className="text-[#0084FF] hover:underline font-bold inline-flex items-center gap-0.5"><MessageCircle className="w-3 h-3 fill-current" /> Messenger: MY Hardware</a></span>
-                      <span><strong>Email:</strong> sales@myhardware.ph</span>
-                    </p>
                   </div>
 
                   {/* Document Badge */}

@@ -177,13 +177,23 @@
   </head>
   <body>
     <div id="root">
-      <!-- Semantic Static Fallback for Search Crawlers & No-JS Agents -->
+      <!-- Smooth Branded Splash Loading Screen while React mounts -->
+      <div style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #fafafa; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <img src="/images/brand/my_hardware_logo_badge.png" alt="MY Hardware Supplies" style="height: 52px; width: auto; margin-bottom: 16px; opacity: 0.95;" />
+        <div style="width: 120px; height: 3px; background: #e2e8f0; border-radius: 999px; overflow: hidden;">
+          <div style="width: 45%; height: 100%; background: #EE4D2D; border-radius: 999px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Semantic Static Fallback for Search Crawlers & No-JS Agents -->
+    <noscript>
       <header style="padding: 16px; background: #EE4D2D; color: white;">
         <h1>MY Hardware &amp; Construction Supply — Tacloban City Wholesale Clearance</h1>
         <p>Direct warehouse liquidation of structural steel, C-purlins, GI pipes, angle bars, paints, and hardware supplies in Tacloban City, Leyte.</p>
         <nav aria-label="Main Navigation">
           <a href="/?tab=catalog" style="color: white; margin-right: 12px; font-weight: bold;">Browse Catalog</a>
-          <a href="/?tab=wholesale" style="color: white; margin-right: 12px; font-weight: bold;">Wholesale Deals (Up to 40% OFF)</a>
+          <a href="/?tab=wholesale" style="color: white; margin-right: 12px; font-weight: bold;">Wholesale Deals (Up to 40-50% OFF)</a>
           <a href="/?tab=promotions" style="color: white; font-weight: bold;">Volume Tiers &amp; Promos</a>
         </nav>
       </header>
@@ -194,7 +204,7 @@
             <li><strong>10% OFF</strong> — Instant discount on orders ₱10,000+</li>
             <li><strong>20% OFF Contractor Tier</strong> — Instant discount on orders ₱25,000+</li>
             <li><strong>35% OFF Builder Tier</strong> — Orders ₱50,000+ (Promo Code: BUILDER)</li>
-            <li><strong>40% OFF Commercial Reseller Tier</strong> — Orders ₱100,000+ (Promo Code: HARDWARE)</li>
+            <li><strong>40-50% OFF Commercial Reseller Tier</strong> — Orders ₱100,000+ (Promo Code: HARDWARE)</li>
           </ul>
         </section>
         <section>
@@ -216,7 +226,7 @@
       <footer style="padding: 16px; background: #1E293B; color: #94A3B8; font-size: 12px;">
         <p>&copy; 2026 MY Hardware &amp; Construction Supply. Sold As-Is, Where-Is. Tacloban City, Leyte, Philippines.</p>
       </footer>
-    </div>
+    </noscript>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

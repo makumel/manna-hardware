@@ -2702,18 +2702,41 @@ const renderPopups = () => (
       </div>
 
       {/* ==================== 1.5 VOLUME TIER & LIQUIDATION GATEWAY BAR ==================== */}
-      <div className="bg-emerald-900 text-white text-[11px] sm:text-xs py-2 px-3 sm:px-6 flex flex-wrap items-center justify-between gap-2 border-b border-emerald-700 shadow-sm">
+      {/* Mobile Ultra-Compact 1-Line Strip */}
+      <div className="sm:hidden bg-emerald-950 text-white text-[10.5px] py-1 px-2.5 flex items-center justify-between gap-1.5 border-b border-emerald-800">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="bg-amber-400 text-slate-950 font-black text-[9px] px-1.5 py-0.2 rounded shrink-0 uppercase tracking-wide">
+            Up to 40-50% OFF
+          </span>
+          <span className="text-emerald-100 font-semibold truncate text-[10.5px]">
+            Direct Warehouse Liquidation &bull; Auto Tiers
+          </span>
+        </div>
+        <button
+          onClick={() => { setActiveTab('lots'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+          className="text-amber-300 hover:text-amber-200 font-black text-[10px] shrink-0 underline cursor-pointer ml-1"
+        >
+          Lots &rarr;
+        </button>
+      </div>
+
+      {/* Desktop Full Gateway Bar */}
+      <div className="hidden sm:flex bg-emerald-900 text-white text-xs py-1.5 px-6 items-center justify-between gap-2 border-b border-emerald-700 shadow-sm">
         <div className="flex items-center gap-2">
-          <span className="bg-white text-emerald-900 font-black text-[9px] px-2 py-0.5 rounded uppercase tracking-wider shadow-xs">Direct Warehouse Pricing</span>
-          <span className="text-emerald-100 font-medium">Single pieces to bulk truckloads &bull; Automatic volume tiers up to 40% OFF</span>
+          <span className="bg-amber-400 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded uppercase tracking-wider shadow-xs">
+            Up to 40-50% OFF
+          </span>
+          <span className="text-emerald-100 font-medium">
+            Direct Warehouse Liquidation &bull; Single pieces to bulk contractor truckloads
+          </span>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-amber-300 font-bold text-[10px] sm:text-xs flex items-center gap-1">
-            <Sparkles className="w-3.5 h-3.5 text-amber-300" /> Auto Tiers: 10% @ ₱10k &bull; 20% @ ₱25k &bull; 35% @ ₱50k &bull; 40% @ ₱100k
+          <span className="text-amber-300 font-bold text-xs flex items-center gap-1">
+            <Sparkles className="w-3.5 h-3.5 text-amber-300" /> Auto Tiers: 10% @ ₱10k &bull; 20% @ ₱25k &bull; 35% @ ₱50k &bull; 40-50% Clearance
           </span>
           <button
             onClick={() => { setActiveTab('lots'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-black px-2.5 py-0.5 rounded text-[10px] sm:text-xs cursor-pointer transition-colors shadow-xs"
+            className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-black px-2.5 py-0.5 rounded text-xs cursor-pointer transition-colors shadow-xs"
           >
             Wholesale Lots &rarr;
           </button>
@@ -2733,20 +2756,20 @@ const renderPopups = () => (
 
       {/* ==================== 2. MY HARDWARE MAIN HEADER (#EE4D2D) ==================== */}
       <header className="sticky top-0 z-40 bg-[#EE4D2D] text-white shadow-md w-full backdrop-blur-md">
-        <div className="max-w-7xl mx-auto pt-2 pb-2.5 px-3 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto pt-1.5 pb-1 sm:pt-2 sm:pb-2.5 px-2.5 sm:px-6 lg:px-8">
           
           {/* Main Search Row */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3">
             {/* Mobile & Desktop Brand Logo (MY Hardware Red Badge Logo) */}
             <div 
               onClick={() => { setActiveTab('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
-              className="flex items-center gap-2 cursor-pointer shrink-0 mr-0.5 sm:mr-2 group"
+              className="flex items-center gap-1.5 sm:gap-2 cursor-pointer shrink-0 mr-0.5 sm:mr-2 group"
               title="MY Hardware Supplies - Direct Warehouse & Industrial Supplies"
             >
               <img
                 src="/images/brand/my_hardware_logo_badge.png"
                 alt="MY Hardware Supplies Logo"
-                className="h-9 sm:h-11 w-auto object-contain drop-shadow-md group-hover:scale-105 transition-transform"
+                className="h-8 sm:h-11 w-auto object-contain drop-shadow-md group-hover:scale-105 transition-transform"
               />
               <div className="hidden lg:block">
                 <h1 className="text-base font-black leading-tight tracking-tight text-white">MY HARDWARE</h1>
@@ -2768,7 +2791,7 @@ const renderPopups = () => (
                   }
                 }
               }}
-              className="flex-1 bg-white rounded-md h-9 sm:h-10 px-2 sm:px-3 flex items-center gap-1.5 sm:gap-2 shadow-xs border border-transparent focus-within:border-amber-400 relative"
+              className="flex-1 bg-white rounded-md h-8 sm:h-10 px-2 sm:px-3 flex items-center gap-1 sm:gap-2 shadow-xs border border-transparent focus-within:border-amber-400 relative"
             >
               <button type="submit" className="text-[#888888] hover:text-[#EE4D2D] shrink-0 cursor-pointer" title="Search">
                 <Search className="w-4 h-4 shrink-0" />
@@ -2820,7 +2843,7 @@ const renderPopups = () => (
               className="relative p-1 text-white hover:opacity-90 shrink-0 cursor-pointer flex items-center gap-1.5"
             >
               <div className="relative">
-                <ShoppingCart className="w-6 h-6 stroke-[1.8]" />
+                <ShoppingCart className="w-5.5 sm:w-6 h-5.5 sm:h-6 stroke-[1.8]" />
                 {cart.reduce((s, i) => s + i.quantity, 0) > 0 && (
                   <span className="absolute -top-1 -right-1.5 bg-white text-[#EE4D2D] text-[9px] font-black px-1.5 py-0.2 rounded-full border border-[#EE4D2D] leading-tight">
                     {cart.reduce((s, i) => s + i.quantity, 0) > 99 ? '99+' : cart.reduce((s, i) => s + i.quantity, 0)}
@@ -2838,7 +2861,7 @@ const renderPopups = () => (
               title="Track Order Status"
               className="md:hidden relative p-1 text-white hover:opacity-90 shrink-0 cursor-pointer"
             >
-              <Truck className="w-6 h-6 stroke-[1.8]" />
+              <Truck className="w-5.5 h-5.5 stroke-[1.8]" />
               <span className="absolute -top-1 -right-1 bg-white text-[#EE4D2D] text-[8px] font-black px-1 rounded-full border border-[#EE4D2D]">
                 TRACK
               </span>
@@ -2846,8 +2869,8 @@ const renderPopups = () => (
           </div>
 
           {/* Navigation Strip under Search */}
-          <div className="flex items-center justify-between gap-3 overflow-x-auto no-scrollbar pt-2.5 text-[11px] sm:text-xs font-medium text-white/95 border-b border-white/10 pb-1.5">
-            <div className="flex items-center gap-4">
+          <div className="flex items-center justify-between gap-2.5 sm:gap-3 overflow-x-auto no-scrollbar pt-1.5 sm:pt-2.5 text-[10.5px] sm:text-xs font-medium text-white/95 border-b border-white/10 pb-1">
+            <div className="flex items-center gap-2.5 sm:gap-4">
               <button
                 onClick={() => { setActiveTab('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                 className={`whitespace-nowrap pb-0.5 cursor-pointer flex items-center gap-1 ${
@@ -2857,16 +2880,16 @@ const renderPopups = () => (
                 <Home className="w-3.5 h-3.5" /> Home Feed
               </button>
 
-              {/* WHOLESALE CONTRACTOR LOTS (30-40% OFF) */}
+              {/* WHOLESALE CONTRACTOR LOTS (UP TO 50% OFF) */}
               <button
                 onClick={() => { setActiveTab('lots'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                className={`whitespace-nowrap px-2.5 py-0.5 rounded cursor-pointer flex items-center gap-1.5 font-black transition-all ${
+                className={`whitespace-nowrap px-2 sm:px-2.5 py-0.5 rounded cursor-pointer flex items-center gap-1 sm:gap-1.5 font-black transition-all ${
                   activeTab === 'lots' 
                     ? 'bg-amber-400 text-slate-950 shadow-md ring-2 ring-white/80' 
                     : 'bg-amber-500/90 text-white hover:bg-amber-400 hover:text-slate-950'
                 }`}
               >
-                <Flame className="w-3.5 h-3.5 text-red-600 animate-pulse" /> WHOLESALE LOTS (30-40% OFF)
+                <Flame className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-red-600 animate-pulse" /> WHOLESALE LOTS (UP TO 50% OFF)
               </button>
 
               {/* FULL CATALOG PUBLIC TAB (User Requested) */}
@@ -3002,7 +3025,7 @@ const renderPopups = () => (
           </div>
 
           {/* Categories Horizontal Scroll Strip */}
-          <div className="flex items-center gap-3 sm:gap-4 overflow-x-auto no-scrollbar pt-1.5 text-[10px] sm:text-[11px] font-normal text-white/90">
+          <div className="flex items-center gap-2.5 sm:gap-4 overflow-x-auto no-scrollbar pt-1 sm:pt-1.5 text-[10px] sm:text-[11px] font-normal text-white/90 pb-0.5">
             {categories.map(cat => (
               <button
                 key={cat}
@@ -3190,7 +3213,7 @@ const renderPopups = () => (
                   </div>
 
                   <h2 className="text-xl sm:text-3xl font-black text-slate-950 tracking-tight leading-tight">
-                    Up to 40% OFF Structural Steel & Plumbing
+                    Up to 40-50% OFF Structural Steel & Plumbing
                   </h2>
 
                   <p className="text-xs sm:text-sm text-slate-800 font-medium leading-snug">
@@ -3612,7 +3635,7 @@ const renderPopups = () => (
                       B2B Liquidation Portal
                     </span>
                     <span className="text-amber-300 text-xs font-bold">
-                      Wholesale Buyout Lots & Up to 40% OFF
+                      Wholesale Buyout Lots & Up to 40-50% OFF
                     </span>
                   </div>
                   <p className="text-xs text-slate-200 mt-0.5">
@@ -3873,7 +3896,7 @@ const renderPopups = () => (
                   </div>
                   <div className="bg-white/5 backdrop-blur-xs p-3 rounded-xl border border-white/10">
                     <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Volume Discount</p>
-                    <p className="text-lg sm:text-xl font-black text-emerald-400 mt-0.5">Up to 40% OFF</p>
+                    <p className="text-lg sm:text-xl font-black text-emerald-400 mt-0.5">Up to 40-50% OFF</p>
                     <p className="text-[10px] text-slate-400">₱25k / ₱50k / ₱100k Tiers</p>
                   </div>
                   <div className="bg-white/5 backdrop-blur-xs p-3 rounded-xl border border-white/10">

@@ -760,6 +760,7 @@ const renderPopups = () => (
   const [valuationSortField, setValuationSortField] = useState('originalIndex');
   const [valuationSortOrder, setValuationSortOrder] = useState('asc');
   const [valuationPricingMode, setValuationPricingMode] = useState('discounted'); // 'discounted' | 'regular'
+  const [quickDeductInput, setQuickDeductInput] = useState('');
 
   // CSV/PDF Upload state
   const [uploadModal, setUploadModal] = useState(false);
@@ -1326,7 +1327,8 @@ const renderPopups = () => (
 
   // ==================== ADVANCED FINANCIAL & PNL METRICS ====================
   const financialMetrics = useMemo(() => {
-    const validOrders = orders.filter(o => o.status !== 'Cancelled');
+    const validOrders = orders.filter(o => o.status !== 'Cancelled' && o.status !== 'Pending Confirmation');
+    const pendingOrders = orders.filter(o => o.status === 'Pending Confirmation');
     const cancelledOrders = orders.filter(o => o.status === 'Cancelled');
 
     let totalGrossRevenue = 0;
@@ -1340,7 +1342,8 @@ const renderPopups = () => (
 
     orders.forEach(o => {
       const isCancelled = o.status === 'Cancelled';
-      if (!isCancelled) {
+      const isPending = o.status === 'Pending Confirmation';
+      if (!isCancelled && !isPending) {
         totalGrossRevenue += Number(o.total || 0);
         totalDiscountsAbsorbed += Number(o.discountAmount || 0);
         if (o.total && (o.subtotal || 0) < 3000) {
@@ -1358,7 +1361,7 @@ const renderPopups = () => (
         const lineProfit = lineRevenue - lineCost;
         const marginPct = lineRevenue > 0 ? ((lineProfit / lineRevenue) * 100).toFixed(1) : '0';
 
-        if (!isCancelled) {
+        if (!isCancelled && !isPending) {
           totalCOGS += lineCost;
           totalItemsSold += qty;
         }
@@ -1419,6 +1422,7 @@ const renderPopups = () => (
 
     return {
       validOrdersCount: validOrders.length,
+      pendingOrdersCount: pendingOrders.length,
       cancelledOrdersCount: cancelledOrders.length,
       cancelledProductCount,
       activeProductCount: products.length - cancelledProductCount,
@@ -2105,8 +2109,15 @@ const renderPopups = () => (
 
   // Order status update & Cancellation
   const handleOrderStatusUpdate = async (orderId, newStatus) => {
+    const targetOrder = orders.find(o => o.orderId === orderId) || userOrders.find(o => o.id === orderId || o.orderId === orderId);
+
     if (newStatus === 'Cancelled') {
-      const confirmCancel = window.confirm(`Are you sure you want to cancel order ${orderId}? Inventory stock will be restored.`);
+      const isPending = targetOrder?.status === 'Pending Confirmation';
+      const confirmCancel = window.confirm(
+        isPending 
+          ? `Are you sure you want to dismiss pending inquiry ${orderId}? (No stock was deducted).`
+          : `Are you sure you want to cancel order ${orderId}? Inventory stock will be restored.`
+      );
       if (!confirmCancel) return;
     }
 
@@ -2126,9 +2137,9 @@ const renderPopups = () => (
         body: JSON.stringify({ status: newStatus })
       });
 
-      if (newStatus === 'Cancelled') {
-        const targetOrder = orders.find(o => o.orderId === orderId) || userOrders.find(o => o.id === orderId || o.orderId === orderId);
-        if (targetOrder && targetOrder.items) {
+      // Only restore stock if the order had been confirmed and deducted previously
+      if (newStatus === 'Cancelled' && targetOrder && targetOrder.status !== 'Pending Confirmation') {
+        if (targetOrder.items) {
           setProducts(prev => {
             const copy = [...prev];
             for (const it of targetOrder.items) {
@@ -2137,6 +2148,9 @@ const renderPopups = () => (
                 copy[idx] = { ...copy[idx], stock: (copy[idx].stock || 0) + (it.quantity || 1) };
               }
             }
+            try {
+              localStorage.setItem('manna_products', JSON.stringify(copy));
+            } catch (e) {}
             return copy;
           });
         }
@@ -2147,7 +2161,14 @@ const renderPopups = () => (
   };
 
   const handleCancelOrder = async (orderId, source = 'merchant') => {
-    const confirmCancel = window.confirm(`Are you sure you want to cancel order ${orderId}? Inventory stock will be restored.`);
+    const targetOrder = orders.find(o => o.orderId === orderId) || userOrders.find(o => o.id === orderId || o.orderId === orderId);
+    const isPending = targetOrder?.status === 'Pending Confirmation';
+
+    const confirmCancel = window.confirm(
+      isPending
+        ? `Are you sure you want to dismiss inquiry ${orderId}?`
+        : `Are you sure you want to cancel order ${orderId}? Inventory stock will be restored.`
+    );
     if (!confirmCancel) return;
 
     setCancellingOrderId(orderId);
@@ -2165,17 +2186,16 @@ const renderPopups = () => (
         body: JSON.stringify({ status: 'Cancelled' })
       });
 
-      const data = await res.json();
-      if (res.ok) {
+      const data = await res.json().catch(() => ({}));
+      if (res.ok || data.success) {
         setOrders(prev => prev.map(o => o.orderId === orderId ? { ...o, status: 'Cancelled' } : o));
         setUserOrders(prev => prev.map(o => (o.id === orderId || o.orderId === orderId) ? { ...o, status: 'Cancelled' } : o));
         if (trackedOrder && (trackedOrder.orderId === orderId || trackedOrder.id === orderId)) {
           setTrackedOrder(prev => ({ ...prev, status: 'Cancelled' }));
         }
 
-        // Restore stock locally
-        const targetOrder = orders.find(o => o.orderId === orderId) || userOrders.find(o => o.id === orderId || o.orderId === orderId);
-        if (targetOrder && targetOrder.items) {
+        // Restore stock locally ONLY IF it was previously confirmed/deducted
+        if (!isPending && targetOrder && targetOrder.items) {
           setProducts(prev => {
             const copy = [...prev];
             for (const it of targetOrder.items) {
@@ -2184,10 +2204,15 @@ const renderPopups = () => (
                 copy[idx] = { ...copy[idx], stock: (copy[idx].stock || 0) + (it.quantity || 1) };
               }
             }
+            try {
+              localStorage.setItem('manna_products', JSON.stringify(copy));
+            } catch (e) {}
             return copy;
           });
+          alert(`Order ${orderId} has been successfully cancelled and stock restored.`);
+        } else {
+          alert(`Inquiry ${orderId} has been dismissed.`);
         }
-        alert(`Order ${orderId} has been successfully cancelled and stock restored.`);
       } else {
         alert(data.error || 'Failed to cancel order.');
       }
@@ -2200,6 +2225,236 @@ const renderPopups = () => (
     } finally {
       setCancellingOrderId(null);
     }
+  };
+
+  // 1-Click Purchase Confirmation & Stock Deductor for Merchant Centre
+  const handleConfirmPurchaseAndDeduct = (orderId) => {
+    const targetOrder = orders.find(o => o.orderId === orderId);
+    if (!targetOrder) {
+      alert(`Order ${orderId} not found.`);
+      return;
+    }
+
+    if (targetOrder.status !== 'Pending Confirmation') {
+      alert(`Order ${orderId} is already marked as "${targetOrder.status}". Stock was previously deducted.`);
+      return;
+    }
+
+    const itemsToDeduct = targetOrder.items || [];
+    setProducts(prev => {
+      const updated = prev.map(p => {
+        const orderItem = itemsToDeduct.find(it => (it.id || it.product_id) === p.id);
+        if (orderItem) {
+          const deductQty = Number(orderItem.quantity) || 1;
+          const currentStock = Number(p.stock) || 0;
+          return { ...p, stock: Math.max(0, currentStock - deductQty) };
+        }
+        return p;
+      });
+      try {
+        localStorage.setItem('manna_products', JSON.stringify(updated));
+      } catch (e) {
+        console.warn(e);
+      }
+      return updated;
+    });
+
+    // Mark order as confirmed / Order Placed
+    setOrders(prev => {
+      const updatedOrders = prev.map(o => o.orderId === orderId ? { ...o, status: 'Order Placed', confirmedAt: new Date().toISOString() } : o);
+      try {
+        localStorage.setItem('manna_orders', JSON.stringify(updatedOrders));
+      } catch (e) {
+        console.warn(e);
+      }
+      return updatedOrders;
+    });
+    setUserOrders(prev => {
+      const updated = prev.map(o => (o.id === orderId || o.orderId === orderId) ? { ...o, status: 'Order Placed', confirmedAt: new Date().toISOString() } : o);
+      try {
+        localStorage.setItem('manna_user_orders', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+    if (trackedOrder && (trackedOrder.orderId === orderId || trackedOrder.id === orderId)) {
+      setTrackedOrder(prev => ({ ...prev, status: 'Order Placed', confirmedAt: new Date().toISOString() }));
+    }
+
+    // Try notifying backend
+    fetch(`/api/admin/orders/${orderId}/status`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${sessionStorage.getItem('manna_admin_token') || ''}`
+      },
+      body: JSON.stringify({ status: 'Order Placed' })
+    }).catch(() => {});
+
+    setStockToast({
+      title: 'Order Confirmed & Stock Deducted!',
+      message: `Order ${orderId} confirmed! Deducted ${itemsToDeduct.reduce((sum, i) => sum + (Number(i.quantity) || 1), 0)} unit(s) from warehouse stock.`,
+      type: 'success'
+    });
+  };
+
+  // Quick-Code Fast Stock Deductor by Code (e.g. MYH-CONFIRM:SKU:qty) or Order Ref (MNA-ORD-...)
+  const handleQuickCodeDeduct = (input) => {
+    if (!input || !input.trim()) return;
+    const trimmed = input.trim();
+
+    // 1. Order ID match
+    if (trimmed.startsWith('MNA-ORD-') || trimmed.startsWith('ORD-')) {
+      handleConfirmPurchaseAndDeduct(trimmed);
+      setQuickDeductInput('');
+      return;
+    }
+
+    // 2. Quick Confirm Code match: MYH-CONFIRM:...
+    if (trimmed.includes('MYH-CONFIRM:')) {
+      const codePayload = trimmed.replace('MYH-CONFIRM:', '').trim();
+      const pairs = codePayload.split(',').map(s => s.trim()).filter(Boolean);
+      const parsedDeductions = [];
+
+      for (const pair of pairs) {
+        const [sku, qtyStr] = pair.split(':');
+        if (sku && qtyStr) {
+          parsedDeductions.push({ id: sku.trim(), quantity: parseInt(qtyStr, 10) || 1 });
+        }
+      }
+
+      if (parsedDeductions.length === 0) {
+        alert('Invalid Quick-Confirm code format. Expected MYH-CONFIRM:SKU:qty,...');
+        return;
+      }
+
+      // Check if an order matches this quickConfirmCode
+      const matchedOrder = orders.find(o => o.quickConfirmCode === trimmed || o.quickConfirmCode?.includes(codePayload));
+      if (matchedOrder && matchedOrder.status === 'Pending Confirmation') {
+        handleConfirmPurchaseAndDeduct(matchedOrder.orderId);
+        setQuickDeductInput('');
+        return;
+      }
+
+      // Direct deduction
+      setProducts(prev => {
+        const updated = prev.map(p => {
+          const match = parsedDeductions.find(it => it.id === p.id);
+          if (match) {
+            return { ...p, stock: Math.max(0, (Number(p.stock) || 0) - match.quantity) };
+          }
+          return p;
+        });
+        try {
+          localStorage.setItem('manna_products', JSON.stringify(updated));
+        } catch (e) {}
+        return updated;
+      });
+
+      setStockToast({
+        title: 'Quick Code Deducted',
+        message: `Successfully deducted stock for ${parsedDeductions.length} items from Quick-Confirm code!`,
+        type: 'success'
+      });
+      setQuickDeductInput('');
+      return;
+    }
+
+    // Fallback: search by partial order ID
+    const foundByPartial = orders.find(o => o.orderId.toLowerCase().includes(trimmed.toLowerCase()));
+    if (foundByPartial) {
+      handleConfirmPurchaseAndDeduct(foundByPartial.orderId);
+      setQuickDeductInput('');
+      return;
+    }
+
+    alert('Unrecognized code format. Please paste a Quick-Confirm Code (MYH-CONFIRM:...) or Order Ref (MNA-ORD-...).');
+  };
+
+  // Messenger Order Logger: logs order as Pending Confirmation and launches Messenger chat
+  const handleSendOrderToMessenger = () => {
+    if (cart.length === 0) {
+      setStockToast({
+        title: 'Cart is Empty',
+        message: 'Add items to your cart before sending an order to Messenger.',
+        type: 'warning'
+      });
+      return;
+    }
+
+    const newOrderId = `MNA-ORD-${Date.now().toString().slice(-6)}`;
+    const quickConfirmCode = `MYH-CONFIRM:${cart.map(i => `${i.id}:${i.quantity}`).join(',')}`;
+
+    const messengerOrder = {
+      orderId: newOrderId,
+      date: new Date().toLocaleString(),
+      customer: {
+        fullName: customer.fullName || (currentUser?.fullName || 'Messenger Buyer'),
+        phone: customer.phone || (currentUser?.phone || ''),
+        address: customer.address || 'Tacloban Hub Pickup / Messenger Delivery',
+        paymentMethod: customer.paymentMethod || 'Messenger COD / GCash'
+      },
+      items: cart.map(i => {
+        const itemDisc = Math.max(Number(i.discount_percent || 0), effectiveDiscountPercent);
+        const discPrice = itemDisc > 0 ? (i.price * (1 - itemDisc / 100)) : i.price;
+        return {
+          id: i.id,
+          product_id: i.id,
+          name: i.name,
+          unit: i.unit,
+          price: i.price,
+          effectivePrice: discPrice,
+          quantity: i.quantity,
+          total: discPrice * i.quantity,
+          warehouse_code: i.warehouse_code,
+          box_no: i.box_no,
+          quote_no: i.quote_no
+        };
+      }),
+      subtotal: cartSubtotal,
+      discountAmount,
+      promoCode: appliedPromo ? appliedPromo.code : null,
+      shippingFee: 0,
+      total: orderTotal,
+      status: 'Pending Confirmation', // Stock is preserved until merchant confirms purchase
+      quickConfirmCode,
+      channel: 'Facebook Messenger'
+    };
+
+    setOrders(prev => [messengerOrder, ...prev]);
+    if (currentUser) {
+      setUserOrders(prev => [messengerOrder, ...prev]);
+    }
+
+    const msgLines = [
+      `Hello MY Hardware Tacloban! I would like to place an order from my cart:`,
+      ``,
+      `📋 Order Ref: ${newOrderId}`,
+      `⚡ Quick-Confirm Code: ${quickConfirmCode}`,
+      ``,
+      `Items Ordered:`,
+      ...cart.map(i => {
+        const itemDisc = Math.max(Number(i.discount_percent || 0), effectiveDiscountPercent);
+        const discPrice = itemDisc > 0 ? (i.price * (1 - itemDisc / 100)) : i.price;
+        const lineTotal = discPrice * i.quantity;
+        return `• ${i.name} (${i.quantity} ${i.unit || 'pc'}) - ₱${lineTotal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} [${i.warehouse_code === 'NT' ? 'Nula Tula (NT)' : 'Cabalwan (CAB)'} • Box #${i.box_no || '1'} ${i.quote_no ? `• ${i.quote_no}` : ''}]`;
+      }),
+      ``,
+      `Subtotal: ₱${cartSubtotal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      discountAmount > 0 ? `Voucher Discount: -₱${discountAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : null,
+      `Estimated Total: ₱${orderTotal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      `Buyer: ${customer.fullName || (currentUser?.fullName || 'Messenger Buyer')}`,
+      customer.phone ? `Phone: ${customer.phone}` : null,
+      `Fulfillment: Warehouse Pickup (Tacloban Hub - Cabalwan/Nula Tula)`
+    ].filter(Boolean).join('\n');
+
+    const url = `https://m.me/mannaHardwareTAC?text=${encodeURIComponent(msgLines)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+
+    setStockToast({
+      title: 'Order Sent to Messenger!',
+      message: `Order Ref ${newOrderId} logged as Pending Confirmation. Warehouse stock is preserved until purchase confirmation with merchant.`,
+      type: 'success'
+    });
   };
 
   // ==================== CHECKOUT SUBMISSION (BACKEND REQUIRE AUTH) ====================
@@ -2255,11 +2510,19 @@ const renderPopups = () => (
         return;
       }
 
-      // Decrement stock locally to keep UI instant
-      setProducts(prev => prev.map(p => {
-        const cItem = cart.find(c => c.id === p.id);
-        return cItem ? { ...p, stock: Math.max(0, p.stock - cItem.quantity) } : p;
-      }));
+      // Decrement stock locally to keep UI instant upon confirmed website checkout
+      setProducts(prev => {
+        const updated = prev.map(p => {
+          const cItem = cart.find(c => c.id === p.id);
+          return cItem ? { ...p, stock: Math.max(0, p.stock - cItem.quantity) } : p;
+        });
+        try {
+          localStorage.setItem('manna_products', JSON.stringify(updated));
+        } catch (e) {
+          console.warn('LocalStorage save error:', e);
+        }
+        return updated;
+      });
 
       const newOrder = {
         orderId: data.order.orderId,
@@ -4768,32 +5031,33 @@ const renderPopups = () => (
             {/*Stock */}
                             <td className="py-2.5 px-3 text-center">
                               {(() => {
+                                const maxStock = Math.max(0, Number(item.stock || 0));
                                 const inCartQty = cart.find(c => c.id === item.id)?.quantity || 0;
-                                const liveStock = Math.max(0, Number(item.stock || 0) - inCartQty);
+                                const isMax = inCartQty >= maxStock && maxStock > 0;
                                 return (
                                   <div className="flex flex-col items-center gap-0.5">
-                                    {item.stock <= 0 ? (
+                                    {maxStock <= 0 ? (
                                       <span className="bg-rose-100 text-rose-700 text-[10px] font-black px-2 py-0.5 rounded-full">
                                         Out of Stock
                                       </span>
-                                    ) : liveStock <= 0 ? (
-                                      <span className="bg-amber-100 text-amber-800 text-[10px] font-black px-2 py-0.5 rounded-full border border-amber-300">
-                                        0 Left (All {inCartQty} in Cart)
-                                      </span>
-                                    ) : liveStock < 10 ? (
+                                    ) : maxStock < 10 ? (
                                       <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                                        {liveStock} Low Stock
+                                        {maxStock} Low Stock
                                       </span>
                                     ) : (
                                       <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                                        {liveStock} Available
+                                        {maxStock} In Stock
                                       </span>
                                     )}
-                                    {inCartQty > 0 && liveStock > 0 && (
+                                    {isMax ? (
+                                      <span className="text-[9px] font-black text-blue-700 bg-blue-50 px-1 rounded border border-blue-200">
+                                        Max in Cart ({inCartQty})
+                                      </span>
+                                    ) : inCartQty > 0 ? (
                                       <span className="text-[9px] font-black text-blue-700">
                                         ({inCartQty} in Cart)
                                       </span>
-                                    )}
+                                    ) : null}
                                   </div>
                                 );
                               })()}
@@ -5801,10 +6065,17 @@ const renderPopups = () => (
                             {!isSidebarCollapsed && <span className="truncate">Orders &amp; Dispatch</span>}
                           </span>
                           {!isSidebarCollapsed && (
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold ${
-                              dashboardTab === 'orders' ? 'bg-white/20 text-white' : 'bg-orange-100 text-[#EE4D2D]'
-                            }`}>
-                              {orders.length}
+                            <span className="flex items-center gap-1">
+                              {orders.some(o => o.status === 'Pending Confirmation') && (
+                                <span className="bg-amber-400 text-slate-950 text-[9px] font-black px-1.5 py-0.2 rounded-full animate-pulse" title="Orders pending confirmation">
+                                  {orders.filter(o => o.status === 'Pending Confirmation').length} pending
+                                </span>
+                              )}
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold ${
+                                dashboardTab === 'orders' ? 'bg-white/20 text-white' : 'bg-orange-100 text-[#EE4D2D]'
+                              }`}>
+                                {orders.length}
+                              </span>
                             </span>
                           )}
                         </button>
@@ -7498,9 +7769,105 @@ const renderPopups = () => (
                         </p>
                       </div>
                       <div className="text-xs font-bold text-slate-600 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
-                        {financialMetrics.validOrdersCount} Active Orders • {financialMetrics.cancelledOrdersCount} Cancelled
+                        {financialMetrics.validOrdersCount} Confirmed &bull; {financialMetrics.pendingOrdersCount || 0} Pending &bull; {financialMetrics.cancelledOrdersCount} Cancelled
                       </div>
                     </div>
+
+                    {/* Quick Confirm & Fast Stock Deductor */}
+                    <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 rounded-xl p-3.5 sm:p-4 shadow-2xs">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-2.5">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-lg bg-[#EE4D2D] text-white flex items-center justify-center font-black shadow-xs shrink-0">
+                            <Zap className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <h4 className="text-xs sm:text-sm font-black text-slate-900 flex items-center gap-2">
+                              1-Click Fast Stock Deductor &amp; Confirm
+                              <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded">
+                                Zero Manual Math
+                              </span>
+                            </h4>
+                            <p className="text-[11px] text-slate-600">
+                              Paste buyer's <strong>Quick-Confirm Code</strong> (e.g. <code className="bg-white/80 px-1 py-0.2 rounded font-mono text-[10px] border border-amber-200">MYH-CONFIRM:...</code>) or <strong>Order Ref</strong> (<code className="bg-white/80 px-1 py-0.2 rounded font-mono text-[10px] border border-amber-200">MNA-ORD-...</code>) to instantly deduct inventory upon Messenger confirmation.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <form onSubmit={e => { e.preventDefault(); handleQuickCodeDeduct(quickDeductInput); }} className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="Paste Quick-Confirm Code or MNA-ORD-XXXXXX here..."
+                          value={quickDeductInput}
+                          onChange={e => setQuickDeductInput(e.target.value)}
+                          className="flex-1 px-3 py-2 text-xs font-mono bg-white border border-amber-300 rounded-lg focus:outline-none focus:border-[#EE4D2D] shadow-inner"
+                        />
+                        <button
+                          type="submit"
+                          className="bg-[#EE4D2D] hover:bg-[#d73f20] text-white text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs whitespace-nowrap transition-colors"
+                        >
+                          <Zap className="w-3.5 h-3.5" />
+                          <span>Deduct Stock by Code</span>
+                        </button>
+                      </form>
+                    </div>
+
+                    {/* Pending Confirmation Messenger Orders Panel */}
+                    {orders.some(o => o.status === 'Pending Confirmation') && (
+                      <div className="bg-amber-50/80 border border-amber-300 rounded-xl p-3.5 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-black text-amber-900 flex items-center gap-1.5">
+                            <Clock className="w-4 h-4 text-amber-600" />
+                            Awaiting Purchase Confirmation &amp; Stock Deduction ({orders.filter(o => o.status === 'Pending Confirmation').length})
+                          </span>
+                          <span className="text-[10px] text-amber-700 font-bold bg-amber-100 px-2 py-0.5 rounded-full">
+                            Physical stock is held until confirmed below
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                          {orders.filter(o => o.status === 'Pending Confirmation').map(pOrd => (
+                            <div key={pOrd.orderId} className="bg-white border border-amber-200 rounded-lg p-3 flex flex-col justify-between shadow-2xs gap-2">
+                              <div>
+                                <div className="flex items-center justify-between">
+                                  <span className="font-mono font-bold text-xs text-slate-800">{pOrd.orderId}</span>
+                                  <span className="text-[9px] bg-amber-100 text-amber-900 font-black px-1.5 py-0.5 rounded border border-amber-300 animate-pulse">
+                                    Pending Confirmation
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-slate-600 mt-1">
+                                  <strong>{pOrd.customer?.fullName || 'Messenger Buyer'}</strong> &bull; {pOrd.customer?.phone || 'Messenger Order'}
+                                </p>
+                                <div className="text-[10px] text-slate-500 mt-1 max-h-20 overflow-y-auto space-y-0.5 border-t border-slate-50 pt-1">
+                                  {pOrd.items?.map((it, idx) => (
+                                    <div key={idx} className="flex justify-between">
+                                      <span>{it.quantity}x {it.name}</span>
+                                      <span className="font-bold">₱{(Number(it.effectivePrice || it.price) * it.quantity).toLocaleString()}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                                <div className="mt-1.5 pt-1.5 border-t border-slate-100 flex justify-between items-center text-xs">
+                                  <span className="font-bold text-slate-700">Total:</span>
+                                  <span className="font-black text-[#EE4D2D]">₱{Number(pOrd.total || 0).toLocaleString()}</span>
+                                </div>
+                              </div>
+                              <div className="flex gap-2 pt-1">
+                                <button
+                                  onClick={() => handleConfirmPurchaseAndDeduct(pOrd.orderId)}
+                                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-1.5 rounded flex items-center justify-center gap-1 cursor-pointer transition-colors shadow-xs"
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5" /> Confirm Order &amp; Deduct Stock
+                                </button>
+                                <button
+                                  onClick={() => handleCancelOrder(pOrd.orderId, 'merchant')}
+                                  className="px-2.5 bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 border border-slate-200 text-xs font-bold py-1.5 rounded cursor-pointer transition-colors"
+                                >
+                                  Dismiss
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {orders.length === 0 ? (
                       <div className="py-12 text-center text-xs text-slate-400 bg-slate-50 rounded-lg">
@@ -7582,9 +7949,10 @@ const renderPopups = () => (
                                     o.status === 'Out for Delivery' ? 'bg-blue-100 text-blue-800' :
                                     o.status === 'Packed' ? 'bg-indigo-100 text-indigo-800' :
                                     o.status === 'Processing' ? 'bg-amber-100 text-amber-800' :
+                                    o.status === 'Pending Confirmation' ? 'bg-amber-100 text-amber-900 border border-amber-300 animate-pulse font-black' :
                                     'bg-orange-100 text-[#EE4D2D]'
                                   }`}>
-                                    {o.status}
+                                    {o.status === 'Pending Confirmation' ? '⏳ Pending Confirmation' : o.status}
                                   </span>
                                 </td>
 
@@ -7592,9 +7960,16 @@ const renderPopups = () => (
                                   <select
                                     value={o.status}
                                     disabled={o.status === 'Cancelled' || o.status === 'Delivered'}
-                                    onChange={e => handleOrderStatusUpdate(o.orderId, e.target.value)}
+                                    onChange={e => {
+                                      if (o.status === 'Pending Confirmation' && e.target.value !== 'Pending Confirmation' && e.target.value !== 'Cancelled') {
+                                        handleConfirmPurchaseAndDeduct(o.orderId);
+                                      } else {
+                                        handleOrderStatusUpdate(o.orderId, e.target.value);
+                                      }
+                                    }}
                                     className="text-xs font-bold border border-slate-300 rounded px-2 py-1 bg-white text-slate-700 focus:outline-none focus:border-[#EE4D2D] disabled:opacity-50"
                                   >
+                                    <option value="Pending Confirmation">⏳ Pending Confirmation</option>
                                     <option value="Order Placed">Order Placed</option>
                                     <option value="Processing">Processing</option>
                                     <option value="Packed">Packed</option>
@@ -7605,7 +7980,16 @@ const renderPopups = () => (
                                 </td>
 
                                 <td className="py-3 px-3 align-top text-center">
-                                  <div className="flex flex-col items-center gap-1.5 min-w-[105px]">
+                                  <div className="flex flex-col items-center gap-1.5 min-w-[125px]">
+                                    {o.status === 'Pending Confirmation' && (
+                                      <button
+                                        onClick={() => handleConfirmPurchaseAndDeduct(o.orderId)}
+                                        className="w-full px-2 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold inline-flex items-center justify-center gap-1 cursor-pointer transition-colors shadow-xs"
+                                        title="Confirm purchase and immediately deduct stock from warehouse inventory"
+                                      >
+                                        <CheckCircle2 className="w-3.5 h-3.5" /> Confirm &amp; Deduct
+                                      </button>
+                                    )}
                                     <button
                                       onClick={() => setInvoiceModalOrder(o)}
                                       className="w-full px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold inline-flex items-center justify-center gap-1 cursor-pointer transition-colors"
@@ -7622,9 +8006,9 @@ const renderPopups = () => (
                                         onClick={() => handleCancelOrder(o.orderId, 'merchant')}
                                         disabled={cancellingOrderId === o.orderId || o.status === 'Delivered'}
                                         className="w-full px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[11px] font-bold inline-flex items-center justify-center gap-1 cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                                        title="Cancel this order and automatically restore product stock"
+                                        title={o.status === 'Pending Confirmation' ? 'Dismiss this pending order inquiry' : 'Cancel this order and automatically restore product stock'}
                                       >
-                                        <Ban className="w-3 h-3" /> Cancel
+                                        <Ban className="w-3 h-3" /> {o.status === 'Pending Confirmation' ? 'Dismiss' : 'Cancel'}
                                       </button>
                                     )}
                                   </div>
@@ -8210,11 +8594,11 @@ const renderPopups = () => (
                             <div className="flex items-center justify-between mt-1 gap-2 flex-wrap">
                               <div>
                                 <div className="flex items-baseline gap-1.5 flex-wrap">
-                                  <span className={`text-[11px] font-black ${effectiveDiscountPercent > 0 ? 'text-slate-400 line-through' : 'text-[#EE4D2D]'}`}>
+                                  <span className={`text-[11px] font-black tabular-nums ${effectiveDiscountPercent > 0 ? 'text-slate-400 line-through' : 'text-[#EE4D2D]'}`}>
                                     ₱{Number(item.price).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </span>
                                   {effectiveDiscountPercent > 0 && (
-                                    <span className="text-[11px] font-black text-emerald-600 flex items-center gap-1">
+                                    <span className="text-[11px] font-black text-emerald-600 flex items-center gap-1 tabular-nums">
                                       <span>(₱{(Math.round(Number(item.price) * (1 - effectiveDiscountPercent / 100) * 100) / 100).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</span>
                                       <span className="text-[8.5px] font-bold bg-emerald-100 text-emerald-800 px-1 py-0.2 rounded border border-emerald-300">
                                         {Math.round(effectiveDiscountPercent)}% OFF
@@ -8224,36 +8608,38 @@ const renderPopups = () => (
                                   <span className="text-[9px] text-slate-400 font-normal"> / {item.unit || 'pc'}</span>
                                 </div>
                                 {effectiveDiscountPercent > 0 && item.quantity > 1 && (
-                                  <p className="text-[9.5px] text-slate-500 mt-0.5">
+                                  <p className="text-[9.5px] text-slate-500 mt-0.5 tabular-nums">
                                     Line Total: <span className="line-through text-slate-400">₱{(Number(item.price) * item.quantity).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>{' '}
                                     <strong className="text-emerald-600 font-black">₱{(Math.round(Number(item.price) * item.quantity * (1 - effectiveDiscountPercent / 100) * 100) / 100).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
                                   </p>
                                 )}
                               </div>
 
-                              {/* Adjustable Quantity Stepper */}
-                              <div className="flex items-center border border-slate-300 rounded overflow-hidden">
+                              {/* Adjustable Quantity Stepper with Polish & 32x32px hit areas */}
+                              <div className="flex items-center border border-slate-300 rounded-lg overflow-hidden bg-white shadow-2xs">
                                 <button
                                   type="button"
                                   onClick={() => updateCartQty(item.id, -1)}
-                                  className="px-2 py-0.5 text-slate-700 hover:bg-slate-100 font-bold text-xs select-none cursor-pointer"
+                                  className="w-8 h-8 flex items-center justify-center text-slate-700 hover:bg-slate-100 active:scale-90 transition-transform font-bold text-sm select-none cursor-pointer"
                                   title="Decrease quantity"
+                                  aria-label="Decrease quantity"
                                 >
                                   -
                                 </button>
-                                <span className="px-2 py-0.5 text-xs font-black text-slate-900 bg-slate-50 border-x border-slate-300 min-w-7 text-center">
+                                <span className="h-8 px-2.5 flex items-center justify-center text-xs font-black text-slate-900 bg-slate-50 border-x border-slate-300 min-w-8 text-center tabular-nums">
                                   {item.quantity}
                                 </span>
                                 <button
                                   type="button"
                                   onClick={() => updateCartQty(item.id, 1)}
                                   disabled={item.quantity >= (item.stock || 0)}
-                                  className={`px-2 py-0.5 font-bold text-xs select-none ${
+                                  className={`w-8 h-8 flex items-center justify-center font-bold text-sm select-none active:scale-90 transition-transform ${
                                     item.quantity >= (item.stock || 0)
                                       ? 'text-slate-300 bg-slate-100 cursor-not-allowed'
                                       : 'text-slate-700 hover:bg-slate-100 cursor-pointer'
                                   }`}
                                   title={item.quantity >= (item.stock || 0) ? `Max stock (${item.stock}) reached` : 'Increase quantity'}
+                                  aria-label="Increase quantity"
                                 >
                                   +
                                 </button>
@@ -8262,10 +8648,11 @@ const renderPopups = () => (
                               <button
                                 type="button"
                                 onClick={() => removeFromCart(item.id)}
-                                className="text-slate-400 hover:text-rose-600 p-1 cursor-pointer"
+                                className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 active:scale-90 transition-all cursor-pointer"
                                 title="Remove item"
+                                aria-label="Remove item from order"
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                <Trash2 className="w-4 h-4" />
                               </button>
                             </div>
                           </div>
@@ -8510,20 +8897,13 @@ const renderPopups = () => (
                       'Confirm & Place Order'
                     )}
                   </button>
-                  <a
-                    href={`https://m.me/mannaHardwareTAC?text=${encodeURIComponent(
-                      `Hello MY Hardware Tacloban! I would like to place an order from checkout:\n\n${cart.map(i => {
-                        const discPrice = effectiveDiscountPercent > 0 ? (i.price * (1 - effectiveDiscountPercent / 100)) : i.price;
-                        const lineTotal = discPrice * i.quantity;
-                        return `• ${i.name} (${i.quantity} ${i.unit || 'pc'}) - ₱${lineTotal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${effectiveDiscountPercent > 0 ? `[Unit: ₱${i.price} -> (₱${discPrice.toFixed(2)}) • ${Math.round(effectiveDiscountPercent)}% OFF]` : `[@ ₱${i.price}]`} [${i.warehouse_code === 'NT' ? 'Nula Tula (NT)' : 'Cabalwan (CAB)'} • Box #${i.box_no || '1'} ${i.quote_no ? `• ${i.quote_no}` : ''}]`;
-                      }).join('\n')}\n\nSubtotal: ₱${cartSubtotal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${activeVolumeTier ? `\nAuto Volume Tier: ${activeVolumeTier.label} (-₱${discountAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` : (discountAmount > 0 ? `\nVoucher Discount: -₱${discountAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '')}\nEstimated Total: ₱${orderTotal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\nReceiver: ${customer.fullName || 'Pickup Customer'}\nPhone: ${customer.phone || 'N/A'}\nFulfillment: Warehouse Pickup (Tacloban Hub - Cabalwan/Nula Tula)`
-                    )}`}
-                    target="_blank"
-                    rel="noreferrer"
+                  <button
+                    type="button"
+                    onClick={handleSendOrderToMessenger}
                     className="w-full mt-2.5 py-3 rounded-lg font-bold text-xs bg-[#0084FF] hover:bg-[#0072de] text-white flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer"
                   >
                     <MessageCircle className="w-4 h-4 fill-current" /> Order via Messenger (Instant Dispatch)
-                  </a>
+                  </button>
                 </form>
               </div>
             )}
@@ -8819,25 +9199,32 @@ const renderPopups = () => (
                         );
                       })()}
                       <div className="flex items-center justify-between mt-2">
-                        <div className="flex items-center border border-slate-300 bg-white rounded text-xs shadow-2xs">
-                          <button onClick={() => updateCartQty(item.id, -1)} className="px-2.5 py-1 text-slate-600 hover:bg-slate-100 cursor-pointer font-bold select-none">-</button>
+                        <div className="flex items-center border border-slate-300 bg-white rounded-lg text-xs shadow-2xs overflow-hidden">
+                          <button 
+                            onClick={() => updateCartQty(item.id, -1)} 
+                            className="w-8 h-8 flex items-center justify-center text-slate-700 hover:bg-slate-100 active:bg-slate-200 active:scale-90 transition-all cursor-pointer font-bold select-none text-sm"
+                            aria-label="Decrease quantity"
+                          >
+                            -
+                          </button>
                           <input
                             type="number"
                             min="1"
                             max={item.stock || 1}
                             value={item.quantity}
                             onChange={(e) => setCartItemQty(item.id, e.target.value)}
-                            className="w-14 text-center font-black text-xs py-1 border-x border-slate-200 focus:outline-none focus:bg-orange-50 text-slate-900"
+                            className="w-12 h-8 text-center font-black text-xs border-x border-slate-200 focus:outline-none focus:bg-orange-50 text-slate-900 tabular-nums"
                           />
                           <button 
                             onClick={() => updateCartQty(item.id, 1)} 
                             disabled={item.quantity >= (item.stock || 0)}
-                            className={`px-2.5 py-1 font-bold select-none ${
+                            className={`w-8 h-8 flex items-center justify-center font-bold text-sm select-none transition-all ${
                               item.quantity >= (item.stock || 0)
                                 ? 'text-slate-300 bg-slate-50 cursor-not-allowed'
-                                : 'text-slate-600 hover:bg-slate-100 cursor-pointer'
+                                : 'text-slate-700 hover:bg-slate-100 active:bg-slate-200 active:scale-90 cursor-pointer'
                             }`}
                             title={item.quantity >= (item.stock || 0) ? `Max stock (${item.stock}) reached` : 'Add 1'}
+                            aria-label="Increase quantity"
                           >
                             +
                           </button>
@@ -8848,7 +9235,12 @@ const renderPopups = () => (
                               Max Stock ({item.stock})
                             </span>
                           )}
-                          <button onClick={() => removeFromCart(item.id)} className="text-slate-400 hover:text-rose-600 cursor-pointer p-1">
+                          <button 
+                            onClick={() => removeFromCart(item.id)} 
+                            className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 active:scale-90 rounded-lg transition-all cursor-pointer"
+                            title="Remove item"
+                            aria-label="Remove item"
+                          >
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
@@ -9005,21 +9397,13 @@ const renderPopups = () => (
                 >
                   Proceed to Checkout {orderTotal > 0 ? `(₱${orderTotal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` : ''} {!currentUser ? '• Log In Required' : ''}
                 </button>
-                <a
-                  href={`https://m.me/mannaHardwareTAC?text=${encodeURIComponent(
-                    `Hello MY Hardware Tacloban! I would like to place an order from my cart:\n\n${cart.map(i => {
-                      const itemDisc = Math.max(Number(i.discount_percent || 0), effectiveDiscountPercent);
-                      const discPrice = itemDisc > 0 ? (i.price * (1 - itemDisc / 100)) : i.price;
-                      const lineTotal = discPrice * i.quantity;
-                      return `• ${i.name} (${i.quantity} ${i.unit || 'pc'}) - ₱${lineTotal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${itemDisc > 0 ? `[Unit: ₱${i.price} -> ₱${discPrice.toFixed(2)} • ${Math.round(itemDisc)}% OFF]` : `[@ ₱${i.price}]`} [${i.warehouse_code === 'NT' ? 'Nula Tula (NT)' : 'Cabalwan (CAB)'} • Box #${i.box_no || '1'} ${i.quote_no ? `• ${i.quote_no}` : ''}]`;
-                    }).join('\n')}\n\nSubtotal: ₱${cartSubtotal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${discountAmount > 0 ? `\nVoucher Discount: -₱${discountAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}\nEstimated Total: ₱${orderTotal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\nFulfillment: Warehouse Pickup (Tacloban Hub - Cabalwan/Nula Tula)`
-                  )}`}
-                  target="_blank"
-                  rel="noreferrer"
+                <button
+                  type="button"
+                  onClick={handleSendOrderToMessenger}
                   className="w-full mt-2 py-2.5 rounded-lg font-bold text-xs bg-[#0084FF] hover:bg-[#0072de] text-white flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer"
                 >
                   <MessageCircle className="w-4 h-4 fill-current" /> Send Order to Messenger
-                </a>
+                </button>
               </div>
             )}
           </div>
@@ -9835,10 +10219,11 @@ const renderPopups = () => (
                       {filteredLotItems.map((item) => {
                         const isItemCancelled = Boolean(item.isCancelled || item.status === 'cancelled');
                         const inCartQty = cart.find(c => c.id === item.id)?.quantity || 0;
-                        const stock = Math.max(0, (Number(item.stock) || 0) - inCartQty);
+                        const physicalStock = Math.max(0, Number(item.stock) || 0);
+                        const isMax = inCartQty >= physicalStock && physicalStock > 0;
                         const price = Number(item.price) || 0;
                         const wholesale = Math.round(price * 0.60 * 100) / 100;
-                        const lineVal = price * stock;
+                        const lineVal = price * physicalStock;
                         return (
                           <tr key={item.id} className={`transition-colors ${isItemCancelled ? 'bg-rose-50/40 text-slate-400' : 'hover:bg-amber-50/40'}`}>
                             {/* SKU: light gray monospace font */}
@@ -9878,10 +10263,12 @@ const renderPopups = () => (
                                 </div>
                               ) : (
                                 <div className="font-bold text-slate-900">
-                                  {stock} <span className="text-[10px] font-normal text-slate-500">{item.unit || 'pc'}</span>
-                                  {inCartQty > 0 && (
+                                  {physicalStock} <span className="text-[10px] font-normal text-slate-500">{item.unit || 'pc'}</span>
+                                  {isMax ? (
+                                    <span className="block text-[9px] font-black text-blue-700 bg-blue-50 px-1 rounded">Max in Cart ({inCartQty})</span>
+                                  ) : inCartQty > 0 ? (
                                     <span className="block text-[9px] font-black text-blue-700">({inCartQty} in Cart)</span>
-                                  )}
+                                  ) : null}
                                 </div>
                               )}
                             </td>
@@ -10481,17 +10868,17 @@ function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = f
   const packTotalPrice = effectivePrice * effectivePackQty;
 
   return (
-    <div className="bg-white rounded-sm overflow-hidden border border-[#EAEAEA] flex flex-col group relative shadow-2xs hover:shadow-md transition-shadow">
+    <div className="bg-white rounded-xl overflow-hidden border border-slate-200/90 flex flex-col group relative shadow-2xs hover:shadow-md hover:border-slate-300 transition-all duration-200">
       
       {/* Product Image Box */}
-      <div className="relative aspect-square bg-[#F7F7F7] overflow-hidden select-none" onContextMenu={(e) => e.preventDefault()}>
+      <div className="relative aspect-square bg-[#F7F7F7] overflow-hidden select-none rounded-t-[11px]" onContextMenu={(e) => e.preventDefault()}>
         <img
           src={product.image}
           alt={product.name}
           loading="lazy"
           draggable={false}
           onContextMenu={(e) => e.preventDefault()}
-          className={`w-full h-full object-cover group-hover:scale-102 transition-transform duration-300 select-none pointer-events-auto ${isOutOfStock ? 'grayscale opacity-60' : ''}`}
+          className={`w-full h-full object-cover group-hover:scale-103 transition-transform duration-300 select-none pointer-events-auto ${isOutOfStock ? 'grayscale opacity-60' : ''}`}
           onError={(e) => {
             e.target.onerror = null;
             e.target.src = "https://images.pexels.com/photos/175039/pexels-photo-175039.jpeg?auto=compress&cs=tinysrgb&h=650&w=940";
@@ -10500,26 +10887,26 @@ function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = f
 
         {/* Prominent Per-Item Discount Banner on top right */}
         {maxDiscount > 0 && !isOutOfStock && (
-          <div className="absolute top-1.5 right-1.5 bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded shadow-md z-10 flex items-center gap-0.5">
+          <div className="absolute top-1.5 right-1.5 bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded-md shadow-md z-10 flex items-center gap-0.5">
             <span>{maxDiscount}% OFF</span>
           </div>
         )}
 
         {/* Wholesale Pack Badge vs Retail vs Stock Status */}
         {isOutOfStock ? (
-          <div className="absolute top-1.5 left-1.5 bg-rose-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-xs flex items-center gap-1 z-10">
+          <div className="absolute top-1.5 left-1.5 bg-rose-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded-md shadow-xs flex items-center gap-1 z-10">
             <span>✕</span> OUT OF STOCK
           </div>
         ) : isMaxStockReached ? (
-          <div className="absolute top-1.5 left-1.5 bg-amber-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-xs flex items-center gap-1 z-10">
-            <span>✓</span> ALL IN CART ({currentInCart})
+          <div className="absolute top-1.5 left-1.5 bg-blue-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded-md shadow-xs flex items-center gap-1 z-10">
+            <span>✓</span> MAX IN CART ({currentInCart})
           </div>
         ) : isRetailMode ? (
-          <div className="absolute top-1.5 left-1.5 bg-emerald-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-xs flex items-center gap-1">
+          <div className="absolute top-1.5 left-1.5 bg-emerald-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded-md shadow-xs flex items-center gap-1">
             <span>RETAIL (PER PC)</span>
           </div>
         ) : (
-          <div className="absolute top-1.5 left-1.5 bg-slate-900 text-amber-400 border border-amber-400/40 text-[8px] font-black px-1.5 py-0.5 rounded shadow-xs flex items-center gap-1">
+          <div className="absolute top-1.5 left-1.5 bg-slate-900 text-amber-400 border border-amber-400/40 text-[8px] font-black px-1.5 py-0.5 rounded-md shadow-xs flex items-center gap-1">
             <Box className="w-2.5 h-2.5 text-amber-400 shrink-0" />
             <span>{pack.packLabel.toUpperCase()}</span>
           </div>
@@ -10549,19 +10936,19 @@ function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = f
         <div>
           {/* LIVE Red Pill */}
           {Boolean(product.featured) && (
-            <span className="bg-[#EE4D2D] text-white text-[8px] font-black px-1 py-0.2 rounded-xs mr-1 uppercase">
+            <span className="bg-[#EE4D2D] text-white text-[8px] font-black px-1.5 py-0.5 rounded-md mr-1 uppercase">
               LIVE
             </span>
           )}
 
           {/* Title - Clean 2-line clamp */}
-          <h3 className="text-xs text-[#222222] font-normal leading-[1.3] line-clamp-2">
+          <h3 className="text-xs text-[#222222] font-semibold leading-[1.35] line-clamp-2">
             {product.name}
           </h3>
 
           {/* Warehouse Depot & Box Tracing Badge */}
-          <div className="flex items-center gap-1.5 my-1 flex-wrap">
-            <span className={`inline-flex items-center gap-0.5 font-bold text-[8px] px-1.5 py-0.5 rounded border ${
+          <div className="flex items-center gap-1.5 my-1.5 flex-wrap">
+            <span className={`inline-flex items-center gap-0.5 font-bold text-[8px] px-1.5 py-0.5 rounded-md border ${
               product.warehouse_code === 'NT'
                 ? 'bg-purple-50 text-purple-800 border-purple-200'
                 : 'bg-blue-50 text-blue-800 border-blue-200'
@@ -10569,48 +10956,48 @@ function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = f
               <MapPin className="w-2.5 h-2.5 shrink-0" />
               <span>{product.warehouse_code === 'NT' ? 'Nula Tula (NT)' : 'Cabalwan (CAB)'}</span>
             </span>
-            <span className="font-mono text-[8px] font-bold text-slate-700 bg-slate-100 px-1 py-0.5 rounded border border-slate-200">
+            <span className="font-mono text-[8px] font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-200">
               Box #{product.box_no || '1'} {product.quote_no ? `• ${product.quote_no}` : ''}
             </span>
           </div>
 
           {/* MY Hardware Badges */}
-          <div className="flex flex-wrap items-center gap-1 mt-1.5">
-            <span className="border border-emerald-600 text-emerald-700 text-[8px] font-bold px-1 rounded-xs leading-none py-0.5 bg-emerald-50">
+          <div className="flex flex-wrap items-center gap-1 mt-1">
+            <span className="border border-emerald-600/60 text-emerald-700 text-[8px] font-bold px-1.5 rounded-md leading-none py-0.5 bg-emerald-50">
               Tacloban Stock
             </span>
             {isOutOfStock ? (
-              <span className="bg-rose-100 text-rose-700 text-[8px] font-black px-1.5 rounded-xs leading-none py-0.5 border border-rose-300">
+              <span className="bg-rose-100 text-rose-700 text-[8px] font-black px-1.5 rounded-md leading-none py-0.5 border border-rose-300">
                 0 In Stock
               </span>
-            ) : isMaxStockReached ? (
-              <span className="bg-amber-100 text-amber-800 text-[8px] font-black px-1.5 rounded-xs leading-none py-0.5 border border-amber-300">
-                0 Left in Stock
-              </span>
-            ) : remainingStock <= 5 ? (
-              <span className="bg-amber-100 text-amber-800 text-[8px] font-black px-1.5 rounded-xs leading-none py-0.5 border border-amber-300 animate-pulse">
-                Only {remainingStock} Left
+            ) : maxStock <= 5 ? (
+              <span className="bg-amber-100 text-amber-800 text-[8px] font-black px-1.5 rounded-md leading-none py-0.5 border border-amber-300 animate-pulse">
+                Only {maxStock} Left
               </span>
             ) : (
-              <span className="text-[8px] text-slate-500 font-semibold leading-none py-0.5">
-                {remainingStock} in stock
+              <span className="text-[8px] text-slate-500 font-semibold leading-none py-0.5 tabular-nums">
+                {maxStock} in stock
               </span>
             )}
-            {currentInCart > 0 && !isOutOfStock && (
-              <span className="bg-blue-100 text-blue-800 text-[8px] font-black px-1.5 rounded-xs leading-none py-0.5 border border-blue-300">
+            {isMaxStockReached ? (
+              <span className="bg-blue-100 text-blue-800 text-[8px] font-black px-1.5 rounded-md leading-none py-0.5 border border-blue-300 tabular-nums">
+                Max in Cart ({currentInCart})
+              </span>
+            ) : currentInCart > 0 && (
+              <span className="bg-blue-100 text-blue-800 text-[8px] font-black px-1.5 rounded-md leading-none py-0.5 border border-blue-300 tabular-nums">
                 {currentInCart} in Cart
               </span>
             )}
             {isLongCargoItem(product) && (
-              <span className="bg-amber-600 text-white text-[8px] font-bold px-1 rounded-xs leading-none py-0.5 flex items-center gap-0.5">
+              <span className="bg-amber-600 text-white text-[8px] font-bold px-1.5 rounded-md leading-none py-0.5 flex items-center gap-0.5">
                 <Warehouse className="w-2.5 h-2.5" /> Self-Haul Priority
               </span>
             )}
-            <span className="bg-[#EE4D2D] text-white text-[8px] font-bold px-1 rounded-xs leading-none py-0.5">
+            <span className="bg-[#EE4D2D] text-white text-[8px] font-bold px-1.5 rounded-md leading-none py-0.5">
               Wholesale Deal
             </span>
             {maxDiscount > 0 && (
-              <span className="bg-red-600 text-white text-[9px] font-black px-1.5 rounded-xs leading-tight py-0.5 tracking-tight shadow-xs flex items-center gap-0.5 animate-pulse">
+              <span className="bg-red-600 text-white text-[9px] font-black px-1.5 rounded-md leading-tight py-0.5 tracking-tight shadow-xs flex items-center gap-0.5">
                 <span>{maxDiscount}% OFF</span>
               </span>
             )}
@@ -10618,24 +11005,24 @@ function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = f
         </div>
 
         {/* Price & Sold Section */}
-        <div className="mt-2">
+        <div className="mt-2.5">
           <div className="flex items-baseline justify-between">
-            <span className="text-[#EE4D2D] font-extrabold text-sm sm:text-base leading-none tracking-tight select-none">
+            <span className="text-[#EE4D2D] font-extrabold text-sm sm:text-base leading-none tracking-tight select-none tabular-nums">
               ₱{Math.floor(isRetailMode ? effectivePrice : packTotalPrice).toLocaleString()}
             </span>
-            <span className="text-[10px] text-[#757575] font-normal">
+            <span className="text-[10px] text-[#757575] font-normal tabular-nums">
               {soldCount} sold
             </span>
           </div>
 
           {!isRetailMode && pack.minQty > 1 && (
-            <p className="text-[8.5px] text-slate-500 font-medium mt-0.5 truncate">
+            <p className="text-[8.5px] text-slate-500 font-medium mt-0.5 truncate tabular-nums">
               ₱{Math.floor(effectivePrice).toLocaleString()}/{product.unit || 'pc'} &bull; Min: {pack.packLabel}
             </p>
           )}
 
           {/* Delivery estimate & Location */}
-          <div className="flex items-center justify-between mt-1.5 text-[9px] text-[#757575] border-t border-slate-50 pt-1">
+          <div className="flex items-center justify-between mt-2 text-[9px] text-[#757575] border-t border-slate-100 pt-1.5">
             <span className="flex items-center gap-0.5 text-[#00BFA5] font-semibold">
               <Truck className="w-2.5 h-2.5" /> {days}
             </span>
@@ -10643,12 +11030,12 @@ function ProductCard({ product, onAddToCart, isRightCol = false, isVideoCard = f
             <button 
               onClick={() => onAddToCart(product, isRetailMode ? 1 : Math.min(pack.minQty, remainingStock))}
               disabled={isOutOfStock || isMaxStockReached}
-              className={`px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-0.5 shadow-xs transition-colors ${
+              className={`h-7 px-2.5 rounded-lg text-[10px] font-bold flex items-center gap-1 shadow-xs transition-transform duration-100 active:scale-95 cursor-pointer ${
                 isOutOfStock 
                   ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300'
                   : isMaxStockReached
-                  ? 'bg-amber-100 text-amber-800 border border-amber-300 cursor-not-allowed'
-                  : 'text-white bg-[#EE4D2D] hover:bg-[#d73f20] cursor-pointer'
+                  ? 'bg-blue-100 text-blue-800 border border-blue-300 cursor-not-allowed'
+                  : 'text-white bg-[#EE4D2D] hover:bg-[#d73f20]'
               }`}
               title={
                 isOutOfStock 
